@@ -4,11 +4,22 @@
   "description": "DSH native browser tools (browser_*) backed by a zero-dependency CDP core driving a dedicated, logged-in Chrome.",
   "type": "module",
   "license": "MIT",
+  "author": "Xumi0920",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Xumi0920/dsh-browser-harness.git"
+  },
+  "homepage": "https://github.com/Xumi0920/dsh-browser-harness#readme",
+  "bugs": {
+    "url": "https://github.com/Xumi0920/dsh-browser-harness/issues"
+  },
   "main": "./lib/index.js",
   "exports": {
     ".": "./lib/index.js",
     "./package.json": "./package.json",
-    "./core": "./src/index.mjs"
+    "./core": "./src/index.mjs",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
   },
   "bin": {
     "bh": "./bin/bh.mjs"

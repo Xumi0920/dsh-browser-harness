@@ -7,25 +7,28 @@
   ```powershell
   Invoke-RestMethod 'http://127.0.0.1:9331/json/version' | ConvertTo-Json -Compress
   ```
-  本机 `~/.dsh/browser-cdp` 自带 9331/9333 两个专用实例（见其 README）。
+  默认约定 9331（`chrome`）/ 9333（`chrome-beta`）两个专用实例端口；插件默认通过 `~/.dsh/browser-cdp/registry.json` 自动发现，可用 config 覆盖。
 
 ## 1. 本地自测（不需要 DSH）
 
 ```powershell
-cd G:\DSH\吃吃喝喝\dsh-browser-harness
+git clone https://github.com/Xumi0920/dsh-browser-harness.git
+cd C:\path\to\dsh-browser-harness
+
 node --test "tests/unit/**/*.test.mjs"        # 单测
 node --test "tests/integration/**/*.test.mjs" # 14 场景（临时 headless Chrome）
-node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟
+npm run test:all                              # 单测 + 场景（共 51 条）
+node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟（需源码 checkout）
 ```
 
 ## 2. 安装插件
 
 ### 2a. 创造模式 / 插件管理器（推荐）
 
-在 Creator（创造模式）空会话里让模型执行：
+在 Creator（创造模式）空会话里让模型执行（把路径换成本机 checkout 路径）：
 
 ```
-plugin_manager { action: "install_bundle", target: "G:\\DSH\\吃吃喝喝\\dsh-browser-harness" }
+plugin_manager { action: "install_bundle", target: "C:\\path\\to\\dsh-browser-harness" }
 ```
 
 返回 `application: "applied"` 即已激活；出现 `nextStep` / `restart-required` 按提示重启 DSH。
@@ -34,7 +37,7 @@ plugin_manager { action: "install_bundle", target: "G:\\DSH\\吃吃喝喝\\dsh-b
 
 ```powershell
 $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd"
-& $DSH plugin --profile desktop add "G:\DSH\吃吃喝喝\dsh-browser-harness"
+& $DSH plugin --profile desktop add "C:\path\to\dsh-browser-harness"
 # 然后重启 DeepSeek Harness
 ```
 

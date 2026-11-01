@@ -14,10 +14,10 @@ browser_tabs        list / use / new / close
 
 ## Why not just Playwright?
 
-- **Zero dependencies.** Node 22+ built-ins only (`fetch`, `WebSocket`, `node:test`). No browser download, no build step.
+- **Zero dependencies.** Node 22+ built-ins only (`fetch`, `WebSocket`, `node:test`). No browser download, no build step. The DSH plugin entry imports the host-provided `@deepseek-ai/dsh-tools` peer — nothing else.
 - **Your logged-in Chrome.** Point it at a dedicated instance (e.g. `--remote-debugging-port=9331 --user-data-dir=...`) that the user signed in once.
 - **Text-first.** Accessibility-tree snapshots and refs beat screenshot-VLM loops for actions; screenshots stay optional.
-- **Scene-tested.** 30 unit tests + 14 end-to-end scenarios (login, async render, tabs, iframe, shadow DOM, download, upload, dialogs, validation, timeout, stale-tab recovery, screenshots, network capture, cookies) run against a real headless Chrome and a local fixture site.
+- **Scene-tested.** 37 unit tests + 14 end-to-end scenarios (51 total: login, async render, tabs, iframe, shadow DOM, download, upload, dialogs, validation, timeout, stale-tab recovery, screenshots, network capture, cookies) run against a real headless Chrome and a local fixture site.
 
 ## Install (DSH 0.2.1-rc.5)
 
@@ -72,9 +72,12 @@ node bin/bh.mjs snapshot
 
 ## Test
 
+Run from a source checkout (npm-packed installs ship the runtime only):
+
 ```sh
 npm test                    # unit: CDP protocol, endpoint, state, AX, tools (no browser)
 npm run test:integration    # 14 scenarios on a throwaway headless Chrome
+npm run test:all            # unit + integration (51 tests)
 node scripts/verify.mjs     # smoke against a live dedicated Chrome
 ```
 
@@ -82,13 +85,14 @@ Integration tests launch their own Chrome with a temporary profile and never tou
 
 ## Safety
 
-- Only tabs this harness creates are closed; user tabs are never modified.
-- Cookie values are redacted by default; no secrets are logged.
+- Only tabs this harness creates are closed; `browser_tabs` never closes user tabs.
+- The cookies API redacts values by default; the harness does not log secrets.
+- `browser_extract` modes `network` and `js` return exactly what the page exposes when explicitly asked (response headers may contain `Set-Cookie`); `browser_tabs {action:"use"}` can attach the session to an existing tab, after which `browser_act` operates on it. Use these intentionally, and never point `cdpUrl` at a daily-driver Chrome.
 - Background operations only — no `Page.bringToFront` unless explicitly requested.
 - Login walls stop the workflow and ask the user.
 
 ## Status
 
-v0.1.0 — first native-plugin release. Downloads/uploads/cookies exist in the core library but are intentionally not exposed as tools yet.
+v0.1.0 — first native-plugin release, pinned to DSH `0.2.1-rc.5` through `engines.dsh`. Downloads/uploads/cookies exist in the core library but are intentionally not exposed as tools yet.
 
 MIT (c) 2026 Xumi0920
