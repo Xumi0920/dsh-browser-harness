@@ -1,31 +1,12 @@
-# 安装与验证（Windows / Linux / DSH 0.2.1-rc.5）
+# 安装与验证
 
 ## 0. 前置
 
-- Node >= 22（DSH 内嵌 Node 已满足）。
-- 一个**专用** Chromium 内核浏览器实例已开启 remote debugging（不要用日常浏览器主 profile）。支持 Chrome / Chromium / Edge / Brave / Vivaldi / Opera / Arc 等任何 Chromium 内核：
-  ```powershell
-  Invoke-RestMethod 'http://127.0.0.1:9331/json/version' | ConvertTo-Json -Compress
-  ```
-  默认 registry 端口（本项目约定）：`chrome` = 9331、`edge` = 9332、`chrome-beta` = 9333、`chromium` = 9334、`brave` = 9335、`vivaldi` = 9336、`opera` = 9337、`arc` = 9338；未指定 `browser` 时会自动回退探测 9222/9223。插件默认通过 `~/.dsh/browser-cdp/registry.json` 自动发现，可用 config 覆盖；registry 条目也支持 `httpUrl`（任意 CDP 地址）。
-- 启动示例（任选本机已安装的浏览器）：
-  ```powershell
-  chrome.exe --remote-debugging-port=9331 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\chrome"
-  msedge.exe --remote-debugging-port=9332 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\edge"
-  brave.exe  --remote-debugging-port=9335 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\brave"
-  ```
-  Linux / macOS 等价命令：
-  ```bash
-  google-chrome --remote-debugging-port=9331 --user-data-dir="$HOME/.dsh/browser-cdp/profiles/chrome"
-  chromium      --remote-debugging-port=9334 --user-data-dir="$HOME/.dsh/browser-cdp/profiles/chromium"
-  microsoft-edge --remote-debugging-port=9332 --user-data-dir="$HOME/.dsh/browser-cdp/profiles/edge"
-  ```
-- 平台：Windows 与 Linux 已验证（Linux CI 用 xvfb 跑 headful 标签组场景）；macOS 未实测。
-- 标签组：默认给插件自建的标签页按任务分组（需要带界面的浏览器；headless 下自动跳过）。首次使用会把随包 MV3 扩展装进专用浏览器 profile；可在配置里用 `tabGroups: false` 关闭。
+- DSH `0.2.1-rc.5`、Node.js >= 22（DSH 内嵌 Node 已满足）。
+- 一个已开启 remote debugging 的**专用** Chromium 内核浏览器。启动方法、端口约定与 registry 配置见 [configuration.md](configuration.md)。
+- 平台：Windows 与 Linux 已验证（Linux CI 用 xvfb 覆盖 headful 标签组）；macOS 未实测。
 
 ## 1. 本地自测（不需要 DSH）
-
-示例路径 `C:\path\to\dsh-browser-harness` 是占位符，请换成本机 clone 的绝对路径。
 
 ```powershell
 git clone https://github.com/Xumi0920/dsh-browser-harness.git C:\path\to\dsh-browser-harness
@@ -34,57 +15,37 @@ cd C:\path\to\dsh-browser-harness
 node --test "tests/unit/**/*.test.mjs"        # 单测
 node --test "tests/integration/**/*.test.mjs" # 27 场景（含标签组 headful 场景）
 npm run test:all                              # 单测 + 场景（共 117 条）
-node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟（需源码 checkout；也可用 edge/brave 等）
+node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟
 ```
 
 ## 2. 安装插件
 
-> 插件已发布到 **GitHub Packages**（`@xumi0920/dsh-browser-harness`），也可从本地 clone 目录安装；npmjs.org 上的 `dsh-browser-harness` 是别的项目。
+插件发布在 **GitHub Packages**：`@xumi0920/dsh-browser-harness`；npmjs.org 上的 `dsh-browser-harness` 是别的项目。任选一种方式：
 
-### 2c. 从 GitHub Packages 安装（需要带 read:packages 的 GitHub token）
+### 2a. GitHub Packages（需要带 read:packages 的 GitHub token）
 
 ```powershell
 npm config set @xumi0920:registry https://npm.pkg.github.com
 npm config set //npm.pkg.github.com/:_authToken "<YOUR_GITHUB_TOKEN>"
-# 然后与 2a/2b 二选一，target 换成包名：
-#   plugin_manager { action: "install_bundle", target: "@xumi0920/dsh-browser-harness" }
-$DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd"
-& $DSH plugin --profile desktop add "@xumi0920/dsh-browser-harness"
+# 创造模式 / 插件管理器：plugin_manager { action: "install_bundle", target: "@xumi0920/dsh-browser-harness" }
+# 或 CLI（装完重启 DSH）：
+& "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" `
+  plugin --profile desktop add "@xumi0920/dsh-browser-harness"
 ```
 
-### 2d. Linux / macOS
+一键脚本（从仓库获取，读取 `GITHUB_TOKEN`）：[install-github-packages.ps1](../scripts/install-github-packages.ps1)（Windows）、[install-github-packages.sh](../scripts/install-github-packages.sh)（Linux / macOS）。
 
-```bash
-# 0) 配置 GitHub Packages（GITHUB_TOKEN 需要 read:packages）
-npm config set @xumi0920:registry https://npm.pkg.github.com
-npm config set //npm.pkg.github.com/:_authToken "$GITHUB_TOKEN"
+### 2b. 本地 clone 目录（推荐开发/自用）
 
-# 1) 安装（dsh 在 PATH 中；否则传 CLI 绝对路径）
-dsh plugin --profile desktop add "@xumi0920/dsh-browser-harness"
-# 或一键脚本（仓库内）：
-GITHUB_TOKEN="$GITHUB_TOKEN" ./scripts/install-github-packages.sh desktop
-
-# 2) 启动专用浏览器（示例）
-google-chrome --remote-debugging-port=9331 --user-data-dir="$HOME/.dsh/browser-cdp/profiles/chrome" &
-```
-
-Windows 一键脚本：`scripts\install-github-packages.ps1`（读取 `$env:GITHUB_TOKEN`）。
-
-> 标签组需要带界面的浏览器：纯 headless（无 `DISPLAY`）会自动跳过；CI 用 `xvfb-run` 跑 headful 场景。配置用 `tabGroups: false` 可关闭。
-
-### 2a. 创造模式 / 插件管理器（推荐，本地目录）
-
-在 Creator（创造模式）空会话里让模型执行（把 target 换成本机 clone 的绝对路径）：
+在 Creator（创造模式）空会话里让模型执行（路径换成你本机 clone 的绝对路径；JSON 里的反斜杠要写两份）：
 
 ```
 plugin_manager { action: "install_bundle", target: "C:\\path\\to\\dsh-browser-harness" }
 ```
 
-上面是 JSON 转义写法，`target` 里的反斜杠要写成两份；实际路径是 `C:\path\to\dsh-browser-harness`，请换成本机 clone 的绝对路径。`plugin_manager` 的每次操作需要 danger-full-access 沙箱或当次批准。
+`plugin_manager` 每次操作需要 danger-full-access 沙箱或当次批准；返回 `application: "applied"` 即已激活，遇到 `nextStep` / `restart-required` 按提示重启。
 
-返回 `application: "applied"` 即已激活；出现 `nextStep` / `restart-required` 按提示重启 DSH。
-
-### 2b. CLI（装完重启 GUI）
+### 2c. CLI 安装本地目录
 
 ```powershell
 $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd"
@@ -92,13 +53,22 @@ $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\ds
 # 然后重启 DeepSeek Harness
 ```
 
+### 2d. Linux / macOS
+
+```bash
+npm config set @xumi0920:registry https://npm.pkg.github.com
+npm config set //npm.pkg.github.com/:_authToken "$GITHUB_TOKEN"
+dsh plugin --profile desktop add "@xumi0920/dsh-browser-harness"   # 或传 CLI 绝对路径
+# 或一键脚本：GITHUB_TOKEN="$GITHUB_TOKEN" ./scripts/install-github-packages.sh desktop
+```
+
 ## 3. 验证（由弱到强）
 
 1. `plugin_manager { action: "list_plugins" }` → `@xumi0920/dsh-browser-harness` 存在且 enabled。
-2. 确认 `~/.dsh/profiles/desktop/package.json` 的 `dependencies` 有 `@xumi0920/dsh-browser-harness`、`dsh.profile.bundles` 含 `@xumi0920/dsh-browser-harness`；注册行在**插件包自身**的 `cordis.patch.yml`，profile 的 patch 不必出现该行。
-3. 创造模式里 `cordis_inspect_query` → Tool provider 能看到 7 个 browser_* 工具与 schema。
+2. 确认 `~/.dsh/profiles/desktop/package.json` 的 `dependencies` 与 `dsh.profile.bundles` 含该包；注册行在**插件包自身**的 `cordis.patch.yml`，profile patch 不必出现。
+3. 创造模式里 `cordis_inspect_query` → Tool provider 能看到 7 个 `browser_*` 工具与 schema。
 4. 实际调用：`browser_status` → `browser_navigate` 打开 `https://example.com` → `browser_snapshot` → `browser_tabs {action:"close"}`。
-5. 确认没有碰用户日常浏览器的标签页（`browser_status.tabs` 里只有专用实例的页）。
+5. 确认 `browser_status.tabs` 里只有专用实例的页；需要时用 `bh groups` 检查标签组。
 
 ## 4. 卸载
 
@@ -108,16 +78,20 @@ $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\ds
 # 或 plugin_manager 的 remove_bundle
 ```
 
-随后重启 DSH。删除本仓库目录不影响浏览器 profile。
+随后重启 DSH。删除仓库目录不影响浏览器 profile；标签组扩展可留在 profile，或用 `chrome://extensions` 手动移除（见 [tab-groups.md](tab-groups.md)）。
 
-## 5. 常见问题
+## 5. 升级
+
+- GitHub Packages：重新执行 `dsh plugin --profile desktop add "@xumi0920/dsh-browser-harness"` 后重启；
+- 本地目录：`git pull` 后重启 DSH（link 安装即时生效）。
+
+## 6. 常见问题
 
 | 现象 | 处理 |
 |---|---|
-| `E_NO_BROWSER` | 专用浏览器没起/端口不对：确认 `/json/version`，或改 config 的 `cdpUrl`/`browser` |
-| 安装后工具不出现 | 重启 DSH；确认 `~/.dsh/profiles/desktop/package.json` 的 `dependencies` / `dsh.profile.bundles` 含 `@xumi0920/dsh-browser-harness`（注册行在插件包自身的 `cordis.patch.yml`） |
+| `E_NO_BROWSER` | 专用浏览器没起/端口不对：确认 `/json/version`，或改配置 `cdpUrl`/`browser`（见 [configuration.md](configuration.md)） |
+| 安装后工具不出现 | 重启 DSH；确认 profile 的 dependencies / bundles 含 scoped 包名 |
 | 浏览器弹 "Allow remote debugging?" | 用的是日常浏览器；改用专用 profile 实例 |
-| 工具报 `E_SELECTOR_TIMEOUT` | 先 `browser_snapshot` 重取 ref，再操作 |
-| 工具报 `E_POLICY_DENIED` | 试图关闭非本 harness 创建的标签页；需要 `force` 时先取得用户明确同意 |
-| 中文输入 | `browser_act {action:"fill"}` 会聚焦元素、Ctrl+A / Backspace 清空，再一次性 `insertText` 写入并派发 `input`/`change`；支持中文，能驱动 React/Vue 受控组件（不是逐字按键） |
-| `browser_status.tabGroups.available = false` | 标签组暂不可用：需要带界面（非 headless）浏览器，且扩展能装进专用 profile；Linux 需有 `DISPLAY`。可用 `bh groups --retry` 清冷却后重试，或 `tabGroups:false` 关闭 |
+| `E_SELECTOR_TIMEOUT` / `E_ELEMENT_NOT_FOUND` | 先 `browser_snapshot` 重取 ref，再操作 |
+| `E_POLICY_DENIED` | 试图关闭非本 harness 创建的标签页；需要 `force` 时先取得用户明确同意 |
+| 标签组不可用（`tabGroups.available=false`） | 见 [tab-groups.md](tab-groups.md) 的“状态与排查” |
