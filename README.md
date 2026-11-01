@@ -24,15 +24,19 @@ browser_tabs        list / use / new / close
 
 ## 安装
 
-插件发布在 **GitHub Packages**：`@xumi0920/dsh-browser-harness`（npmjs.org 上的同名包属于其他项目）；需要 **DSH 0.2.1-rc.5 + Node 22**（`engines` 会校验）。任选一种安装方式。
+插件发布在 **GitHub Packages**：`@xumi0920/dsh-browser-harness`（npmjs.org 上的同名包属于其他项目）；需要 **DSH 0.2.1-rc.5 + Node 22**。任选一种方式：
 
-**方式一：一句话交给 DSH 安装**（创造模式会话；`plugin_manager` 是创造模式专用工具，每次操作需要 danger-full-access 或当次批准）：
+**方式一（推荐，图形界面）：DSH Web 插件页**
+
+打开 DSH Web 的**插件页**（左侧/设置里的「插件」入口；会话菜单里的「浏览更多插件」也能进入），在「已安装」标签页点 **添加插件** → **安装第三方插件**，支持 **npm 包名 / Git 仓库 / 本地目录**；官方市场条目在 **发现** 标签页搜索并安装。
+
+**方式二：一句话交给 DSH 安装**（创造模式会话；`plugin_manager` 是创造模式专用工具，每次操作需要 danger-full-access 或当次批准）：
 
 > 把 `@xumi0920/dsh-browser-harness` 安装到当前 DSH profile。
 
-> GitHub Packages 来源**需要先完成「方式二」里的两条 npm config**（read:packages token）；不想配 token 的话，把包名换成你本机 clone 的绝对路径即可：`把 <本机 clone 路径> 安装到当前 profile`。
+> GitHub Packages 来源**需要先完成「方式三」里的两条 npm config**（read:packages token）；不想配 token 的话，把包名换成你本机 clone 的绝对路径即可：`把 <本机 clone 路径> 安装到当前 profile`。
 
-**方式二：手动安装（GitHub Packages）**：
+**方式三：手动安装（GitHub Packages / CLI）**
 
 ```powershell
 npm config set "@xumi0920:registry" "https://npm.pkg.github.com"
@@ -41,11 +45,13 @@ npm config set "//npm.pkg.github.com/:_authToken" "<YOUR_GITHUB_TOKEN>"
   plugin --profile desktop add "@xumi0920/dsh-browser-harness"
 ```
 
-> 本地 CLI 安装时请先退出 DeepSeek Harness，装完重启。本地目录安装、Linux / macOS、一键脚本（token 只写临时 npm 配置）、验证与卸载见 **[docs/install.md](docs/install.md)**。
+> CLI 直接改 profile 时请先退出 DeepSeek Harness，装完重启。本地目录安装、Linux / macOS、一键脚本（token 只写临时 npm 配置）、验证与卸载见 **[docs/install.md](docs/install.md)**。
+
+**热插拔**：安装结果的 `application` 为 `applied` 时已经热生效，不必重启；为 `restart-required` 时才重启（`restartReason` 会解释原因：`no-hmr` / `package-moved` / `host-module` / `unmanaged-plugin` / `module-comparison`）。**替换已安装的包**（升级、换目录、本地 link 改代码）通常需要重启才能加载新的 JS 模块；图形界面会直接提示「请重启 DSH 使更改生效。{原因}」。
 
 ## 快速开始
 
-装好后先**重启 DSH**，并启动专用 Chromium 浏览器（端口/启动命令见 [docs/configuration.md](docs/configuration.md)；默认 9331）。之后在**任意 DSH 会话**里让模型直接调用即可（所有预设都能用，不限于创造模式；创造模式只影响用 `plugin_manager` 安装这一步）：
+安装生效后（`applied` 或重启完成），先启动专用 Chromium 浏览器（端口/启动命令见 [docs/configuration.md](docs/configuration.md)；默认 9331）。之后在**任意 DSH 会话**里让模型直接调用即可（所有预设都能用，不限于创造模式；创造模式只影响用 `plugin_manager` 安装这一步）：
 
 ```
 browser_status → browser_navigate {url} → browser_snapshot → browser_act {action:"click", ref}
@@ -58,12 +64,20 @@ browser_extract {mode:"text" | "html" | "js" | "network"}
 
 | 文档 | 内容 |
 |---|---|
-| [安装与验证](docs/install.md) | 一句话交给 DSH / GitHub Packages / 本地 / Linux / 卸载 / 升级 / FAQ |
+| [安装与验证](docs/install.md) | 插件页 / 一句话交给 DSH / GitHub Packages / 本地 / Linux / 卸载 / 升级 / FAQ |
 | [配置](docs/configuration.md) | 浏览器发现、端口约定、registry、profile patch 配置键 |
 | [按任务标签组](docs/tab-groups.md) | 行为边界、配置、排查、实现方式 |
 | [使用](docs/usage.md) | DSH 工作流、独立库、CLI |
 | [架构](docs/architecture.md) | 分层、关键流程、错误模型、安全边界 |
+| [扩展与语言](docs/extending.md) | 插件语言、热插拔/HMR、用 MCP 接入 Python 等其它语言 |
 | [仓库结构](docs/README.md) | 目录约定、维护与发布流程 |
+
+## 扩展与语言
+
+- **原生插件**：Node 22+ 的 ESM 包（JS/TS；TS 需先构建），通过 bundle patch 注册，热插拔由 DSH 的 HMR 协调。
+- **其它语言**：写一个 MCP server（stdio 或 Streamable HTTP，Python / Go / Rust / Node 均可），在 profile 里加 `@deepseek-ai/dsh-mcp-client` 条目，工具会以 `mcp__<serverName>__<tool>` 暴露。
+- **技能**：Markdown（`SKILL.md`），不需要写代码；**UI 插件**：JS/TS（DSH Web Client）。
+- 为什么插件是 JS/TS：它是宿主运行时（Node 22 / V8）加载的模块语言，模型本身并不"运行 JS"；TS/零构建 JS 对 Agent 编写插件最省事。Python 的数据/ML 生态走 MCP 更合适。细节见 [docs/extending.md](docs/extending.md)。
 
 ## 测试
 
@@ -84,6 +98,6 @@ CI：单测跑 ubuntu / windows；集成场景跑 ubuntu（xvfb，含 headful �
 
 ## 状态
 
-v0.3.4：修复标签组配置透传（`tabGroups` / `tabGroupTitle` / `tabGroupColor` 现在真正生效）；拒绝 `file://` 等非 http(s) 导航；安装脚本 token 只写临时 npm 配置、不再落盘；安装文档前置/引号/重启说明修正；CI 强制 27 场景且 headful S16 必须实跑；publish 增加 tag↔version 校验与打包冒烟。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
+v0.3.5：文档更新——补充 DSH Web **插件页**官方安装入口（添加插件 / 安装第三方插件 / 发现市场）、修正热插拔说明（`application: applied` 已热生效，`restart-required` 才需重启）、新增 [docs/extending.md](docs/extending.md) 说明扩展语言（原生 JS/TS + MCP 接入 Python 等）；功能与 v0.3.4 一致。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
 
 MIT © 2026 Xumi0920

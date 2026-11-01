@@ -20,21 +20,31 @@ node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟
 
 ## 2. 安装插件
 
-插件发布在 **GitHub Packages**：`@xumi0920/dsh-browser-harness`；npmjs.org 上的 `dsh-browser-harness` 是别的项目。GitHub Packages 来源需要先配置 registry + read:packages token（见 2b）；本地目录安装不需要 token。任选一种方式。
+插件发布在 **GitHub Packages**：`@xumi0920/dsh-browser-harness`；npmjs.org 上的 `dsh-browser-harness` 是别的项目。GitHub Packages 来源需要先配置 registry + read:packages token（见 2c）；本地目录安装不需要 token。任选一种方式。热插拔/重启规则见 [extending.md](extending.md#热插拔与重启)。
 
-### 2a. 一句话交给 DSH 安装（创造模式会话）
+### 2a. DSH Web 插件页（图形界面，推荐）
+
+打开 DSH Web 的**插件页**（左侧/设置里的「插件」入口；会话菜单的「浏览更多插件」也可进入）：
+
+- 「已安装」标签页 → **添加插件** → **安装第三方插件**：支持 **npm 包名 / Git 仓库 / 本地目录**；
+- 「发现」标签页：搜索已配置的插件市场索引，按分类/标签筛选后安装；
+- 插件页的「添加插件」箭头菜单里还有 **让 Agent 创建插件**（进入创造模式）。
+
+安装结果看 `application`：`applied` 已热生效；`restart-required` 会提示「请重启 DSH 使更改生效。{原因}」，按提示重启即可。
+
+### 2b. 一句话交给 DSH 安装（创造模式会话）
 
 在 DSH 创造模式会话里直接对模型说：
 
 > 把 `@xumi0920/dsh-browser-harness` 安装到当前 DSH profile。
 
-使用 GitHub Packages 来源时，**先完成 2b 的两条 npm config**，否则 pnpm 会从 npmjs.org 解析并返回 404/401。本地目录安装则把包名换成绝对路径：
+使用 GitHub Packages 来源时，**先完成 2c 的两条 npm config**，否则 pnpm 会从 npmjs.org 解析并返回 404/401。本地目录安装则把包名换成绝对路径：
 
 > 把 `C:\path\to\dsh-browser-harness` 安装到当前 profile。
 
-DSH 会调用 `plugin_manager` 的 `install_bundle` 完成安装；`plugin_manager` 是**创造模式专用工具**，每次操作需要 danger-full-access 沙箱或当次批准。安装完成后重启 DSH，即可在**任意会话/预设**里使用 `browser_*` 工具（不限于创造模式）。
+DSH 会调用 `plugin_manager` 的 `install_bundle` 完成安装；`plugin_manager` 是**创造模式专用工具**，每次操作需要 danger-full-access 沙箱或当次批准。安装结果为 `applied` 时已热生效；`restart-required` 时按提示重启。之后即可在**任意会话/预设**里使用 `browser_*` 工具（不限于创造模式）。
 
-### 2b. GitHub Packages（需要带 read:packages 的 GitHub token）
+### 2c. GitHub Packages（需要带 read:packages 的 GitHub token）
 
 ```powershell
 npm config set "@xumi0920:registry" "https://npm.pkg.github.com"
@@ -52,7 +62,7 @@ npm config set "//npm.pkg.github.com/:_authToken" "<YOUR_GITHUB_TOKEN>"
 
 > 如果你运行过**旧版**脚本，它可能把 token 明文留在了 `~/.npmrc`：执行 `npm config delete "//npm.pkg.github.com/:_authToken"`，并到 GitHub 撤销那个 token，换用 fine-grained、只带 `read:packages` 的新 token。
 
-### 2c. 本地 clone 目录（推荐开发/自用）
+### 2d. 本地 clone 目录（推荐开发/自用）
 
 在 Creator（创造模式）空会话里让模型执行（路径换成你本机 clone 的绝对路径；JSON 里的反斜杠要写两份）：
 
@@ -62,7 +72,7 @@ plugin_manager { action: "install_bundle", target: "C:\\path\\to\\dsh-browser-ha
 
 `plugin_manager` 每次操作需要 danger-full-access 沙箱或当次批准；返回 `application: "applied"` 即已激活，遇到 `nextStep` / `restart-required` 按提示重启。
 
-### 2d. CLI 安装本地目录
+### 2e. CLI 安装本地目录
 
 先退出 DeepSeek Harness，再执行（装完重启）：
 
@@ -71,7 +81,7 @@ $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\ds
 & $DSH plugin --profile desktop add "C:\path\to\dsh-browser-harness"
 ```
 
-### 2e. Linux / macOS
+### 2f. Linux / macOS
 
 ```bash
 npm config set "@xumi0920:registry" "https://npm.pkg.github.com"

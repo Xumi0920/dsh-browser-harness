@@ -9,6 +9,7 @@
 | [tab-groups.md](tab-groups.md) | 按任务标签组：行为边界、配置、排查、实现方式 |
 | [usage.md](usage.md) | DSH 工作流、独立库、CLI |
 | [architecture.md](architecture.md) | 分层架构、关键流程、错误模型、安全边界、测试策略 |
+| [extending.md](extending.md) | 扩展与语言：原生 JS/TS 插件、热插拔/HMR、MCP 接入 Python 等其它语言 |
 | [README.md](README.md) | 本文件：仓库结构与维护约定 |
 
 ## 目录
