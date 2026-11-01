@@ -126,5 +126,5 @@ open -na "Google Chrome" --args --remote-debugging-port=9331 "--user-data-dir=$H
 - `browser_tabs {action:"use"}` 只接受 **page** target 和 `http(s)` / `about:blank` URL：非自建标签页必须用精确 `targetId`，URL 子串只匹配 harness 自建标签页；`file:`、`chrome:`、扩展 worker 等会被拒绝。
 - 只允许打开 `http(s)` 页面（`about:blank` 除外）；`file://`、`data:`、`javascript:`、`chrome://` 等会被 `E_POLICY_DENIED` 拒绝。
 - 截图默认写入 `screenshotDir`，拒绝目录外路径、symlink 逃逸和覆盖已有文件。
-- 工具输出会对 token 类 URL query / 响应 headers 做**尽力脱敏**；页面正文、HTML、截图和用户输入仍可能包含敏感数据，不要把浏览器工具当作完整 DLP。
-- 状态文件里只保留去掉 query/fragment 的 URL；harness 探测失败会报 `E_NO_BROWSER`，不会自行启动浏览器。
+- 工具输出会对 token 类 URL query / 响应 headers 做**尽力脱敏**（参数名归一化；`Location`/`Content-Location` 整值隐藏）；页面正文、HTML、截图和用户输入仍可能包含敏感数据，不要把浏览器工具当作完整 DLP。
+- 状态文件里只保留去掉 userinfo/query/fragment 的 URL；harness 探测失败会报 `E_NO_BROWSER`，不会自行启动浏览器。

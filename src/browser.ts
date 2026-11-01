@@ -32,6 +32,8 @@ export function sanitizeUrlForState(url: any) {
   const raw = String(url || "");
   try {
     const parsed = new URL(raw);
+    parsed.username = "";
+    parsed.password = "";
     parsed.search = "";
     parsed.hash = "";
     return parsed.toString();

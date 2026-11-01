@@ -4,7 +4,7 @@
 
 | 版本 | 支持 |
 |---|---|
-| 最新 Release（当前 v0.6.0） | ✅ 接收安全报告 |
+| 最新 Release（当前 v0.6.1） | ✅ 接收安全报告 |
 | 上一个 minor 版本 | ✅ 尽力修复 |
 | 更旧版本 | ❌ 建议先升级 |
 
@@ -30,7 +30,7 @@
 
 ## 数据处理提示
 
-- 状态文件：`~/.dsh/browser-harness/state-<lane>.json`（URL 已去除 query/fragment，POSIX 0600/目录 0700）。
+- 状态文件：`~/.dsh/browser-harness/state-<lane>.json`（URL 已去除 userinfo/query/fragment，POSIX 0600/目录 0700）。
 - 截图：默认写入 `<stateDir>/screenshots/`，拒绝覆盖已有文件、不允许逃逸到目录外。
 - 安装 token：一键脚本只写入临时 npm 配置；手动 `npm config set` 会持久化到 `~/.npmrc`，请安装后删除并撤销。
 - GitHub Packages 只能使用 **classic PAT**（`read:packages`），不支持 fine-grained token。
