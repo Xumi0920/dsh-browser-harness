@@ -11,17 +11,17 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { startFixtureServer } from "../fixtures/server.mjs";
-import { launchChrome } from "./helpers/launch-chrome.mjs";
+import { startFixtureServer } from "../fixtures/server.js";
+import { launchChrome } from "./helpers/launch-chrome.js";
 import { Browser } from "../../dist/src/browser.js";
 import { findByRole, snapshotToText } from "../../dist/src/ax.js";
-import { cleanupTempDirs, tempDir } from "../helpers/temp.mjs";
+import { cleanupTempDirs, tempDir } from "../helpers/temp.js";
 
 
 after(cleanupTempDirs);
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SAMPLE_UPLOAD = join(HERE, "..", "fixtures", "upload-sample.txt");
+const SAMPLE_UPLOAD = fileURLToPath(new URL("../../tests/fixtures/upload-sample.txt", import.meta.url));
 
 let server;
 let chrome;
@@ -206,7 +206,7 @@ test("S09 form validation: error visible, fix, submit succeeds", async (t) => {
 test("S10 selector timeout: structured E_SELECTOR_TIMEOUT, no hang", async (t) => {
   const page = await openTab(t, "/never.html");
   if (!page) return;
-  await assert.rejects(page.waitForSelector("#does-not-exist", { timeoutMs: 300 }), (error) => {
+  await assert.rejects(page.waitForSelector("#does-not-exist", { timeoutMs: 300 }), (error: any) => {
     assert.equal(error.code, "E_SELECTOR_TIMEOUT");
     assert.match(error.message, /does-not-exist/);
     return true;

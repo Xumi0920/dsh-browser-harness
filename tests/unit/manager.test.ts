@@ -59,7 +59,7 @@ test("pageFor passes the session lane and starts capture once", async () => {
 
 test("pageFor fails with E_NO_TAB when the session has no current tab", async () => {
   const { manager } = managerWithConnection();
-  await assert.rejects(manager.pageFor("other"), (error) => {
+  await assert.rejects(manager.pageFor("other"), (error: any) => {
     assert.equal(error.code, "E_NO_TAB");
     return true;
   });
@@ -136,7 +136,7 @@ test("ensure maps a connect failure to E_NO_BROWSER", async () => {
   const manager = new BrowserManager({
     browserFactory: async () => { throw new Error("ECONNREFUSED 127.0.0.1:9331"); },
   });
-  await assert.rejects(manager.ensure(), (error) => {
+  await assert.rejects(manager.ensure(), (error: any) => {
     assert.equal(error.code, "E_NO_BROWSER");
     assert.match(error.message, /cannot reach a dedicated automation browser/);
     return true;

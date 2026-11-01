@@ -12,7 +12,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** Chromium-family executables this helper knows how to launch. */
 const BROWSER_PATHS = [
@@ -108,19 +108,19 @@ export function findAlternateChromium() {
 }
 
 /** Kill every Chromium process using this throwaway user-data-dir. */
-async function killByUserDataDir(userDataDir) {
+async function killByUserDataDir(userDataDir: any) {
   if (process.platform === "win32") {
     const pattern = userDataDir.replace(/'/g, "''");
     const script = "Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(chrome|msedge|chromium|brave|vivaldi|opera)" +
       "' -and $_.CommandLine -like '*" + pattern + "*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }";
-    await new Promise((resolve) => execFile("powershell", ["-NoProfile", "-Command", script], () => resolve()));
+    await new Promise<void>((resolve) => execFile("powershell", ["-NoProfile", "-Command", script], () => resolve()));
     return;
   }
-  await new Promise((resolve) => execFile("pkill", ["-f", userDataDir], () => resolve()));
+  await new Promise<void>((resolve) => execFile("pkill", ["-f", userDataDir], () => resolve()));
 }
 
 /** Wait until the freshly launched browser answers /json/version. */
-async function waitForCdpReady(httpUrl, timeoutMs = 10_000) {
+async function waitForCdpReady(httpUrl: any, timeoutMs = 10_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -138,7 +138,7 @@ async function waitForCdpReady(httpUrl, timeoutMs = 10_000) {
  * @param {{ headless?: boolean, extraArgs?: string[], executable?: string, allowExtensions?: boolean }} [options]
  * @returns {Promise<null | { proc: any, port: number, httpUrl: string, userDataDir: string, executable: string, close: () => Promise<void> }>}
  */
-export async function launchChrome(options = {}) {
+export async function launchChrome(options: any = {}) {
   const executable = options.executable || findChrome();
   if (!executable) return null;
   const userDataDir = await mkdtemp(join(tmpdir(), "bh-browser-"));
@@ -193,7 +193,7 @@ export async function launchChrome(options = {}) {
     async close() {
       try { proc.kill(); } catch { /* ignore */ }
       if (process.platform === "win32" && proc.pid) {
-        await new Promise((resolve) => execFile("taskkill", ["/pid", String(proc.pid), "/T", "/F"], () => resolve()));
+        await new Promise<void>((resolve) => execFile("taskkill", ["/pid", String(proc.pid), "/T", "/F"], () => resolve()));
       }
       // The visible process may be a relaunched child: kill anything still
       // using this throwaway profile so no headless browser leaks.

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Page } from "../../dist/src/page.js";
-import { FakeTransport, quad } from "./helpers/fake-transport.mjs";
+import { FakeTransport, quad } from "./helpers/fake-transport.js";
 
 const AX_NODES = [
   { role: { value: "button" }, backendDOMNodeId: 10, name: { value: "Go" } },
@@ -29,7 +29,7 @@ function setupPage({ ax = AX_NODES } = {}) {
 
 test("refs need a snapshot and never silently remap", async () => {
   const { page } = setupPage();
-  await assert.rejects(page.click({ ref: "e1" }), (error) => {
+  await assert.rejects(page.click({ ref: "e1" }), (error: any) => {
     assert.equal(error.code, "E_ELEMENT_NOT_FOUND");
     assert.match(error.details.hint, /no snapshot yet/);
     return true;
@@ -39,7 +39,7 @@ test("refs need a snapshot and never silently remap", async () => {
   assert.deepEqual(await page.click({ ref: "e1" }), { ok: true, x: 30, y: 30 });
   const second = await page.snapshot();
   assert.deepEqual(second.nodes.map((node) => node.ref), ["e3", "e4"]);
-  await assert.rejects(page.click({ ref: "e1" }), (error) => {
+  await assert.rejects(page.click({ ref: "e1" }), (error: any) => {
     assert.equal(error.code, "E_ELEMENT_NOT_FOUND");
     assert.match(error.details.hint, /latest snapshot/);
     return true;
@@ -51,7 +51,7 @@ test("navigate clears the snapshot so old refs fail loudly", async () => {
   await page.snapshot();
   await page.navigate("https://example.com/next");
   assert.equal(page.lastSnapshot, null);
-  await assert.rejects(page.click({ ref: "e2" }), (error) => {
+  await assert.rejects(page.click({ ref: "e2" }), (error: any) => {
     assert.match(error.details.hint, /no snapshot yet/);
     return true;
   });

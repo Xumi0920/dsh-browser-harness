@@ -3,6 +3,11 @@
 [简体中文](README.md) | **English**
 
 [![ci](https://github.com/Xumi0920/dsh-browser-harness/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Xumi0920/dsh-browser-harness/actions/workflows/ci.yml)
+[![version](https://img.shields.io/github/package-json/v/Xumi0920/dsh-browser-harness?label=version)](https://github.com/Xumi0920/dsh-browser-harness/releases)
+[![license](https://img.shields.io/github/license/Xumi0920/dsh-browser-harness?label=license)](LICENSE)
+[![node](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](package.json)
+[![typescript](https://img.shields.io/badge/source-TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![chromium](https://img.shields.io/badge/browser-any%20Chromium-4285F4?logo=googlechrome&logoColor=white)](docs/configuration.md)
 
 **Native browser tools for DeepSeek Harness (DSH).** A zero-dependency CDP core exposes seven `browser_*` tools that drive a *dedicated, already-logged-in* Chromium-based browser, return compact e1/e2 ref snapshots, and group harness-created tabs per task.
 
@@ -20,7 +25,7 @@ browser_tabs        list / use / new / close
 
 ## Highlights
 
-- **Zero runtime dependencies.** The build uses only Node built-ins (`fetch` / `WebSocket`) and never downloads a browser. The source is **TypeScript** compiled to `dist/`; the plugin entry only uses the host-provided `@deepseek-ai/dsh-tools` peer.
+- **Zero runtime dependencies + all TypeScript.** The build uses only Node built-ins (`fetch` / `WebSocket`) and never downloads a browser. Sources, tests, scripts and the extension are all **TypeScript**, compiled by `tsc` to `dist/`, `dist-tests/`, `dist-scripts/` and `extension/sw.js`; the plugin entry only uses the host-provided `@deepseek-ai/dsh-tools` peer.
 - **Your real login state.** Point it at a dedicated Chromium instance; sign in once and it persists. Your daily browser is never touched.
 - **Text-first.** Accessibility-tree snapshots and refs beat screenshot-VLM loops; screenshots stay optional.
 - **Per-task tab groups.** Tabs the harness creates are grouped per DSH session; work tabs are never grouped, and headless browsers skip grouping.
@@ -97,7 +102,7 @@ npm install                 # dev deps (TypeScript); runtime stays zero-dependen
 npm run test:all            # build + 102 unit + 27 integration = 129 tests
 ```
 
-CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu + xvfb (27-scenario gate, S15/S16 must actually run).
+CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu + xvfb (27-scenario gate, S15/S16 must actually run). Tests and scripts are compiled by `tsc` too (`dist-tests/` / `dist-scripts/`), sharing the runtime NodeNext config.
 
 ## Safety
 
@@ -108,4 +113,4 @@ CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu
 
 ## License
 
-MIT (c) 2026 Xumi0920 · current version **v0.4.4** · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog
+MIT (c) 2026 Xumi0920 · current version **v0.5.0** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog

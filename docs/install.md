@@ -11,16 +11,16 @@
 ```powershell
 git clone https://github.com/Xumi0920/dsh-browser-harness.git C:\path\to\dsh-browser-harness
 cd C:\path\to\dsh-browser-harness
-npm install                                   # 仅开发依赖：typescript + @types/node
-npm run build                                 # tsc 编译到 dist/（发布产物）
+npm install                                   # 开发依赖：typescript / @types/node / @types/chrome / semver
+npm run build                                 # tsc → dist/ + extension/sw.js（发布产物）
 
-npm test                                      # 构建 + 102 单测（fake CDP 替身，无需浏览器）
+npm test                                      # 构建源码与测试，跑 102 单测（fake CDP 替身）
 npm run test:integration                      # 构建 + 27 场景（真实 headless/headful Chromium）
 npm run test:all                              # 构建 + 共 129 条
-node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟（需先 build）
+npm run verify -- --browser chrome            # 对 live 实例冒烟（需先 build）
 ```
 
-> 源码是 TypeScript（`src/`、`lib/`、`bin/`），运行时零第三方依赖；`dist/` 是构建产物，不提交到 git。
+> **全量 TypeScript**：源码（`src/`、`lib/`、`bin/`）、测试（`tests/`）、脚本（`scripts/`）、扩展（`extension-src/`）都是 TS，由 `tsc` 编译到 `dist/`、`dist-tests/`、`dist-scripts/`、`extension/sw.js`；运行时零第三方依赖，构建产物不提交到 git。
 
 ## 2. 安装插件
 

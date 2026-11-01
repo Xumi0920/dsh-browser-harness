@@ -3,8 +3,13 @@
  * No network, no Chrome: every send() is recorded and answered by a handler.
  */
 export class FakeTransport {
+  calls: any[];
+  handlers: Map<string, any>;
+  listeners: Map<string, Set<any>>;
+  closed: boolean;
+  sessionSeq: number;
+
   constructor() {
-    /** @type {{ method: string, params: any, options: any }[]} */
     this.calls = [];
     this.handlers = new Map();
     this.listeners = new Map();
@@ -13,33 +18,33 @@ export class FakeTransport {
   }
 
   /** Answer one CDP method. */
-  on(method, handler) {
+  on(method: string, handler: any) {
     this.handlers.set(method, handler);
     return this;
   }
 
-  async send(method, params = {}, options = {}) {
+  async send(method: string, params: any = {}, options: any = {}) {
     this.calls.push({ method, params, options });
     const handler = this.handlers.get(method);
     if (handler) return handler(params, options);
     return {};
   }
 
-  onEvent(method, handler) {
+  onEvent(method: string, handler: any) {
     if (!this.listeners.has(method)) this.listeners.set(method, new Set());
-    this.listeners.get(method).add(handler);
+    this.listeners.get(method)!.add(handler);
     return () => this.listeners.get(method)?.delete(handler);
   }
 
-  emit(method, params = {}, sessionId) {
+  emit(method: string, params: any = {}, sessionId?: any) {
     for (const handler of [...(this.listeners.get(method) || [])]) handler(params, sessionId);
   }
 
-  listenerCount(method) {
+  listenerCount(method: string) {
     return (this.listeners.get(method) || new Set()).size;
   }
 
-  count(method) {
+  count(method: string) {
     return this.calls.filter((call) => call.method === method).length;
   }
 

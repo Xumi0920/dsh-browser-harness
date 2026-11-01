@@ -1,6 +1,6 @@
 {
   "name": "@xumi0920/dsh-browser-harness",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "description": "DSH native browser tools (browser_*) backed by a zero-dependency CDP core driving a dedicated, logged-in Chromium-based browser (Chrome, Edge, Brave, Chromium, Vivaldi, Opera, Arc), with per-task Chrome tab groups for harness-created tabs.",
   "type": "module",
   "license": "MIT",
@@ -59,11 +59,13 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test \"tests/unit/**/*.test.mjs\"",
-    "test:integration": "npm run build && node --test \"tests/integration/**/*.test.mjs\"",
-    "test:all": "npm run build && node --test \"tests/**/*.test.mjs\"",
-    "verify": "npm run build && node scripts/verify.mjs",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.extension.json",
+    "build:tests": "npm run build && tsc -p tsconfig.tests.json",
+    "test": "npm run build:tests && node --test \"dist-tests/unit/**/*.test.js\"",
+    "test:integration": "npm run build:tests && node --test \"dist-tests/integration/**/*.test.js\"",
+    "test:all": "npm run build:tests && node --test \"dist-tests/**/*.test.js\"",
+    "verify": "npm run build && tsc -p tsconfig.scripts.json && node dist-scripts/verify.js",
+    "fixture": "npm run build:tests && node dist-tests/fixtures/server.js",
     "doctor": "node dist/bin/bh.js doctor"
   },
   "keywords": [
@@ -83,6 +85,7 @@
     "typescript"
   ],
   "devDependencies": {
+    "@types/chrome": "^0.3.7",
     "@types/node": "^26.6.6",
     "semver": "^7.8.5",
     "typescript": "^7.0.2"

@@ -37,7 +37,7 @@ node dist/bin/bh.js close [targetId] [--force]
 node dist/bin/bh.js groups [--retry]    # 标签组状态/列表；--retry 重试安装扩展
 ```
 
-`npm run verify -- --browser chrome`（或 `npm run build && node scripts/verify.mjs --browser chrome`）可对 live 专用浏览器做冒烟（需源码 checkout）。
+`npm run verify -- --browser chrome` 可对 live 专用浏览器做冒烟（脚本为 TypeScript，编译到 `dist-scripts/verify.js`；需源码 checkout）。
 
 ## 提示
 

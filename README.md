@@ -3,6 +3,11 @@
 **简体中文** | [English](README.en.md)
 
 [![ci](https://github.com/Xumi0920/dsh-browser-harness/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Xumi0920/dsh-browser-harness/actions/workflows/ci.yml)
+[![version](https://img.shields.io/github/package-json/v/Xumi0920/dsh-browser-harness?label=version)](https://github.com/Xumi0920/dsh-browser-harness/releases)
+[![license](https://img.shields.io/github/license/Xumi0920/dsh-browser-harness?label=license)](LICENSE)
+[![node](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](package.json)
+[![typescript](https://img.shields.io/badge/source-TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![chromium](https://img.shields.io/badge/browser-any%20Chromium-4285F4?logo=googlechrome&logoColor=white)](docs/configuration.md)
 
 **DeepSeek Harness（DSH）原生浏览器工具。** 零依赖 CDP 内核 + 7 个 `browser_*` 工具，直连**专用、已登录**的 Chromium 内核浏览器，提供 e1/e2 引用快照，并按任务给自建标签页分组。
 
@@ -20,7 +25,7 @@ browser_tabs        list / use / new / close
 
 ## 亮点
 
-- **运行时零依赖**：构建产物只用 Node 内置的 `fetch` / `WebSocket`，不下载浏览器；源码为 **TypeScript**，`tsc` 构建到 `dist/`，插件入口仅用宿主提供的 `@deepseek-ai/dsh-tools` peer。
+- **运行时零依赖 + 全量 TypeScript**：构建产物只用 Node 内置的 `fetch` / `WebSocket`，不下载浏览器；源码、测试、脚本、扩展全部是 **TypeScript**，分别由 `tsc` 编译到 `dist/`、`dist-tests/`、`dist-scripts/`、`extension/sw.js`；插件入口仅用宿主提供的 `@deepseek-ai/dsh-tools` peer。
 - **真实登录态**：接自己起好的专用 Chromium 实例，登录一次长期有效；不碰日常浏览器。
 - **文本优先**：无障碍树 + ref 比“截图喂视觉模型”更准更省，截图只是补充。
 - **按任务标签组**：插件自建的标签页自动按 DSH 会话分组，工作标签页不受影响；headless 自动跳过。
@@ -97,7 +102,7 @@ npm install                 # 开发依赖（TypeScript），运行时零依赖
 npm run test:all            # 构建 + 102 单测 + 27 集成场景 = 129 条
 ```
 
-CI：单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场景跑 ubuntu + xvfb（门禁 27 条，S15/S16 必须实跑）。
+CI：单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场景跑 ubuntu + xvfb（门禁 27 条，S15/S16 必须实跑）。测试与脚本同样由 `tsc` 编译（`dist-tests/` / `dist-scripts/`），与运行时源码共用 NodeNext 配置。
 
 ## 安全边界
 
@@ -108,4 +113,4 @@ CI：单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场�
 
 ## 许可
 
-MIT © 2026 Xumi0920 · 当前版本 **v0.4.4** · 更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)
+MIT © 2026 Xumi0920 · 当前版本 **v0.5.0** · 全量 TypeScript（源码/测试/脚本/扩展）· 更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)

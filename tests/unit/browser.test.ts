@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Browser, assertNavigableUrl } from "../../dist/src/browser.js";
 import { readState, rememberOwnedTab, setCurrent } from "../../dist/src/state.js";
-import { FakeTransport } from "./helpers/fake-transport.mjs";
-import { cleanupTempDirs, tempDir } from "../helpers/temp.mjs";
+import { FakeTransport } from "./helpers/fake-transport.js";
+import { cleanupTempDirs, tempDir } from "../helpers/temp.js";
 
 
 after(cleanupTempDirs);
@@ -53,7 +53,7 @@ test("attach reuses one Page per target", async () => {
 
 test("closeTab refuses non-owned tabs unless forced", async () => {
   const { browser, transport } = await setup({ targets: [pageTarget("t1")] });
-  await assert.rejects(browser.closeTab("t1"), (error) => {
+  await assert.rejects(browser.closeTab("t1"), (error: any) => {
     assert.equal(error.code, "E_POLICY_DENIED");
     return true;
   });
@@ -120,12 +120,12 @@ test("only http(s) pages and about:blank may be opened", () => {
   assert.equal(assertNavigableUrl("http://127.0.0.1:3638/form.html"), "http://127.0.0.1:3638/form.html");
   assert.equal(assertNavigableUrl("about:blank"), "about:blank");
   for (const blocked of ["file:///C:/Windows/win.ini", "data:text/html,hi", "javascript:alert(1)", "chrome://settings", "devtools://devtools/bundled/inspector.html"]) {
-    assert.throws(() => assertNavigableUrl(blocked), (error) => {
+    assert.throws(() => assertNavigableUrl(blocked), (error: any) => {
       assert.equal(error.code, "E_POLICY_DENIED");
       return true;
     }, blocked + " must be rejected");
   }
-  assert.throws(() => assertNavigableUrl("not a url"), (error) => error.code === "E_BAD_ARG");
+  assert.throws(() => assertNavigableUrl("not a url"), (error: any) => error.code === "E_BAD_ARG");
 });
 
 test("open() creates a new tab instead of navigating a non-owned current tab", async () => {

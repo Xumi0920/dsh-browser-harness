@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CDPTransport } from "../../dist/src/cdp/transport.js";
-import { FakeWebSocket } from "./helpers/fake-websocket.mjs";
+import { FakeWebSocket } from "./helpers/fake-websocket.js";
 
 test.beforeEach(() => FakeWebSocket.reset());
 
@@ -52,7 +52,7 @@ test("CDP error responses reject with E_CDP and keep the method", async () => {
   };
   const tr = makeTransport();
   await tr.connect();
-  await assert.rejects(tr.send("Nope.method"), (error) => {
+  await assert.rejects(tr.send("Nope.method"), (error: any) => {
     assert.equal(error.code, "E_CDP");
     assert.match(error.message, /Nope\.method/);
     return true;
@@ -63,7 +63,7 @@ test("CDP error responses reject with E_CDP and keep the method", async () => {
 test("timeouts reject with E_TIMEOUT and drop the pending entry", async () => {
   const tr = makeTransport({ defaultTimeoutMs: 20 });
   await tr.connect();
-  await assert.rejects(tr.send("Slow.method"), (error) => {
+  await assert.rejects(tr.send("Slow.method"), (error: any) => {
     assert.equal(error.code, "E_TIMEOUT");
     assert.match(error.message, /timed out after 20ms/);
     return true;
@@ -97,11 +97,11 @@ test("close rejects pending commands and further sends", async () => {
   await tr.connect();
   const pending = tr.send("Hangs.forever");
   tr.close();
-  await assert.rejects(pending, (error) => {
+  await assert.rejects(pending, (error: any) => {
     assert.equal(error.code, "E_NOT_CONNECTED");
     return true;
   });
-  await assert.rejects(tr.send("After.close"), (error) => {
+  await assert.rejects(tr.send("After.close"), (error: any) => {
     assert.equal(error.code, "E_NOT_CONNECTED");
     return true;
   });

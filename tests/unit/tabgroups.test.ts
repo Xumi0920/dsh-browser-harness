@@ -10,7 +10,7 @@ import {
   tabGroupSessionTag,
   tabGroupTitleFor,
 } from "../../dist/src/tabgroups.js";
-import { FakeTransport } from "./helpers/fake-transport.mjs";
+import { FakeTransport } from "./helpers/fake-transport.js";
 
 const EXTENSION_PATH = join(tmpdir(), "bh-package", "extension");
 const EXTENSION_URL = "chrome-extension://ext-1/sw.js";

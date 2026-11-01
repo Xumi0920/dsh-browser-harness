@@ -19,7 +19,7 @@ import {
 async function freshDir() {
   return tempDir("bh-state-");
 }
-import { cleanupTempDirs, tempDir } from "../helpers/temp.mjs";
+import { cleanupTempDirs, tempDir } from "../helpers/temp.js";
 
 
 after(cleanupTempDirs);

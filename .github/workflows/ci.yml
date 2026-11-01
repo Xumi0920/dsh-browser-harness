@@ -41,7 +41,7 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: npm run build
+      - run: npm run build:tests
       - name: Locate Chrome
         run: |
           if command -v google-chrome > /dev/null; then
@@ -60,7 +60,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          xvfb-run -a -s "-screen 0 1280x800x24" node --test --test-reporter=tap "tests/integration/**/*.test.mjs" | tee tap.txt
+          xvfb-run -a -s "-screen 0 1280x800x24" node --test --test-reporter=tap "dist-tests/integration/**/*.test.js" | tee tap.txt
       - name: Verify the scenario suite really ran
         shell: bash
         run: |

@@ -1,7 +1,7 @@
 /**
  * Local scenario server for integration tests. Zero dependencies, port 0.
  *
- * Run directly to get a URL: node tests/fixtures/server.mjs
+ * Run directly to get a URL: node tests/fixtures/server.js
  */
 
 import { createServer } from "node:http";
@@ -11,7 +11,8 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SITE = join(HERE, "site");
+// Tests compile to dist-tests/fixtures/, so resolve the fixture site back in tests/fixtures/site.
+const SITE = fileURLToPath(new URL("../../tests/fixtures/site", import.meta.url));
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -21,7 +22,7 @@ const MIME = {
   ".csv": "text/csv; charset=utf-8",
 };
 
-function readBody(request) {
+function readBody(request: any): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks = [];
     request.on("data", (chunk) => chunks.push(chunk));
@@ -46,9 +47,9 @@ function send(response, status, body, headers = {}) {
 }
 
 /** Start the fixture server; resolves with its base URL and a close handle. */
-export async function startFixtureServer({ port = 0 } = {}) {
+export async function startFixtureServer({ port = 0 }: any = {}) {
   const sessions = new Set();
-  const server = createServer(async (request, response) => {
+  const server = createServer(async (request: any, response: any) => {
     try {
       const url = new URL(request.url, "http://127.0.0.1");
       const pathname = url.pathname;
@@ -112,7 +113,7 @@ export async function startFixtureServer({ port = 0 } = {}) {
       }
 
       if (pathname === "/api/slow") {
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await new Promise<void>((resolve) => setTimeout(resolve, 300));
         send(response, 200, JSON.stringify({ value: 42, items: [1, 2, 3] }), { "content-type": MIME[".json"] });
         return;
       }
@@ -150,18 +151,18 @@ export async function startFixtureServer({ port = 0 } = {}) {
       send(response, 500, "server error: " + String(error && error.message ? error.message : error));
     }
   });
-  await new Promise((resolve) => server.listen(port, "127.0.0.1", resolve));
-  const address = server.address();
+  await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
+  const address: any = server.address();
   const base = "http://127.0.0.1:" + address.port;
   return {
     url: base,
     port: address.port,
     sessions,
-    close: () => new Promise((resolve) => server.close(() => resolve())),
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
 }
 
-if (process.argv[1] && process.argv[1].endsWith("server.mjs")) {
+if (process.argv[1] && process.argv[1].endsWith("server.js")) {
   const fixture = await startFixtureServer();
   console.log(JSON.stringify({ url: fixture.url, port: fixture.port }));
 }

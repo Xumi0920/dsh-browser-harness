@@ -12,11 +12,11 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { startFixtureServer } from "../fixtures/server.mjs";
-import { launchChrome } from "./helpers/launch-chrome.mjs";
+import { startFixtureServer } from "../fixtures/server.js";
+import { launchChrome } from "./helpers/launch-chrome.js";
 import { BrowserManager } from "../../dist/lib/manager.js";
 import { createTools } from "../../dist/lib/tools.js";
-import { cleanupTempDirs, tempDir } from "../helpers/temp.mjs";
+import { cleanupTempDirs, tempDir } from "../helpers/temp.js";
 
 
 after(cleanupTempDirs);

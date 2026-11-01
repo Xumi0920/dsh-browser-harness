@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_PORTS, listEndpoints, probeVersion, readRegistry, registryPath, resolveEndpoint } from "../../dist/src/cdp/endpoint.js";
-import { cleanupTempDirs, tempDir } from "../helpers/temp.mjs";
+import { cleanupTempDirs, tempDir } from "../helpers/temp.js";
 
 
 after(cleanupTempDirs);
@@ -86,7 +86,7 @@ test("browser selector probes the fixed port and fails closed when down", async 
       dshHome: home,
       fetchImpl: fakeFetch(() => { throw new Error("ECONNREFUSED"); }),
     }),
-    (error) => {
+    (error: any) => {
       assert.equal(error.code, "E_NO_BROWSER");
       return true;
     },
@@ -113,7 +113,7 @@ test("auto mode reports every tried endpoint when nothing is reachable", async (
   const home = await dshHomeWithRegistry(registry);
   await assert.rejects(
     resolveEndpoint({ dshHome: home, fetchImpl: fakeFetch(() => { throw new Error("down"); }) }),
-    (error) => {
+    (error: any) => {
       assert.equal(error.code, "E_NO_BROWSER");
       // 2 configured candidates + the other known Chromium ports + 9222/9223
       assert.ok(error.details.tried.length >= 2);
@@ -127,7 +127,7 @@ test("auto mode reports every tried endpoint when nothing is reachable", async (
 test("403 becomes an actionable E_NO_BROWSER", async () => {
   await assert.rejects(
     probeVersion("http://127.0.0.1:9331", { fetchImpl: fakeFetch(() => jsonResponse({}, 403)) }),
-    (error) => {
+    (error: any) => {
       assert.equal(error.code, "E_NO_BROWSER");
       assert.match(error.message, /403/);
       return true;
@@ -222,7 +222,7 @@ test("unknown browser selectors list every supported browser", async () => {
   const home = await dshHomeWithRegistry(registry);
   await assert.rejects(
     resolveEndpoint({ browser: "safari", dshHome: home, fetchImpl: fakeFetch(() => jsonResponse({})) }),
-    (error) => {
+    (error: any) => {
       assert.equal(error.code, "E_NO_BROWSER");
       for (const id of ["chrome", "edge", "chrome-beta", "chromium", "brave", "vivaldi", "opera", "arc"]) {
         assert.ok(error.details.known.includes(id), id + " is advertised");
@@ -265,7 +265,7 @@ test("resolveEndpoint honors BH_WS and BH_CDP_URL", async () => {
 
 test("resolveEndpoint rejects an unknown BH_BROWSER selector", async () => {
   const home = await tempDir("bh-env-");
-  await assert.rejects(resolveEndpoint({ env: { BH_BROWSER: "nope" }, dshHome: home }), (error) => {
+  await assert.rejects(resolveEndpoint({ env: { BH_BROWSER: "nope" }, dshHome: home }), (error: any) => {
     assert.equal(error.code, "E_NO_BROWSER");
     assert.match(error.message, /unknown browser selector/);
     return true;
@@ -276,7 +276,7 @@ test("probeVersion maps an aborted probe to E_NO_BROWSER", async () => {
   const fetchImpl = (url, init) => new Promise((resolve, reject) => {
     init.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
   });
-  await assert.rejects(probeVersion("http://127.0.0.1:1", { fetchImpl, timeoutMs: 20 }), (error) => {
+  await assert.rejects(probeVersion("http://127.0.0.1:1", { fetchImpl, timeoutMs: 20 }), (error: any) => {
     assert.equal(error.code, "E_NO_BROWSER");
     assert.match(error.message, /probe timed out/);
     return true;

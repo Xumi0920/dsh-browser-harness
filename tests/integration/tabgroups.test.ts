@@ -12,8 +12,8 @@ import assert from "node:assert/strict";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { startFixtureServer } from "../fixtures/server.mjs";
-import { launchChrome } from "./helpers/launch-chrome.mjs";
+import { startFixtureServer } from "../fixtures/server.js";
+import { launchChrome } from "./helpers/launch-chrome.js";
 import { Browser } from "../../dist/src/browser.js";
 import { tabGroupTitleFor } from "../../dist/src/tabgroups.js";
 
@@ -26,7 +26,7 @@ before(async () => {
 after(async () => {
   await server?.close();
 });
-import { cleanupTempDirs, tempDir } from "../helpers/temp.mjs";
+import { cleanupTempDirs, tempDir } from "../helpers/temp.js";
 
 
 after(cleanupTempDirs);

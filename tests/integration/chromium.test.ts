@@ -11,11 +11,11 @@ import assert from "node:assert/strict";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { startFixtureServer } from "../fixtures/server.mjs";
-import { findAlternateChromium, launchChrome } from "./helpers/launch-chrome.mjs";
+import { startFixtureServer } from "../fixtures/server.js";
+import { findAlternateChromium, launchChrome } from "./helpers/launch-chrome.js";
 import { BrowserManager } from "../../dist/lib/manager.js";
 import { createTools } from "../../dist/lib/tools.js";
-import { cleanupTempDirs, tempDir } from "../helpers/temp.mjs";
+import { cleanupTempDirs, tempDir } from "../helpers/temp.js";
 
 
 after(cleanupTempDirs);

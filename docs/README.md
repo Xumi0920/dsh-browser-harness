@@ -24,14 +24,15 @@
 | `dist/` | `tsc` 构建产物（ESM JS + `.d.ts`），`package.json` 的 main/exports/bin 都指向这里 | ✅ |
 | `types/` | 宿主 peer 的最小环境声明（`@deepseek-ai/dsh-tools`） | ❌ |
 | `tsconfig.json` | TypeScript 构建配置（`npm run build`） | ❌ |
-| `extension/` | 标签组用的 MV3 扩展（仅 `tabs`/`tabGroups` 权限） | ✅ |
+| `extension/` | 标签组用的 MV3 扩展运行时资产：`manifest.json` + 构建生成的 `sw.js`（仅 `tabs`/`tabGroups` 权限） | ✅ |
+| `extension-src/` | MV3 service worker 的 **TypeScript** 源码（`sw.ts` → `extension/sw.js`） | ❌ |
 | `skills/browser-harness/` | 运行时技能正文（**单一来源**，`lib/skill.ts` 编译后从 `dist/lib/skill.js` 读取） | ✅ |
 | `locale/` | DSH 插件展示元数据（en/zh） | ✅ |
 | `docs/` | 本目录：安装/配置/标签组/使用/架构/结构约定 | ✅ |
-| `tests/fixtures/` | 集成测试用的本地 fixture 站 | ❌ |
-| `tests/unit/helpers/` | 单测替身（FakeTransport / FakeWebSocket） | ❌ |
-| `tests/integration/helpers/` | 真机测试辅助（任意 Chromium 启动器） | ❌ |
-| `scripts/` | 冒烟（`verify.mjs`）与 GitHub Packages 一键安装脚本 | ❌ |
+| `tests/` | 单测/集成场景/helpers/fixture 全部 **TypeScript**，编译到 `dist-tests/` | ❌ |
+| `dist-tests/` | 测试的编译产物（`node --test "dist-tests/**/*.test.js"`） | ❌ |
+| `scripts/` | 冒烟（`verify.ts` → `dist-scripts/verify.js`）与 GitHub Packages 一键安装脚本 | ❌ |
+| `tsconfig*.json` | 主源码 / 测试 / 脚本 / 扩展四套构建配置 | ❌ |
 
 `package.json` 的 `files` 字段就是发布白名单：`dist/` 构建产物 + 运行时资产（extension/skills/locale）+ `docs/` + README/LICENSE；**源码、测试、脚本、tsconfig 不进包**。
 
@@ -40,13 +41,13 @@
 - 技能正文：只维护 `skills/browser-harness/SKILL.md`（不保留根目录副本）。
 - README：`README.md`（中文，默认）与 `README.en.md`（英文镜像），改一处要同步另一处。
 - 文档按主题拆分：安装 → `docs/install.md`；配置 → `docs/configuration.md`；标签组 → `docs/tab-groups.md`；使用 → `docs/usage.md`；架构 → `docs/architecture.md`。
-- 标签组标题/颜色逻辑：`src/tabgroups.ts`；扩展侧代码只在 `extension/`。
-- 发布产物唯一来源：`npm run build`（`tsc`）→ `dist/`；不要手改 `dist/`，也不要提交它（已 gitignore）。
+- 标签组标题/颜色逻辑：`src/tabgroups.ts`；扩展侧代码只在 `extension-src/sw.ts`，构建到 `extension/sw.js`。
+- 发布产物唯一来源：`npm run build`（`tsc`）→ `dist/`、`extension/sw.js`；测试编译到 `dist-tests/`，脚本编译到 `dist-scripts/`。不要手改这些构建产物，也不要提交它们（已 gitignore）。
 
 ## 维护约定
 
-- 源码是 TypeScript（`strict: true`，含 `noImplicitAny`）：先 `npm install` 再 `npm run build`；改代码后跑 `npm run test:all`（自动构建，当前 102 单测 + 27 集成场景 = 129 条）。
-- CI：`npm ci` + build 后单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场景跑 ubuntu（xvfb 提供 display），门禁要求正好 27 条且 S15/S16 必须实际执行；publish 校验 tag==v版本并做打包冒烟（含 `dist/` 产物）。
+- 全量 TypeScript：源码/测试/脚本/扩展均为 TS（主源码 `strict: true` 含 `noImplicitAny`；测试因动态替身以 `noCheck` 编译）。先 `npm install`，改代码后跑 `npm run test:all`（自动构建源码与测试，当前 102 单测 + 27 集成场景 = 129 条）。
+- CI：`npm ci` 后单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场景先 `npm run build:tests` 再在 ubuntu + xvfb 跑 `dist-tests/integration/**/*.test.js`，门禁要求正好 27 条且 S15/S16 必须实际执行；publish 校验 tag==v版本并做打包冒烟（含 `dist/` 产物）。
 - 版本与发布：GitHub Release 触发 `.github/workflows/publish.yml`，发布到 GitHub Packages（`@xumi0920/dsh-browser-harness`）；版本号需与 tag 一致。
 - 依赖升级（Dependabot，weekly）：逐个 PR `gh pr checkout <n>` → `npm ci` → `npx tsc --noEmit` → `npm run build` → 全量 `npm run test:all`（102 单测 + 27 集成）；分支落后 main 时先 `gh pr update-branch <n>` 再复测；通过后 `gh pr merge <n> --squash --delete-branch`。仅 devDependencies/lockfile 变化时**不必发版**（`dist/` 与运行时依赖不变）；typescript / @types/node 等工具链升级必须同时通过类型检查与集成场景。
 - DSH 版本兼容：`engines.dsh` 与 DSH peer 均为 `>=0.2.1-rc.5`（不设上限）；`tests/unit/package.test.mjs` 按 DSH plugin-manager 的 `semver.satisfies(..., { includePrerelease: true })` 逻辑校验。
