@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Standalone CLI over the core (no DSH required):
- *   bh doctor | tabs | open <url> | info | snapshot | text [sel] | js <expr> | shot [path] | close
+ *   bh doctor | tabs | open <url> | info | snapshot | text [sel] | js <expr> | shot [path] | close | groups [--retry]
  */
 
 import { Browser } from "../src/browser.mjs";
@@ -17,7 +17,7 @@ function stateDir() {
 
 async function main() {
   if (!command || command === "help" || command === "--help") {
-    console.log("usage: bh <doctor|tabs|open <url>|info|snapshot|text [selector]|js <expr>|shot [path]|close>");
+    console.log("usage: bh <doctor|tabs|open <url>|info|snapshot|text [selector]|js <expr>|shot [path]|close|groups [--retry]>");
     return;
   }
   if (command === "doctor") {
@@ -44,6 +44,13 @@ async function main() {
       const targetId = args.find((arg) => !arg.startsWith("--"));
       const result = await browser.closeTab(targetId, { force });
       console.log(JSON.stringify(result));
+      return;
+    }
+    if (command === "groups") {
+      // --retry clears the failure cooldown so a fixed environment can be retried now.
+      if (args.includes("--retry")) browser.tabGroups.resetFailure();
+      const groups = await browser.tabGroups.listGroups();
+      console.log(JSON.stringify({ ...browser.tabGroups.info(), groups }, null, 2));
       return;
     }
     const current = await browser.current();

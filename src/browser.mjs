@@ -176,7 +176,7 @@ export class Browser {
       const state = await stateStore.readState(lane, this.config.stateDir);
       const remembered = state.group && Number.isFinite(state.group.id) ? state.group.id : null;
       const groupId = remembered !== null && (await this.tabGroups.groupExists(remembered)) ? remembered : null;
-      const title = this.config.tabGroupTitle || tabGroupTitleFor(lane);
+      const title = tabGroupTitleFor(lane, this.config.tabGroupTitle);
       const color = this.config.tabGroupColor || tabGroupColorFor(lane);
       const result = await this.tabGroups.groupTab(page, { title, color, groupId });
       if (result && result.ok && Number.isFinite(result.groupId) && result.groupId !== remembered) {

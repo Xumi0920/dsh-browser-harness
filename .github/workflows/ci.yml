@@ -38,11 +38,13 @@ jobs:
             echo "::error::No Chrome/Chromium found; integration scenarios would silently skip."
             exit 1
           fi
+      - name: Install xvfb for the headful tab-group scenario
+        run: sudo apt-get update && sudo apt-get install -y xvfb
       - name: Run scenario suite
         shell: bash
         run: |
           set -o pipefail
-          node --test --test-reporter=tap "tests/integration/**/*.test.mjs" | tee tap.txt
+          xvfb-run -a -s "-screen 0 1280x800x24" node --test --test-reporter=tap "tests/integration/**/*.test.mjs" | tee tap.txt
       - name: Fail when the scenario suite did not really run
         run: |
           tests=$(grep -E '^# tests [0-9]+' tap.txt | awk '{print $3}')
