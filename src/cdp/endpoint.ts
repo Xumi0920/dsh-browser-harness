@@ -12,6 +12,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { noBrowser } from "../errors.js";
+import { redactTextForOutput, safeEndpointLabel } from "../redact.js";
 
 const DEFAULT_PROBE_TIMEOUT_MS = 2_500;
 
@@ -142,21 +143,23 @@ export async function probeVersion(httpUrl: any, options: any = {} as any) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetchImpl(normalizeBaseUrl(httpUrl) + "/json/version", { signal: controller.signal });
+    const endpointLabel = safeEndpointLabel(httpUrl);
     if (response.status === 403) {
-      throw noBrowser("remote debugging is disabled or needs approval (HTTP 403) for " + httpUrl, { httpUrl, status: 403 });
+      throw noBrowser("remote debugging is disabled or needs approval (HTTP 403) for " + endpointLabel, { endpoint: endpointLabel, status: 403 });
     }
     if (!response.ok) {
-      throw noBrowser("CDP endpoint " + httpUrl + " answered HTTP " + response.status, { httpUrl, status: response.status });
+      throw noBrowser("CDP endpoint " + endpointLabel + " answered HTTP " + response.status, { endpoint: endpointLabel, status: response.status });
     }
     const body = await response.json();
     if (!body || typeof body.webSocketDebuggerUrl !== "string" || !body.webSocketDebuggerUrl.startsWith("ws://")) {
-      throw noBrowser("endpoint " + httpUrl + " is not a usable Chromium DevTools endpoint", { httpUrl });
+      throw noBrowser("endpoint " + endpointLabel + " is not a usable Chromium DevTools endpoint", { endpoint: endpointLabel });
     }
     return { webSocketDebuggerUrl: body.webSocketDebuggerUrl, browser: body.Browser, userAgent: body["User-Agent"] };
   } catch (error: any) {
     if (error && error.code === "E_NO_BROWSER") throw error;
     const reason = error && error.name === "AbortError" ? "probe timed out" : String(error && error.message ? error.message : error);
-    throw noBrowser("cannot reach CDP endpoint " + httpUrl + ": " + reason, { httpUrl });
+    const endpointLabel = safeEndpointLabel(httpUrl);
+    throw noBrowser("cannot reach CDP endpoint " + endpointLabel + ": " + redactTextForOutput(reason), { endpoint: endpointLabel });
   } finally {
     clearTimeout(timer);
   }
@@ -221,7 +224,7 @@ export async function resolveEndpoint(options: any = {} as any) {
       const version = await probeVersion(candidate.httpUrl, probeOptions);
       return { wsUrl: version.webSocketDebuggerUrl, httpUrl: candidate.httpUrl, browser: candidate.id, source: "auto:" + candidate.id };
     } catch (error: any) {
-      failures.push(candidate.id + "(" + candidate.httpUrl + "): " + (error && error.message));
+      failures.push(candidate.id + "(" + safeEndpointLabel(candidate.httpUrl) + "): " + redactTextForOutput(error && error.message));
     }
   }
 
@@ -242,7 +245,7 @@ export async function resolveEndpoint(options: any = {} as any) {
       const candidate = fallbacks[index];
       return { wsUrl: result.value.webSocketDebuggerUrl, httpUrl: candidate.httpUrl, browser: candidate.id, source: "auto-fallback:" + candidate.id };
     }
-    failures.push(fallbacks[index].id + "(" + fallbacks[index].httpUrl + "): " + (result.reason && result.reason.message));
+    failures.push(fallbacks[index].id + "(" + safeEndpointLabel(fallbacks[index].httpUrl) + "): " + redactTextForOutput(result.reason && result.reason.message));
   }
   throw noBrowser("no reachable CDP endpoint; start a dedicated Chromium-based browser (Chrome, Edge, Brave, Chromium, Vivaldi, Opera, Arc) with --remote-debugging-port, or pass browser/cdpUrl/ws", { tried: failures });
 }
@@ -265,7 +268,7 @@ export async function listEndpoints(options: any = {} as any) {
       label: (entry && entry.label) || ((KNOWN_BROWSERS as Record<string, any>)[id] && (KNOWN_BROWSERS as Record<string, any>)[id].label) || id,
       port: candidate ? candidate.port : null,
       enabled,
-      httpUrl: candidate ? candidate.httpUrl : null,
+      httpUrl: candidate ? safeEndpointLabel(candidate.httpUrl) : null,
       status: "disabled",
       browser: null,
     };
@@ -274,10 +277,10 @@ export async function listEndpoints(options: any = {} as any) {
       const version = await probeVersion(candidate.httpUrl, probeOptions);
       row.status = "live";
       row.browser = version.browser;
-      row.wsUrl = version.webSocketDebuggerUrl;
+      row.wsUrl = safeEndpointLabel(version.webSocketDebuggerUrl);
     } catch (error: any) {
       row.status = "down";
-      row.error = error && error.message;
+      row.error = redactTextForOutput(error && error.message);
     }
     return row;
   }));

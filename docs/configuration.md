@@ -1,6 +1,6 @@
 # 配置
 
-本插件只**探测**已运行的浏览器，绝不启动、杀死或重配用户的浏览器。所有配置都可以放在 profile patch（`~/.dsh/profiles/desktop/cordis.patch.yml`）里。
+本插件只**探测**已运行的浏览器：不启动或终止浏览器进程。默认标签分组会在所连接的专用浏览器中安装/更新辅助扩展（可用 `tabGroups: false` 关闭该机制），除此之外不修改浏览器配置。所有配置都可以放在 profile patch（`~/.dsh/profiles/desktop/cordis.patch.yml`）里。
 
 ## 1. 浏览器如何被发现
 

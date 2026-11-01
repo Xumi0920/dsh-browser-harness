@@ -5,7 +5,7 @@
  * background listeners beyond the lifetime of this Page object.
  */
 
-import { writeFile, readFile, readdir, stat, mkdir, realpath } from "node:fs/promises";
+import { writeFile, readFile, readdir, stat, mkdir, realpath, lstat } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -56,6 +56,33 @@ function modifierMask(modifiers: any) {
     return mask;
   }
   return Number(modifiers) || 0;
+}
+
+
+/** Verify every existing component of a screenshot parent before mkdir. */
+async function assertSafeScreenshotParent(base: string, realBase: string, parent: string) {
+  let current = base;
+  let nearestExisting = base;
+  for (const part of relative(base, parent).split(sep).filter(Boolean)) {
+    current = join(current, part);
+    let stats: any;
+    try {
+      stats = await lstat(current);
+    } catch (error: any) {
+      if (error && error.code === "ENOENT") break;
+      throw policyDenied("cannot verify screenshot path", { path: current });
+    }
+    if (stats.isSymbolicLink()) throw policyDenied("screenshot path must not traverse symlinks or junctions", { path: current });
+    if (!stats.isDirectory()) throw policyDenied("screenshot path component is not a directory", { path: current });
+    nearestExisting = current;
+  }
+  const realNearest = await realpath(nearestExisting).catch(() => {
+    throw policyDenied("cannot resolve screenshot path", { path: nearestExisting });
+  });
+  const relativeNearest = relative(realBase, realNearest);
+  if (relativeNearest === ".." || relativeNearest.startsWith(".." + sep) || isAbsolute(relativeNearest)) {
+    throw policyDenied("screenshot path must stay inside screenshotDir", { path: nearestExisting, screenshotDir: realBase });
+  }
 }
 
 function pngSize(buffer: any) {
@@ -541,15 +568,20 @@ export class Page {
     const buffer = Buffer.from(result.data, "base64");
     const base = resolve(this.screenshotDir);
     await mkdir(base, { recursive: true, mode: 0o700 });
-    const realBase = await realpath(base).catch(() => base);
+    const realBase = await realpath(base).catch(() => {
+      throw policyDenied("cannot resolve screenshotDir", { screenshotDir: base });
+    });
     const target = filePath ? resolve(base, String(filePath)) : join(base, "bh-shot-" + Date.now() + ".png");
     const relativeTarget = relative(resolve(this.screenshotDir), target);
     if (relativeTarget === ".." || relativeTarget.startsWith(".." + sep) || isAbsolute(relativeTarget)) {
       throw policyDenied("screenshot path must stay inside screenshotDir", { path: target, screenshotDir: base });
     }
     const parent = dirname(target);
+    await assertSafeScreenshotParent(base, realBase, parent);
     await mkdir(parent, { recursive: true, mode: 0o700 });
-    const realParent = await realpath(parent).catch(() => parent);
+    const realParent = await realpath(parent).catch(() => {
+      throw policyDenied("cannot resolve screenshot path", { path: parent });
+    });
     const relativeParent = relative(realBase, realParent);
     if (relativeParent === ".." || relativeParent.startsWith(".." + sep) || isAbsolute(relativeParent)) {
       throw policyDenied("screenshot path must stay inside screenshotDir", { path: target, screenshotDir: realBase });

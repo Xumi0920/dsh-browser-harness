@@ -30,7 +30,7 @@ browser_tabs        list / use / new / close
 - **Your real login state.** Point it at a dedicated Chromium instance; sign in once and it persists. Your daily browser is never touched.
 - **Text-first.** Accessibility-tree snapshots and refs beat screenshot-VLM loops; screenshots stay optional.
 - **Per-task tab groups.** Tabs the harness creates are grouped per DSH session; work tabs are never grouped, and headless browsers skip grouping.
-- **Tested.** 138 unit tests (fake CDP) + 27 integration scenarios (real headless/headful Chromium) = 165, with CI on three platforms.
+- **Tested.** 141 unit tests (fake CDP) + 27 integration scenarios (real headless/headful Chromium) = 168, with CI on three platforms.
 - **Hardened boundaries.** `browser_tabs use` accepts only page targets with http(s)/about:blank URLs (non-owned tabs need an exact targetId); screenshots stay inside `screenshotDir` and never overwrite; `fill` never echoes the entered value; JS mode is marked non-concurrent; token-like URLs/headers are redacted in tool output; broad port fallback is explicit `auto` only.
 
 ## Requirements
@@ -102,7 +102,7 @@ browser_extract {mode:"text" | "html" | "js" | "network"}
 
 ```sh
 npm install                 # dev deps (TypeScript); runtime stays zero-dependency
-npm run test:all            # build + 138 unit + 27 integration = 165 tests
+npm run test:all            # build + 141 unit + 27 integration = 168 tests
 ```
 
 CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu + xvfb (27-scenario gate, S15/S16 must actually run). Tests and scripts are compiled by `tsc` too (`dist-tests/` / `dist-scripts/`), sharing the runtime NodeNext config.
@@ -114,9 +114,10 @@ CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu
 - Screenshots are confined to `screenshotDir` (default `<stateDir>/screenshots`); directory escapes, symlinks and overwriting existing files are rejected.
 - `browser_act fill` returns only `{ok, length, verified}` and never echoes the input; JS mode can mutate page state and is marked non-concurrent.
 - Cookies are redacted by default; network URLs/headers and status/tab URLs get best-effort token redaction: query keys are matched after camelCase/kebab/snake-case normalization, and `Location` / `Content-Location` are redacted wholesale. Page content, HTML and screenshots may still contain sensitive data: not a full DLP.
+- `browser_status` endpoint diagnostics omit full CDP URLs; connection errors keep only a stable error code and a safe hint.
 - State stores URLs without query/fragment/userinfo; broad CDP port fallback requires explicit `browser: "auto"` / `BH_ALLOW_FALLBACK=1`.
 - Never point `cdpUrl` at a daily-driver browser; background operations only; login walls stop the workflow and ask the user.
 
 ## License
 
-MIT (c) 2026 Xumi0920 · current version **v1.0.2** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog
+MIT (c) 2026 Xumi0920 · current version **v1.0.3** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog

@@ -8,6 +8,9 @@
 
 import { HarnessError } from "../src/errors.js";
 import { findByRole, formatSnapshot } from "../src/ax.js";
+import { redactHeadersForOutput, redactTextForOutput, redactUrlForOutput } from "../src/redact.js";
+
+export { redactHeadersForOutput, redactTextForOutput, redactUrlForOutput };
 
 const textOutput = (value: any) => (typeof value === "string" ? value : JSON.stringify(value, null, 2));
 
@@ -15,45 +18,6 @@ const jsonOutput = {
   schema: { type: "object", additionalProperties: true },
   render: (_args: any, value: any) => [{ type: "text", text: textOutput(value) }],
 };
-
-// Query keys are normalized (lowercase, separators removed) before matching so
-// accessToken / access-token / ACCESS_TOKEN / %61ccessToken all match. Keep this
-// a finite canonical set: substring rules would also redact monkey/tokenizer.
-const SENSITIVE_QUERY = /^(token|accesstoken|refreshtoken|idtoken|session|sessionid|sid|auth|authorization|password|passwd|secret|apikey|key|code)$/i;
-// Location / Content-Location carry redirect URLs that may themselves contain
-// credentials; conservatively redact the whole value (case-insensitive).
-const SENSITIVE_HEADER = /^(authorization|proxy-authorization|cookie|set-cookie|location|content-location|x[-_].*(token|secret|session|auth|key).*)$/i;
-
-/** Strip credentials and sensitive query values before a URL enters tool output. */
-export function redactUrlForOutput(raw: any) {
-  const text = String(raw || "");
-  if (!text) return raw;
-  try {
-    const url = new URL(text);
-    let changed = false;
-    if (url.username) { url.username = "redacted"; changed = true; }
-    if (url.password) { url.password = "redacted"; changed = true; }
-    for (const [key, value] of [...url.searchParams.entries()]) {
-      const normalizedKey = key.toLowerCase().replace(/[-_\s]/g, "");
-      if (SENSITIVE_QUERY.test(normalizedKey) || /(token|secret|session|password|authorization)/i.test(value)) {
-        url.searchParams.set(key, "[redacted]");
-        changed = true;
-      }
-    }
-    if (url.hash) { url.hash = "#redacted"; changed = true; }
-    return changed ? url.toString() : text;
-  } catch {
-    return text;
-  }
-}
-
-/** Redact credential-carrying response/request headers. */
-export function redactHeadersForOutput(headers: any) {
-  if (!headers || typeof headers !== "object") return headers;
-  const out: any = {};
-  for (const [key, value] of Object.entries(headers)) out[key] = SENSITIVE_HEADER.test(key) ? "[redacted]" : value;
-  return out;
-}
 
 function redactEvent(event: any) {
   return {
@@ -63,13 +27,31 @@ function redactEvent(event: any) {
   };
 }
 
+function redactEndpoint(endpoint: any) {
+  if (!endpoint || typeof endpoint !== "object") return endpoint;
+  return {
+    id: endpoint.id,
+    label: endpoint.label,
+    port: endpoint.port,
+    enabled: endpoint.enabled,
+    status: endpoint.status,
+    browser: endpoint.browser ?? null,
+    ...(endpoint.error ? { error: redactTextForOutput(endpoint.error) } : {}),
+  };
+}
+
 function redactStatus(status: any) {
   if (!status || typeof status !== "object") return status;
-  return {
-    ...status,
-    ...(status.current ? { current: redactEvent(status.current) } : {}),
-    ...(Array.isArray(status.tabs) ? { tabs: status.tabs.map(redactEvent) } : {}),
+  const out: any = {
+    connected: Boolean(status.connected),
+    version: status.version ?? null,
+    tabs: Array.isArray(status.tabs) ? status.tabs.map(redactEvent) : [],
+    current: status.current ? redactEvent(status.current) : null,
+    endpoints: Array.isArray(status.endpoints) ? status.endpoints.map(redactEndpoint) : [],
   };
+  if (status.tabGroups !== undefined) out.tabGroups = status.tabGroups;
+  if (status.error !== undefined) out.error = redactTextForOutput(status.error);
+  return out;
 }
 
 
@@ -89,7 +71,7 @@ function wrap(handler: any) {
     try {
       return await handler(args, sessionId, exec);
     } catch (error: any) {
-      if (error instanceof HarnessError) throw new Error(error.code + ": " + error.message);
+      if (error instanceof HarnessError) throw new Error(error.code + ": " + redactTextForOutput(error.message));
       throw error;
     }
   };

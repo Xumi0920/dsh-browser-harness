@@ -11,6 +11,7 @@
 import { Browser } from "../src/browser.js";
 import { noTab, HarnessError } from "../src/errors.js";
 import { listEndpoints } from "../src/cdp/endpoint.js";
+import { redactTextForOutput } from "../src/redact.js";
 
 export class BrowserManager {
   config: any;
@@ -59,11 +60,12 @@ export class BrowserManager {
         this.connection = browser;
         return browser;
       } catch (error: any) {
+        // Keep the stable code and a safe hint; never copy the raw connect error
+        // (it may contain a tokenized CDP URL or other configured credentials).
         throw new HarnessError(
-          error.code || "E_NO_BROWSER",
-          "cannot reach a dedicated automation browser: " + error.message +
-            " — start a Chromium-based browser with --remote-debugging-port (e.g. the 9331 Chrome or 9332 Edge instance in ~/.dsh/browser-cdp) or configure browser/cdpUrl.",
-          { cause: error },
+          (error && error.code) || "E_NO_BROWSER",
+          "cannot reach a dedicated automation browser — start a Chromium-based browser with --remote-debugging-port (e.g. the 9331 Chrome or 9332 Edge instance in ~/.dsh/browser-cdp) or configure browser/cdpUrl. Connection error details are intentionally omitted.",
+          { code: (error && error.code) || "E_NO_BROWSER" },
         );
       } finally {
         this.connecting = null;
@@ -170,7 +172,7 @@ export class BrowserManager {
       current = await browser.current(lane);
       tabGroups = browser.tabGroups ? browser.tabGroups.info() : null;
     } catch (error: any) {
-      return { connected: false, error: error.message, endpoints, tabs: [], current: null, version: null };
+      return { connected: false, error: redactTextForOutput(error && error.message), endpoints, tabs: [], current: null, version: null };
     }
     return { connected: true, version, tabs, current, tabGroups, endpoints };
   }

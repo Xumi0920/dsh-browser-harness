@@ -14,9 +14,9 @@ cd C:\path\to\dsh-browser-harness
 npm install                                   # 开发依赖：typescript / @types/node / @types/chrome / semver
 npm run build                                 # tsc → dist/ + extension/sw.js（发布产物）
 
-npm test                                      # 构建源码与测试，跑 138 单测（fake CDP 替身）
+npm test                                      # 构建源码与测试，跑 141 单测（fake CDP 替身）
 npm run test:integration                      # 构建 + 27 场景（真实 headless/headful Chromium）
-npm run test:all                              # 构建 + 共 165 条
+npm run test:all                              # 构建 + 共 168 条
 npm run verify -- --browser chrome            # 对 live 实例冒烟（需先 build）
 ```
 

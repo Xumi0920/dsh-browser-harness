@@ -7,11 +7,13 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   github-packages:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
@@ -35,7 +37,8 @@ jobs:
             fi
             echo "publishing v${version} from tag ${GITHUB_REF_NAME}"
           else
-            echo "::warning::workflow_dispatch publish of ${version} from ${GITHUB_REF_NAME}; make sure a matching release/tag exists"
+            echo "::error::publish is only allowed from a tag (got ref ${GITHUB_REF_NAME})"
+            exit 1
           fi
       - name: Build and unit tests
         run: npm test

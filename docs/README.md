@@ -48,10 +48,10 @@
 
 ## 维护约定
 
-- 全量 TypeScript：源码/测试/脚本/扩展均为 TS（主源码 `strict: true` 含 `noImplicitAny`；测试因动态替身以 `noCheck` 编译）。先 `npm install`，改代码后跑 `npm run test:all`（自动构建源码与测试，当前 138 单测 + 27 集成场景 = 165 条）。
+- 全量 TypeScript：源码/测试/脚本/扩展均为 TS（主源码 `strict: true` 含 `noImplicitAny`；测试因动态替身以 `noCheck` 编译）。先 `npm install`，改代码后跑 `npm run test:all`（自动构建源码与测试，当前 141 单测 + 27 集成场景 = 168 条）。
 - CI：`npm ci` 后单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场景先 `npm run build:tests` 再在 ubuntu + xvfb 跑 `dist-tests/integration/**/*.test.js`，门禁要求正好 27 条且 S15/S16 必须实际执行；publish 校验 tag==v版本并做打包冒烟（含 `dist/` 产物）；CodeQL 在 push main / 每周扫描 `javascript-typescript`。
 - 版本与发布：GitHub Release 触发 `.github/workflows/publish.yml`，发布到 GitHub Packages（`@xumi0920/dsh-browser-harness`）；版本号需与 tag 一致。自 **v1.0.0** 起改为单线发布，只保留最新 Release/tag，历史版本（v0.1.0–v0.6.1）的 tag/Release 已清理并归档；升级请直接使用最新版。
-- 依赖升级（Dependabot，weekly）：逐个 PR `gh pr checkout <n>` → `npm ci` → `npx tsc --noEmit` → `npm run build` → 全量 `npm run test:all`（138 单测 + 27 集成）；分支落后 main 时先 `gh pr update-branch <n>` 再复测；通过后 `gh pr merge <n> --squash --delete-branch`。仅 devDependencies/lockfile 变化时**不必发版**（`dist/` 与运行时依赖不变）；typescript / @types/node 等工具链升级必须同时通过类型检查与集成场景。
+- 依赖升级（Dependabot，weekly）：逐个 PR `gh pr checkout <n>` → `npm ci` → `npx tsc --noEmit` → `npm run build` → 全量 `npm run test:all`（141 单测 + 27 集成）；分支落后 main 时先 `gh pr update-branch <n>` 再复测；通过后 `gh pr merge <n> --squash --delete-branch`。仅 devDependencies/lockfile 变化时**不必发版**（`dist/` 与运行时依赖不变）；typescript / @types/node 等工具链升级必须同时通过类型检查与集成场景。
 - DSH 版本兼容：`engines.dsh` 与 DSH peer 均为 `>=0.2.1-rc.5`（不设上限）；`tests/unit/package.test.ts` 按 DSH plugin-manager 的 `semver.satisfies(..., { includePrerelease: true })` 逻辑校验。
 - 提交信息用 conventional commits（`feat:` / `fix:` / `docs:` / `test:` / `chore:`）。
 - 新增浏览器相关能力时，优先扩展 `src/`；插件层只做 DSH 适配。
@@ -64,7 +64,7 @@
 - **Tag 保护**：对 `v*` 禁止非维护者创建/移动/删除；Release 只从 tag 发布。
 - **Code security**：Secret scanning + Push protection（已开启）、Dependabot alerts + security updates（已开启）、CodeQL（已加工作流）；依赖图保持开启。
 - **Private vulnerability reporting**：Security 标签页 → 开启私密漏洞报告（SECURITY.md 已链接）。
-- **Actions 加固**：publish 的 `workflow_dispatch` 只允许维护者/受保护环境；关键 action 可进一步固定到 commit SHA（与 Dependabot 升级配合），目前使用官方 major tag。
+- **Actions 加固**：publish 现在只接受 tag 发布（`workflow_dispatch` 非 tag ref 会失败），`packages:write` 已限定到发布 job；关键 action 可进一步固定到 commit SHA（与 Dependabot 升级配合），目前使用官方 major tag。
 - **Publish 环境**：可为 `publish` job 配置 Environment + required reviewers；tag 校验已存在（tag 必须等于 `v${version}`）。
 - 本地 `.env` / `.npmrc` / 证书 / 截图目录已加入 `.gitignore`，不要提交 token。
 
