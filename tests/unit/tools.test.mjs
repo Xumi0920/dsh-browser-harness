@@ -30,13 +30,10 @@ function fakeManager(overrides = {}) {
     status: async () => ({ connected: true, version: { product: "Chrome/156" }, tabs: [], current: null, endpoints: [] }),
     navigate: async () => page,
     pageFor: async () => page,
-    browserFor: async () => ({
-      listTabs: async () => [{ targetId: "T1", url: "https://example.com" }],
-      current: async () => ({ targetId: "T1" }),
-      use: async (id) => ({ targetId: id, info: async () => ({ url: "https://example.com" }) }),
-      newTab: async () => ({ targetId: "T2", info: async () => ({ url: "about:blank" }) }),
-      closeTab: async () => ({ ok: true }),
-    }),
+    listTabs: async () => ({ tabs: [{ targetId: "T1", url: "https://example.com", owned: true }], current: { targetId: "T1" } }),
+    useTab: async (sessionId, id) => ({ targetId: id, info: async () => ({ url: "https://example.com" }) }),
+    openTab: async (sessionId, url) => ({ targetId: "T2", info: async () => ({ url: url || "about:blank" }) }),
+    closeTab: async (sessionId, targetId) => ({ ok: true, closed: targetId }),
     ...overrides,
   };
 }
@@ -112,4 +109,69 @@ test("output render produces text content blocks", () => {
   const blocks = status.output.render({}, { connected: true });
   assert.equal(blocks[0].type, "text");
   assert.match(blocks[0].text, /connected/);
+});
+
+test("browser_extract network reports capture state and event count", async () => {
+  const tools = build();
+  const extract = tools.find((definition) => definition.name === "browser_extract");
+  const value = await extract.execute({ mode: "network" }, { agent: { session: { id: "s1" } } });
+  assert.equal(value.mode, "network");
+  assert.equal(value.count, 1);
+  assert.equal(value.capturing, false, "fake page has no capture flag");
+  assert.equal(value.events[0].url, "https://example.com/api");
+});
+
+test("browser_extract network includeBody attaches response bodies", async () => {
+  const manager = fakeManager();
+  const page = {
+    info: async () => ({ url: "https://example.com" }),
+    networkEvents: () => [{ requestId: "r1", url: "https://example.com/api", status: 200 }],
+    networkBodies: async (events) => events.map((event) => ({ ...event, body: "{\"value\":42}" })),
+  };
+  manager.pageFor = async () => page;
+  const tools = build(manager);
+  const extract = tools.find((definition) => definition.name === "browser_extract");
+  const value = await extract.execute({ mode: "network", includeBody: true }, {});
+  assert.equal(value.events[0].body, '{"value":42}');
+  assert.equal(value.count, 1);
+});
+
+test("snapshot truncated flag is truthful when text is line-capped", async () => {
+  const manager = fakeManager();
+  const page = {
+    targetId: "T1",
+    info: async () => ({ url: "https://example.com" }),
+    snapshot: async () => ({ nodes: Array.from({ length: 250 }, (_, index) => ({ ref: "e" + (index + 1), role: "button", name: "B" + index })), truncated: false }),
+  };
+  manager.pageFor = async () => page;
+  const tools = build(manager);
+  const snapshotTool = tools.find((definition) => definition.name === "browser_snapshot");
+  const value = await snapshotTool.execute({}, {});
+  assert.equal(value.nodes, 250);
+  assert.equal(value.truncated, true, "200-line cap must be reported as truncated");
+  assert.match(value.text, /snapshot truncated \(200 of 250 nodes\)/);
+});
+
+test("browser_tabs list returns owned flags and the current tab", async () => {
+  const tools = build();
+  const tabs = tools.find((definition) => definition.name === "browser_tabs");
+  const value = await tabs.execute({ action: "list" }, {});
+  assert.equal(value.tabs[0].owned, true);
+  assert.equal(value.current.targetId, "T1");
+});
+
+test("browser_tabs routes use/new/close through the manager", async () => {
+  const calls = [];
+  const manager = fakeManager({
+    useTab: async (sessionId, id) => { calls.push(["use", sessionId, id]); return { targetId: id, info: async () => ({ url: "https://example.com" }) }; },
+    openTab: async (sessionId, url) => { calls.push(["new", sessionId, url]); return { targetId: "T2", info: async () => ({ url }) }; },
+    closeTab: async (sessionId, targetId) => { calls.push(["close", sessionId, targetId]); return { ok: true, closed: targetId }; },
+  });
+  const tools = build(manager);
+  const tabs = tools.find((definition) => definition.name === "browser_tabs");
+  const exec = { agent: { session: { id: "s9" } } };
+  assert.equal((await tabs.execute({ action: "use", targetId: "T1" }, exec)).used, "T1");
+  assert.equal((await tabs.execute({ action: "new", url: "https://x.test" }, exec)).created, "T2");
+  assert.deepEqual(await tabs.execute({ action: "close", targetId: "T1" }, exec), { ok: true, closed: "T1" });
+  assert.deepEqual(calls, [["use", "s9", "T1"], ["new", "s9", "https://x.test"], ["close", "s9", "T1"]]);
 });

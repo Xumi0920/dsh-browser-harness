@@ -70,6 +70,7 @@ export function boxCenter(model) {
  *   roles?: string[] | Set<string>,
  *   includeText?: boolean,
  *   boxes?: Map<number, any>,
+ *   refStart?: number,
  * }} [options]
  * @returns {{ nodes: Array<{ref: string, role: string, name: string, value?: unknown, disabled?: boolean, backendDOMNodeId: number, center?: {x:number,y:number}, size?: {width:number,height:number}}>, truncated: boolean, total: number }}
  */
@@ -77,6 +78,7 @@ export function buildSnapshot(nodes, options = {}) {
   const maxNodes = options.maxNodes ?? 400;
   const roleSet = options.roles ? new Set(options.roles) : INTERACTIVE_ROLES;
   const boxes = options.boxes;
+  const refStart = Number.isFinite(options.refStart) ? Number(options.refStart) : 0;
   const out = [];
   let matched = 0;
   for (const node of nodes || []) {
@@ -95,7 +97,7 @@ export function buildSnapshot(nodes, options = {}) {
     const center = box ? boxCenter(box) : null;
     /** @type {Record<string, unknown>} */
     const row = {
-      ref: "e" + (out.length + 1),
+      ref: "e" + (refStart + out.length + 1),
       role,
       name,
       backendDOMNodeId: node.backendDOMNodeId,
@@ -151,23 +153,48 @@ export function findByRole(snapshotNodes, query = {}) {
   });
 }
 
+/** Default cap on rendered snapshot lines (snapshot nodes may be capped higher). */
+export const MAX_SNAPSHOT_TEXT_LINES = 200;
+
+/** Render one snapshot node as a compact model-readable line. */
+export function snapshotLine(node) {
+  const parts = [node.ref, node.role];
+  if (node.name) parts.push(JSON.stringify(node.name));
+  if (node.value !== undefined && node.value !== null && node.value !== "") parts.push("value=" + JSON.stringify(node.value));
+  if (node.disabled) parts.push("disabled");
+  if (node.center) parts.push("@" + node.center.x + "," + node.center.y);
+  return parts.join(" ");
+}
+
+/**
+ * Render a snapshot as text plus an authoritative truncation flag.
+ *
+ * The flag is true when the accessibility layer cut nodes *or* the text line
+ * cap hid some of the nodes that were kept, so callers never report a short
+ * text as complete.
+ *
+ * @param {{ nodes: any[], truncated?: boolean, total?: number }} snapshot
+ * @param {{ maxLines?: number }} [options]
+ * @returns {{ text: string, truncated: boolean, shown: number }}
+ */
+export function formatSnapshot(snapshot, options = {}) {
+  const maxLines = options.maxLines ?? MAX_SNAPSHOT_TEXT_LINES;
+  const nodes = (snapshot && snapshot.nodes) || [];
+  const shown = nodes.slice(0, maxLines);
+  const truncated = Boolean(snapshot && snapshot.truncated) || nodes.length > shown.length;
+  const lines = shown.map(snapshotLine);
+  if (truncated) {
+    const total = Math.max(nodes.length, Number(snapshot && snapshot.total) || 0);
+    lines.push("... snapshot truncated (" + shown.length + " of " + total + " nodes)");
+  }
+  return { text: lines.join("\n"), truncated, shown: shown.length };
+}
+
 /**
  * Render a snapshot as compact text lines for a model.
- * @param {{ nodes: any[], truncated?: boolean }} snapshot
+ * @param {{ nodes: any[], truncated?: boolean, total?: number }} snapshot
  * @param {{ maxLines?: number }} [options]
  */
 export function snapshotToText(snapshot, options = {}) {
-  const maxLines = options.maxLines ?? 200;
-  const lines = [];
-  for (const node of (snapshot && snapshot.nodes) || []) {
-    if (lines.length >= maxLines) break;
-    const parts = [node.ref, node.role];
-    if (node.name) parts.push(JSON.stringify(node.name));
-    if (node.value !== undefined && node.value !== null && node.value !== "") parts.push("value=" + JSON.stringify(node.value));
-    if (node.disabled) parts.push("disabled");
-    if (node.center) parts.push("@" + node.center.x + "," + node.center.y);
-    lines.push(parts.join(" "));
-  }
-  if (snapshot && snapshot.truncated) lines.push("... snapshot truncated");
-  return lines.join("\n");
+  return formatSnapshot(snapshot, options).text;
 }

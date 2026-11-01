@@ -38,7 +38,7 @@ after(async () => {
   for (const targetId of [...openedTabs]) {
     try { await browser.closeTab(targetId, { force: true }); } catch { /* ignore */ }
   }
-  try { browser?.close(); } catch { /* ignore */ }
+  try { await browser?.close(); } catch { /* ignore */ }
   await chrome?.close();
   await server?.close();
 });
@@ -217,7 +217,7 @@ test("S11 stale target: external close is recovered by the next call", async (t)
   openedTabs.add(page.targetId);
   const other = await Browser.connect({ cdpUrl: chrome.httpUrl, stateDir: join(stateDir, "other"), lane: "other" });
   await other.transport.send("Target.closeTarget", { targetId: page.targetId });
-  other.close();
+  await other.close();
   assert.equal(await browser.current(), null, "closed tab is pruned from state");
   const recovered = await browser.open(server.url + "/b.html");
   assert.match((await recovered.info()).title, /Page B/);

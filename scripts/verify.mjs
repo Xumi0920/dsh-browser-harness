@@ -35,6 +35,6 @@ try {
   console.log("tabs before/after:", before.length, after.length);
   console.log("VERIFY_OK");
 } finally {
-  browser?.close();
+  await browser?.close();
 }
 process.exit(0);
