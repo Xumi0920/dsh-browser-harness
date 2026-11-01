@@ -51,7 +51,7 @@ git clone https://github.com/Xumi0920/dsh-browser-harness.git C:\path\to\dsh-bro
 
 > Each `plugin_manager` operation needs a danger-full-access sandbox or per-call approval. Its `target` accepts an npm package name, a git URL, a tarball, or a local absolute directory.
 
-The plugin is a DSH bundle (`dsh.bundle.patch` -> `cordis.patch.yml`), so it registers `browser_*` tools at profile level and embeds the `browser-harness` skill. See [install.md](install.md) for the full install, verify and uninstall steps.
+The plugin is a DSH bundle (`dsh.bundle.patch` -> `cordis.patch.yml`), so it registers `browser_*` tools at profile level and embeds the `browser-harness` skill. See [install.md](install.md) (currently Chinese) for the full install, verify and uninstall steps.
 
 ## Configure the target browser
 
@@ -122,6 +122,6 @@ Integration tests launch their own Chrome with a temporary profile and never tou
 
 ## Status
 
-v0.1.1 — fixes `browser_extract` network capture at the tool layer (enabled and kept across calls), strict snapshot-ref validation (a stale ref now errors instead of remapping), reused/released Page CDP sessions, real `owned` flags in `browser_tabs`, a truthful snapshot truncation flag, and the `bh close` command; the skill text now has a single source. Pinned to DSH `0.2.1-rc.5` through `engines.dsh`. Downloads/uploads/cookies exist in the core library but are intentionally not exposed as tools yet. See the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog.
+v0.1.2 — current release. Includes the tool-layer network-capture fix (`browser_extract` keeps captured requests across calls), strict snapshot-ref validation (a stale ref now errors instead of remapping), reused/released Page CDP sessions, real `owned` flags in `browser_tabs`, a truthful snapshot truncation flag, the `bh close` command, and this round's cleanups (dead code/unused imports, CLI state directory aligned with the library, `js` output capped at 200k chars, package icon/publish metadata). Pinned to DSH `0.2.1-rc.5` through `engines.dsh`. Downloads/uploads/cookies exist in the core library but are intentionally not exposed as tools yet. See the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog.
 
 MIT (c) 2026 Xumi0920

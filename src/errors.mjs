@@ -122,6 +122,6 @@ export function uploadFailed(message, details = {}) {
 }
 export function asHarnessError(error, fallback = "unexpected harness failure") {
   if (error instanceof HarnessError) return error;
-  if (error instanceof Error) return new HarnessError(codes.E_TIMEOUT === "never" ? codes.E_EVAL : codes.E_EVAL, error.message || fallback, { cause: error });
+  if (error instanceof Error) return new HarnessError(codes.E_EVAL, error.message || fallback, { cause: error });
   return new HarnessError(codes.E_EVAL, fallback, { details: { value: String(error) } });
 }

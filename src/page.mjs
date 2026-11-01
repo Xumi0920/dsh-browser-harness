@@ -411,7 +411,6 @@ export class Page {
     }
     await this.send("Input.insertText", { text: value }, { timeoutMs: 10_000 });
     if (target.objectId) {
-      const expression = "(() => { const el = this; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); return el.value; })()";
       await this.send("Runtime.callFunctionOn", { objectId: target.objectId, functionDeclaration: "function () { this.dispatchEvent(new Event('input', { bubbles: true })); this.dispatchEvent(new Event('change', { bubbles: true })); return this.value; }", returnByValue: true }, { timeoutMs: 5_000 });
     }
     return { ok: true, length: value.length, ...(options.verify ? { value: await this.evaluate("document.activeElement ? document.activeElement.value : null") } : {}) };

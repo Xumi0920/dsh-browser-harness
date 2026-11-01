@@ -4,11 +4,11 @@
  */
 
 import { join } from "node:path";
-import { CDPTransport, connectTransport } from "./cdp/transport.mjs";
+import { CDPTransport } from "./cdp/transport.mjs";
 import { resolveEndpoint } from "./cdp/endpoint.mjs";
 import { Page } from "./page.mjs";
 import * as stateStore from "./state.mjs";
-import { badArgument, elementNotFound, noTab, policyDenied, staleTarget, targetGone } from "./errors.mjs";
+import { badArgument, elementNotFound, noTab, policyDenied, targetGone } from "./errors.mjs";
 
 const INTERNAL_URL = /^(chrome|devtools|edge|about:blank|chrome-extension):/;
 const DEFAULT_TIMEOUT_MS = 15_000;
