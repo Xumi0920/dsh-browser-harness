@@ -24,7 +24,15 @@ browser_tabs        list / use / new / close
 
 ## 安装
 
-插件发布在 **GitHub Packages**：`@xumi0920/dsh-browser-harness`（npmjs.org 上的同名包属于其他项目）。
+插件发布在 **GitHub Packages**：`@xumi0920/dsh-browser-harness`（npmjs.org 上的同名包属于其他项目）。任选一种安装方式。
+
+**最简单：一句话交给 DSH 安装**（创造模式会话；`plugin_manager` 是创造模式专用工具，每次操作需要 danger-full-access 或当次批准）：
+
+> 把 `@xumi0920/dsh-browser-harness` 安装到当前 DSH profile。
+
+本地目录同理，把包名换成你 clone 的绝对路径：`把 <本机 clone 路径> 安装到当前 profile`。
+
+**或手动安装（GitHub Packages）**：
 
 ```powershell
 npm config set @xumi0920:registry https://npm.pkg.github.com
@@ -37,7 +45,7 @@ npm config set //npm.pkg.github.com/:_authToken "<YOUR_GITHUB_TOKEN>"
 
 ## 快速开始
 
-在 DSH（创造模式）里让模型直接调用：
+插件装好后，在**任意 DSH 会话**里让模型直接调用即可（所有预设都能用，不限于创造模式；创造模式只影响用 `plugin_manager` 安装这一步）：
 
 ```
 browser_status → browser_navigate {url} → browser_snapshot → browser_act {action:"click", ref}
@@ -50,7 +58,7 @@ browser_extract {mode:"text" | "html" | "js" | "network"}
 
 | 文档 | 内容 |
 |---|---|
-| [安装与验证](docs/install.md) | GitHub Packages / 本地 / Linux / 卸载 / 升级 / FAQ |
+| [安装与验证](docs/install.md) | 一句话交给 DSH / GitHub Packages / 本地 / Linux / 卸载 / 升级 / FAQ |
 | [配置](docs/configuration.md) | 浏览器发现、端口约定、registry、profile patch 配置键 |
 | [按任务标签组](docs/tab-groups.md) | 行为边界、配置、排查、实现方式 |
 | [使用](docs/usage.md) | DSH 工作流、独立库、CLI |
@@ -76,6 +84,6 @@ CI：单测跑 ubuntu / windows；集成场景跑 ubuntu（xvfb，含 headful �
 
 ## 状态
 
-v0.3.2：文档重构（README 精简，安装/配置/标签组/使用/架构拆到 `docs/`），功能与 v0.3.1 一致。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
+v0.3.3：安装文档补充「一句话交给 DSH 安装」，并修正快速开始的模式说明（插件装好后所有预设可用；`plugin_manager` 安装工具仅在创造模式启用）。功能与 v0.3.1 一致。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
 
 MIT © 2026 Xumi0920
