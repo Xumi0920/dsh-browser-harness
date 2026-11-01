@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Browser } from "../../src/browser.mjs";
+import { Browser, assertNavigableUrl } from "../../src/browser.mjs";
 import { readState, rememberOwnedTab, setCurrent } from "../../src/state.mjs";
 import { FakeTransport } from "./helpers/fake-transport.mjs";
 
@@ -109,4 +109,17 @@ test("close detaches every cached page and closes the transport", async () => {
   assert.equal(second.closed, true);
   assert.equal(transport.count("Target.detachFromTarget"), 2);
   assert.equal(transport.closed, true);
+});
+
+test("only http(s) pages and about:blank may be opened", () => {
+  assert.equal(assertNavigableUrl("https://example.com/a"), "https://example.com/a");
+  assert.equal(assertNavigableUrl("http://127.0.0.1:3638/form.html"), "http://127.0.0.1:3638/form.html");
+  assert.equal(assertNavigableUrl("about:blank"), "about:blank");
+  for (const blocked of ["file:///C:/Windows/win.ini", "data:text/html,hi", "javascript:alert(1)", "chrome://settings", "devtools://devtools/bundled/inspector.html"]) {
+    assert.throws(() => assertNavigableUrl(blocked), (error) => {
+      assert.equal(error.code, "E_POLICY_DENIED");
+      return true;
+    }, blocked + " must be rejected");
+  }
+  assert.throws(() => assertNavigableUrl("not a url"), (error) => error.code === "E_BAD_ARG");
 });

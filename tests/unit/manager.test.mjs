@@ -99,3 +99,35 @@ test("ensure returns the existing connection without reconnecting", async () => 
   const { manager, browser } = managerWithConnection();
   assert.equal(await manager.ensure(), browser);
 });
+
+test("ensure forwards tab-group and extension settings to the browser factory", async () => {
+  let captured = null;
+  const manager = new BrowserManager({
+    browser: "chrome-beta",
+    dialogPolicy: "auto-dismiss",
+    tabGroups: false,
+    tabGroupTitle: "任务 {session}",
+    tabGroupColor: "blue",
+    extensionPath: "/opt/dsh/extension",
+    extensionId: "abcdef",
+    browserFactory: async (options) => {
+      captured = options;
+      return { transport: { closed: false } };
+    },
+  });
+  await manager.ensure();
+  assert.deepEqual(captured, {
+    browser: "chrome-beta",
+    cdpUrl: undefined,
+    ws: undefined,
+    stateDir: undefined,
+    downloadDir: undefined,
+    dialogPolicy: "auto-dismiss",
+    tabGroups: false,
+    tabGroupTitle: "任务 {session}",
+    tabGroupColor: "blue",
+    extensionPath: "/opt/dsh/extension",
+    extensionId: "abcdef",
+    lane: "dsh",
+  });
+});

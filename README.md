@@ -20,32 +20,32 @@ browser_tabs        list / use / new / close
 - **真实登录态**：连自己起好的专用 Chromium 实例（Chrome / Chromium / Edge / Brave / Vivaldi / Opera / Arc 都可以），登录一次长期有效。
 - **文本优先**：无障碍树 + ref 比“截图喂视觉模型”更准更省；截图只是可选补充。
 - **按任务标签组**：插件自建的标签页自动按 DSH 会话分组，工作标签页不受影响；headless 自动跳过。
-- **可验证**：90 个单测 + 27 个集成场景 = 117 条，全部跑在真实 headless / headful Chromium 上。
+- **可验证**：92 个单测（fake CDP 替身，无需浏览器）+ 27 个集成场景（真实 headless / headful Chromium）= 119 条。
 
 ## 安装
 
-插件发布在 **GitHub Packages**：`@xumi0920/dsh-browser-harness`（npmjs.org 上的同名包属于其他项目）。任选一种安装方式。
+插件发布在 **GitHub Packages**：`@xumi0920/dsh-browser-harness`（npmjs.org 上的同名包属于其他项目）；需要 **DSH 0.2.1-rc.5 + Node 22**（`engines` 会校验）。任选一种安装方式。
 
-**最简单：一句话交给 DSH 安装**（创造模式会话；`plugin_manager` 是创造模式专用工具，每次操作需要 danger-full-access 或当次批准）：
+**方式一：一句话交给 DSH 安装**（创造模式会话；`plugin_manager` 是创造模式专用工具，每次操作需要 danger-full-access 或当次批准）：
 
 > 把 `@xumi0920/dsh-browser-harness` 安装到当前 DSH profile。
 
-本地目录同理，把包名换成你 clone 的绝对路径：`把 <本机 clone 路径> 安装到当前 profile`。
+> GitHub Packages 来源**需要先完成「方式二」里的两条 npm config**（read:packages token）；不想配 token 的话，把包名换成你本机 clone 的绝对路径即可：`把 <本机 clone 路径> 安装到当前 profile`。
 
-**或手动安装（GitHub Packages）**：
+**方式二：手动安装（GitHub Packages）**：
 
 ```powershell
-npm config set @xumi0920:registry https://npm.pkg.github.com
-npm config set //npm.pkg.github.com/:_authToken "<YOUR_GITHUB_TOKEN>"
+npm config set "@xumi0920:registry" "https://npm.pkg.github.com"
+npm config set "//npm.pkg.github.com/:_authToken" "<YOUR_GITHUB_TOKEN>"
 & "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" `
   plugin --profile desktop add "@xumi0920/dsh-browser-harness"
 ```
 
-本地目录安装、Linux / macOS、一键脚本、验证与卸载见 **[docs/install.md](docs/install.md)**。
+> 本地 CLI 安装时请先退出 DeepSeek Harness，装完重启。本地目录安装、Linux / macOS、一键脚本（token 只写临时 npm 配置）、验证与卸载见 **[docs/install.md](docs/install.md)**。
 
 ## 快速开始
 
-插件装好后，在**任意 DSH 会话**里让模型直接调用即可（所有预设都能用，不限于创造模式；创造模式只影响用 `plugin_manager` 安装这一步）：
+装好后先**重启 DSH**，并启动专用 Chromium 浏览器（端口/启动命令见 [docs/configuration.md](docs/configuration.md)；默认 9331）。之后在**任意 DSH 会话**里让模型直接调用即可（所有预设都能用，不限于创造模式；创造模式只影响用 `plugin_manager` 安装这一步）：
 
 ```
 browser_status → browser_navigate {url} → browser_snapshot → browser_act {action:"click", ref}
@@ -70,7 +70,7 @@ browser_extract {mode:"text" | "html" | "js" | "network"}
 ```sh
 npm test                    # 单测（无浏览器）
 npm run test:integration    # 27 个集成场景
-npm run test:all            # 单测 + 场景（共 117 条）
+npm run test:all            # 单测 + 场景（共 119 条）
 ```
 
 CI：单测跑 ubuntu / windows；集成场景跑 ubuntu（xvfb，含 headful 标签组）。
@@ -84,6 +84,6 @@ CI：单测跑 ubuntu / windows；集成场景跑 ubuntu（xvfb，含 headful �
 
 ## 状态
 
-v0.3.3：安装文档补充「一句话交给 DSH 安装」，并修正快速开始的模式说明（插件装好后所有预设可用；`plugin_manager` 安装工具仅在创造模式启用）。功能与 v0.3.1 一致。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
+v0.3.4：修复标签组配置透传（`tabGroups` / `tabGroupTitle` / `tabGroupColor` 现在真正生效）；拒绝 `file://` 等非 http(s) 导航；安装脚本 token 只写临时 npm 配置、不再落盘；安装文档前置/引号/重启说明修正；CI 强制 27 场景且 headful S16 必须实跑；publish 增加 tag↔version 校验与打包冒烟。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
 
 MIT © 2026 Xumi0920
