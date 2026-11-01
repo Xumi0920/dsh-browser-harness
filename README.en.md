@@ -19,7 +19,7 @@ browser_tabs        list / use / new / close
 - **Zero dependencies.** Node 22+ built-ins only (`fetch`, `WebSocket`, `node:test`). No browser download, no build step. The DSH plugin entry imports the host-provided `@deepseek-ai/dsh-tools` peer — nothing else.
 - **Your logged-in Chrome.** Point it at a dedicated instance (default `chrome`, port 9331) that the user signed in once.
 - **Text-first.** Accessibility-tree snapshots and refs beat screenshot-VLM loops for actions; screenshots stay optional.
-- **Scene-tested.** 48 unit tests + 19 end-to-end scenarios (14 browser scenarios + 5 tool-layer scenarios, 67 total: login, async render, tabs, iframe, shadow DOM, download, upload, dialogs, validation, timeout, stale-tab recovery, screenshots, network capture, cookies) run against a real headless Chrome and a local fixture site.
+- **Scene-tested.** 74 unit tests + 24 end-to-end scenarios (14 browser scenarios + 10 tool-layer/CLI scenarios, 98 total: login, async render, tabs, iframe, shadow DOM, download, upload, dialogs, validation, timeout, stale-tab recovery, screenshots, network capture, cookies) run against a real headless Chrome and a local fixture site.
 
 ## Requirements
 
@@ -105,8 +105,8 @@ Run from a source checkout. The packed artifact (`npm pack`) contains the runtim
 
 ```sh
 npm test                    # unit: CDP protocol, endpoint, state, AX, tools (no browser)
-npm run test:integration    # 19 scenarios on a throwaway headless Chrome
-npm run test:all            # unit + integration (67 tests)
+npm run test:integration    # 24 scenarios on a throwaway headless Chrome
+npm run test:all            # unit + integration (98 tests)
 node scripts/verify.mjs     # smoke against a live dedicated Chrome
 ```
 

@@ -19,7 +19,7 @@ browser_tabs        list / use / new / close
 - **零依赖**：只用 Node 22+ 内置能力（`fetch`、`WebSocket`、`node:test`），不下载浏览器、不需要构建；插件入口仅使用宿主提供的 `@deepseek-ai/dsh-tools` peer。
 - **真实登录态**：连用户自己起好的专用 Chrome 实例（默认 `chrome`，端口 9331），登录一次长期有效。
 - **文本优先**：无障碍树 + ref 比“截图喂视觉模型”更准更省；截图只是可选补充。
-- **场景测试**：48 个单测 + 19 个端到端场景（14 条浏览器场景 + 5 条工具层场景，共 67 条；登录、异步渲染、多标签、iframe、Shadow DOM、下载、上传、对话框、表单校验、选择器超时、标签页被关恢复、截图、网络捕获、Cookie），全部跑在真实 headless Chrome + 本地 fixture 站上。
+- **场景测试**：74 个单测 + 24 个端到端场景（14 条浏览器场景 + 10 条工具层/CLI 场景，共 98 条；登录、异步渲染、多标签、iframe、Shadow DOM、下载、上传、对话框、表单校验、选择器超时、标签页被关恢复、截图、网络捕获、Cookie），全部跑在真实 headless Chrome + 本地 fixture 站上。
 
 ## 环境要求
 
@@ -105,8 +105,8 @@ CLI 子命令：`doctor`、`tabs`、`open <url>`、`info`、`snapshot`、`text [
 
 ```sh
 npm test                    # 单测（无浏览器）
-npm run test:integration    # 19 个场景（临时 headless Chrome）
-npm run test:all            # 单测 + 场景（共 67 条）
+npm run test:integration    # 24 个场景（临时 headless Chrome）
+npm run test:all            # 单测 + 场景（共 98 条）
 node scripts/verify.mjs     # 对 live 专用 Chrome 冒烟
 ```
 

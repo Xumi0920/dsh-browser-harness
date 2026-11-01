@@ -6,14 +6,19 @@
 
 import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { startFixtureServer } from "../../fixtures/server.mjs";
 import { launchChrome } from "./helpers/launch-chrome.mjs";
 import { BrowserManager } from "../../lib/manager.js";
 import { createTools } from "../../lib/tools.js";
 
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const runCli = promisify(execFile);
 const SESSION = "it-tools-session";
 let server;
 let chrome;
@@ -131,4 +136,88 @@ test("T05 browser_screenshot writes a PNG through the tool", async (t) => {
   assert.match(shot.path, /\.png$/);
   assert.ok(shot.bytes > 1_000);
   await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});
+
+test("T06 browser_snapshot filters by role and reports refs", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/form.html", newTab: true });
+  const snap = await run("browser_snapshot", { role: "button" });
+  assert.equal(snap.targetId, nav.targetId);
+  assert.ok(snap.nodes >= 1, "form has at least one button");
+  assert.match(snap.text, /button/);
+  assert.equal(snap.truncated, false);
+  const byName = await run("browser_snapshot", { name: "submit", exact: false });
+  assert.ok(byName.nodes >= 1, "name filter finds the submit button");
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});
+
+test("T07 browser_act fill, type and press drive real inputs", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/form.html", newTab: true });
+  await run("browser_act", { action: "fill", selector: "#name", text: "harness" });
+  const filled = await run("browser_extract", { mode: "js", expression: "document.querySelector('#name').value" });
+  assert.equal(filled.value, "harness");
+  await run("browser_act", { action: "type", text: "x" });
+  const typed = await run("browser_extract", { mode: "js", expression: "document.querySelector('#name').value" });
+  assert.equal(typed.value, "harnessx", "type inserts into the focused input");
+  const pressed = await run("browser_act", { action: "press", key: "Tab" });
+  assert.equal(pressed.ok, true);
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});
+
+test("T08 browser_extract html, js and text-selector modes", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/a.html", newTab: true });
+  const html = await run("browser_extract", { mode: "html" });
+  assert.match(html.value, /Page A/);
+  assert.equal(html.truncated, false);
+  const js = await run("browser_extract", { mode: "js", expression: "document.title" });
+  assert.equal(js.value, "Page A");
+  const text = await run("browser_extract", { mode: "text", selector: "#a" });
+  assert.equal(text.value, "alpha");
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});
+
+test("T09 browser_tabs new/use/close manage harness tabs only", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/a.html", newTab: true });
+  const created = await run("browser_tabs", { action: "new", url: server.url + "/b.html" });
+  const tabs = await run("browser_tabs", { action: "list" });
+  const a = tabs.tabs.find((tab) => tab.targetId === nav.targetId);
+  const b = tabs.tabs.find((tab) => tab.targetId === created.created);
+  assert.ok(a, "navigate tab is listed");
+  assert.ok(b, "new tab is listed");
+  assert.equal(a.owned, true);
+  assert.equal(b.owned, true);
+  const used = await run("browser_tabs", { action: "use", targetId: nav.targetId });
+  assert.equal(used.used, nav.targetId);
+  assert.match(used.url, /a\.html/);
+  await run("browser_tabs", { action: "close", targetId: created.created });
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+  const after = await run("browser_tabs", { action: "list" });
+  assert.ok(!after.tabs.some((tab) => tab.targetId === created.created || tab.targetId === nav.targetId));
+});
+
+test("T10 CLI open/snapshot/info/close drive a real tab", async (t) => {
+  if (needChrome(t)) return;
+  const stateDir = await mkdtemp(join(tmpdir(), "bh-cli-"));
+  const env = { ...process.env, BH_CDP_URL: chrome.httpUrl, BH_STATE_DIR: stateDir };
+  const bh = join(ROOT, "bin", "bh.mjs");
+  const exec = (args) => runCli(process.execPath, [bh, ...args], { env, timeout: 30_000 });
+
+  const opened = await exec(["open", server.url + "/a.html"]);
+  assert.match(opened.stdout, /a\.html/);
+
+  const snapshot = await exec(["snapshot"]);
+  assert.match(snapshot.stdout, /Page A/);
+
+  const info = await exec(["info"]);
+  assert.match(info.stdout, /"url"/);
+  assert.match(info.stdout, /a\.html/);
+
+  const closed = await exec(["close"]);
+  assert.match(closed.stdout, /"ok":true/);
+
+  const doctor = await runCli(process.execPath, [bh, "doctor"], { env, timeout: 30_000 });
+  assert.match(doctor.stdout, /chrome/);
 });

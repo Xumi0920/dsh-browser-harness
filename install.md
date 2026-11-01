@@ -19,8 +19,8 @@ git clone https://github.com/Xumi0920/dsh-browser-harness.git C:\path\to\dsh-bro
 cd C:\path\to\dsh-browser-harness
 
 node --test "tests/unit/**/*.test.mjs"        # 单测
-node --test "tests/integration/**/*.test.mjs" # 19 场景（临时 headless Chrome）
-npm run test:all                              # 单测 + 场景（共 67 条）
+node --test "tests/integration/**/*.test.mjs" # 24 场景（临时 headless Chrome）
+npm run test:all                              # 单测 + 场景（共 98 条）
 node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟（需源码 checkout）
 ```
 
