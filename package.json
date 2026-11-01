@@ -1,10 +1,14 @@
 {
   "name": "dsh-browser-harness",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "DSH native browser tools (browser_*) backed by a zero-dependency CDP core driving a dedicated, logged-in Chrome.",
   "type": "module",
   "license": "MIT",
   "author": "Xumi0920",
+  "icon": "./icon.svg",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Xumi0920/dsh-browser-harness.git"

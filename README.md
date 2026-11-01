@@ -122,6 +122,6 @@ node scripts/verify.mjs     # 对 live 专用 Chrome 冒烟
 
 ## 状态
 
-v0.1.1：修复 `browser_extract` 的 network 捕获（工具层启用并跨调用保留）、ref 严格校验（旧 ref 报错而不是重映射）、Page/CDP session 复用与释放、`browser_tabs` 的 `owned` 标记、快照截断标志，并实现 `bh close`；技能文案改为单一来源。通过 `engines.dsh` 精确绑定 DSH `0.2.1-rc.5`。下载/上传/Cookie 能力在内核库中但未作为工具暴露。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
+v0.1.2：当前版本。包含 `browser_extract` 的 network 捕获修复（工具层启用并跨调用保留）、ref 严格校验（旧 ref 报错而不是重映射）、Page/CDP session 复用与释放、`browser_tabs` 的 `owned` 标记、快照截断标志、`bh close`，以及本轮小清理（死代码/未用导入、CLI 状态目录与库默认一致、`js` 输出 200k 上限、包图标与发布元数据）。通过 `engines.dsh` 精确绑定 DSH `0.2.1-rc.5`。下载/上传/Cookie 能力在内核库中但未作为工具暴露。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
 
 MIT © 2026 Xumi0920

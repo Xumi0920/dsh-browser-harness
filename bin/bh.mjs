@@ -7,13 +7,12 @@
 import { Browser } from "../src/browser.mjs";
 import { listEndpoints } from "../src/cdp/endpoint.mjs";
 import { snapshotToText } from "../src/ax.mjs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { defaultStateDir } from "../src/state.mjs";
 
 const [command, ...args] = process.argv.slice(2);
 
 function stateDir() {
-  return process.env.BH_STATE_DIR || join(process.env.DSH_HOME || process.env.HOME || tmpdir(), "browser-harness");
+  return defaultStateDir();
 }
 
 async function main() {
