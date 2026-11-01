@@ -44,3 +44,5 @@ node bin/bh.mjs groups [--retry]    # 标签组状态/列表；--retry 重试安
 - 登录墙：停手问人，不要输入未获授权的凭据；
 - 默认后台操作，不抢前台；
 - 需要登录态/交互式页面时才用浏览器，纯公开读取优先 `web_fetch`。
+
+扩展与语言（原生插件 JS/TS、MCP、技能、ACP）见 [extending.md](extending.md)。
