@@ -15,6 +15,10 @@ import { startFixtureServer } from "../fixtures/server.mjs";
 import { findAlternateChromium, launchChrome } from "./helpers/launch-chrome.mjs";
 import { BrowserManager } from "../../dist/lib/manager.js";
 import { createTools } from "../../dist/lib/tools.js";
+import { cleanupTempDirs, tempDir } from "../helpers/temp.mjs";
+
+
+after(cleanupTempDirs);
 
 const SESSION = "it-alternate-browser";
 let server;
@@ -35,7 +39,7 @@ before(async () => {
     browser = null;
     return;
   }
-  const stateDir = await mkdtemp(join(tmpdir(), "bh-alt-"));
+  const stateDir = await tempDir("bh-alt-");
   manager = new BrowserManager({ cdpUrl: browser.httpUrl, stateDir });
   tools = createTools(
     { tools: { register() { throw new Error("createTools must not register by itself"); } }, effect() {}, get() { return undefined; } },

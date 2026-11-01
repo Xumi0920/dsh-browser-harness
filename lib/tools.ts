@@ -9,14 +9,14 @@
 import { HarnessError } from "../src/errors.js";
 import { findByRole, formatSnapshot } from "../src/ax.js";
 
-const textOutput = (value) => (typeof value === "string" ? value : JSON.stringify(value, null, 2));
+const textOutput = (value: any) => (typeof value === "string" ? value : JSON.stringify(value, null, 2));
 
 const jsonOutput = {
   schema: { type: "object", additionalProperties: true },
-  render: (_args, value) => [{ type: "text", text: textOutput(value) }],
+  render: (_args: any, value: any) => [{ type: "text", text: textOutput(value) }],
 };
 
-function summarizePage(page, info) {
+function summarizePage(page: any, info: any) {
   return {
     targetId: page.targetId,
     url: info && info.url,
@@ -26,8 +26,8 @@ function summarizePage(page, info) {
   };
 }
 
-function wrap(handler) {
-  return async (args, exec) => {
+function wrap(handler: any) {
+  return async (args: any, exec: any) => {
     const sessionId = exec && exec.agent && exec.agent.session ? exec.agent.session.id : undefined;
     try {
       return await handler(args, sessionId, exec);
@@ -46,8 +46,8 @@ function wrap(handler) {
  * @param {(definition: any) => any} defineTool
  * @returns {any[]}
  */
-export function createTools(ctx, manager, config = {} as any, defineTool) {
-  const tool = (definition) => defineTool(definition);
+export function createTools(ctx: any, manager: any, config: any = {} as any, defineTool: any) {
+  const tool = (definition: any) => defineTool(definition);
   const maxSnapshotNodes = Number(config.maxSnapshotNodes) || 250;
 
   return [
@@ -59,7 +59,7 @@ export function createTools(ctx, manager, config = {} as any, defineTool) {
       output: jsonOutput,
       timeoutMs: 20_000,
       isConcurrencySafe: () => true,
-      execute: wrap(async (args, sessionId) => manager.status(sessionId)),
+      execute: wrap(async (args: any, sessionId: any) => manager.status(sessionId)),
     }),
 
     tool({
@@ -74,7 +74,7 @@ export function createTools(ctx, manager, config = {} as any, defineTool) {
       output: jsonOutput,
       timeoutMs: 60_000,
       isConcurrencySafe: () => false,
-      execute: wrap(async (args, sessionId) => {
+      execute: wrap(async (args: any, sessionId: any) => {
         const page = await manager.navigate(sessionId, String(args.url), { newTab: Boolean(args.newTab), waitUntil: args.waitUntil });
         const info = await page.info();
         const snapshot = await page.snapshot({ maxNodes: maxSnapshotNodes });
@@ -95,7 +95,7 @@ export function createTools(ctx, manager, config = {} as any, defineTool) {
       output: jsonOutput,
       timeoutMs: 30_000,
       isConcurrencySafe: () => true,
-      execute: wrap(async (args, sessionId) => {
+      execute: wrap(async (args: any, sessionId: any) => {
         const page = await manager.pageFor(sessionId);
         const snapshot = await page.snapshot({ maxNodes: Math.min(Number(args.maxNodes) || maxSnapshotNodes, 400) });
         let nodes = snapshot.nodes;
@@ -126,7 +126,7 @@ export function createTools(ctx, manager, config = {} as any, defineTool) {
       output: jsonOutput,
       timeoutMs: 30_000,
       isConcurrencySafe: () => false,
-      execute: wrap(async (args, sessionId) => {
+      execute: wrap(async (args: any, sessionId: any) => {
         const page = await manager.pageFor(sessionId);
         const action = String(args.action);
         if (action === "click") {
@@ -140,7 +140,7 @@ export function createTools(ctx, manager, config = {} as any, defineTool) {
           return { action, ...(await page.fill({ ref: args.ref, selector: args.selector, text: String(args.text ?? "") }, { verify: true })) };
         }
         if (action === "press") {
-          const modifiers = String(args.modifiers || "").split(",").map((part) => part.trim()).filter(Boolean);
+          const modifiers = String(args.modifiers || "").split(",").map((part: any) => part.trim()).filter(Boolean);
           return { action, ...(await page.press(String(args.key || "Enter"), { modifiers })) };
         }
         if (action === "scroll") return { action, ...(await page.scroll({ dx: Number(args.dx) || 0, dy: Number(args.dy) || 0 })) };
@@ -162,7 +162,7 @@ export function createTools(ctx, manager, config = {} as any, defineTool) {
       output: jsonOutput,
       timeoutMs: 30_000,
       isConcurrencySafe: () => true,
-      execute: wrap(async (args, sessionId) => {
+      execute: wrap(async (args: any, sessionId: any) => {
         const page = await manager.pageFor(sessionId);
         const mode = String(args.mode);
         if (mode === "text") {
@@ -172,7 +172,7 @@ export function createTools(ctx, manager, config = {} as any, defineTool) {
           return { mode, value: truncated ? text.slice(0, 200_000) : value, truncated };
         }
         if (mode === "html") {
-          const value = await page.evaluate((selector) => {
+          const value = await page.evaluate((selector: any) => {
             const element = selector ? document.querySelector(selector) : document.documentElement;
             return element ? element.outerHTML : null;
           }, { args: [args.selector || null] });
@@ -192,7 +192,7 @@ export function createTools(ctx, manager, config = {} as any, defineTool) {
           return { mode, value };
         }
         if (mode === "network") {
-          const matched = page.networkEvents().filter((event) => !args.urlContains || String(event.url || "").includes(String(args.urlContains)));
+          const matched = page.networkEvents().filter((event: any) => !args.urlContains || String(event.url || "").includes(String(args.urlContains)));
           const events = matched.slice(-100);
           const capturing = Boolean(page.networkEnabled);
           if (args.includeBody) {
@@ -215,7 +215,7 @@ export function createTools(ctx, manager, config = {} as any, defineTool) {
       output: jsonOutput,
       timeoutMs: 60_000,
       isConcurrencySafe: () => false,
-      execute: wrap(async (args, sessionId) => {
+      execute: wrap(async (args: any, sessionId: any) => {
         const page = await manager.pageFor(sessionId);
         return page.screenshot({ fullPage: Boolean(args.fullPage), path: args.path });
       }),
@@ -233,7 +233,7 @@ export function createTools(ctx, manager, config = {} as any, defineTool) {
       output: jsonOutput,
       timeoutMs: 30_000,
       isConcurrencySafe: () => false,
-      execute: wrap(async (args, sessionId) => {
+      execute: wrap(async (args: any, sessionId: any) => {
         const action = String(args.action);
         if (action === "list") return manager.listTabs(sessionId);
         if (action === "use") {

@@ -19,7 +19,7 @@ const DEFAULT_TIMEOUT_MS = 15_000;
  * data:, javascript: and browser-internal schemes would let a tool read files
  * outside the CDP sandbox or control browser UI, so they are rejected.
  */
-export function assertNavigableUrl(url) {
+export function assertNavigableUrl(url: any) {
   const raw = String(url ?? "");
   if (raw === "about:blank") return raw;
   let parsed;
@@ -34,7 +34,7 @@ export function assertNavigableUrl(url) {
   return raw;
 }
 
-function isRealPage(target) {
+function isRealPage(target: any) {
   return target && target.type === "page" && !INTERNAL_URL.test(String(target.url || "")) && !String(target.url || "").includes("omnibox-popup");
 }
 
@@ -55,7 +55,7 @@ export class Browser {
    *   config?: { stateDir?: string, downloadDir?: string, dialogPolicy?: string, marker?: string },
    * }} options
    */
-  constructor(options) {
+  constructor(options: any) {
     this.transport = options.transport;
     this.endpoint = options.endpoint;
     this.lane = options.lane || "default";
@@ -81,7 +81,7 @@ export class Browser {
    *   fetchImpl?: typeof fetch, WebSocketImpl?: any, timeoutMs?: number,
    * }} [options]
    */
-  static async connect(options = {} as any) {
+  static async connect(options: any = {} as any) {
     const endpoint = await resolveEndpoint(options);
     const transport = new CDPTransport(endpoint.wsUrl, {
       WebSocketImpl: options.WebSocketImpl,
@@ -110,34 +110,34 @@ export class Browser {
   }
 
   /** All real page targets, with `owned` reflecting harness-created tabs. */
-  async listTabs({ lane = this.lane, includeChrome = false } = {} as any) {
+  async listTabs({ lane = this.lane, includeChrome = false }: any = {} as any) {
     const result = await this.transport.send("Target.getTargets", {}, { timeoutMs: 5_000 });
-    const targets = (result.targetInfos || []).filter((target) => target.type === "page");
-    await this.#prunePages(new Set(targets.map((target) => target.targetId)));
-    const filtered = includeChrome ? targets : targets.filter((target) => isRealPage(target) || target.url === "about:blank");
+    const targets = (result.targetInfos || []).filter((target: any) => target.type === "page");
+    await this.#prunePages(new Set(targets.map((target: any) => target.targetId)));
+    const filtered = includeChrome ? targets : targets.filter((target: any) => isRealPage(target) || target.url === "about:blank");
     const state = await stateStore.readState(lane, this.config.stateDir);
-    const owned = new Set(state.ownedTabs.map((tab) => tab.targetId));
-    return filtered.map((target) => ({ targetId: target.targetId, url: target.url, title: target.title, owned: owned.has(target.targetId) }));
+    const owned = new Set(state.ownedTabs.map((tab: any) => tab.targetId));
+    return filtered.map((target: any) => ({ targetId: target.targetId, url: target.url, title: target.title, owned: owned.has(target.targetId) }));
   }
 
-  async #currentState(lane) {
+  async #currentState(lane: any) {
     return stateStore.readState(lane, this.config.stateDir);
   }
 
   /** The remembered current tab, validated against live targets. */
-  async current(lane = this.lane) {
+  async current(lane: any = this.lane) {
     const state = await this.#currentState(lane);
     if (!state.current) return null;
     const targets = await this.transport.send("Target.getTargets", {}, { timeoutMs: 5_000 }).catch(() => ({ targetInfos: [] }));
     const infos = targets.targetInfos || [];
-    await this.#prunePages(new Set(infos.map((target) => target.targetId)));
-    const live = infos.find((target) => target.targetId === state.current.targetId);
+    await this.#prunePages(new Set(infos.map((target: any) => target.targetId)));
+    const live = infos.find((target: any) => target.targetId === state.current.targetId);
     if (!live) return null;
     return { targetId: live.targetId, url: live.url, title: live.title };
   }
 
   /** Attach to a target, reusing the cached Page (one CDP session per tab). */
-  async attach(targetId) {
+  async attach(targetId: any) {
     const cached = this.pages.get(targetId);
     if (cached && !cached.closed) return cached;
     let result;
@@ -154,7 +154,7 @@ export class Browser {
   }
 
   /** Detach and forget the cached Page for a target. */
-  async #dropPage(targetId) {
+  async #dropPage(targetId: any) {
     const page = this.pages.get(targetId);
     if (!page) return;
     this.pages.delete(targetId);
@@ -166,21 +166,21 @@ export class Browser {
   }
 
   /** Drop cached Pages whose target no longer exists (e.g. closed elsewhere). */
-  async #prunePages(liveTargetIds) {
+  async #prunePages(liveTargetIds: any) {
     for (const targetId of [...this.pages.keys()]) {
       if (!liveTargetIds.has(targetId)) await this.#dropPage(targetId);
     }
   }
 
   /** Reuse the remembered tab when it matches, otherwise open a new one. */
-  async open(url, { newTab = false, waitUntil = "load", timeoutMs = 30_000, lane = this.lane } = {} as any) {
+  async open(url: any, { newTab = false, waitUntil = "load", timeoutMs = 30_000, lane = this.lane }: any = {} as any) {
     if (typeof url !== "string" || url.length === 0) throw badArgument("open(url) needs a URL");
     assertNavigableUrl(url);
     if (!newTab) {
       const existing = await this.current(lane);
       if (existing) {
         const state = await this.#currentState(lane);
-        const owned = state.ownedTabs.some((tab) => tab.targetId === existing.targetId);
+        const owned = state.ownedTabs.some((tab: any) => tab.targetId === existing.targetId);
         if (owned) {
           const page = await this.attach(existing.targetId);
           await page.navigate(url, { waitUntil, timeoutMs });
@@ -193,7 +193,7 @@ export class Browser {
   }
 
   /** Create a background tab (never foregrounded) and optionally navigate it. */
-  async newTab(url = "about:blank", { waitUntil = "load", timeoutMs = 30_000, lane = this.lane } = {} as any) {
+  async newTab(url: any = "about:blank", { waitUntil = "load", timeoutMs = 30_000, lane = this.lane }: any = {} as any) {
     assertNavigableUrl(url);
     const created = await this.transport.send("Target.createTarget", { url: "about:blank", background: true }, { timeoutMs: 10_000 });
     const page = await this.attach(created.targetId);
@@ -208,7 +208,7 @@ export class Browser {
    * Put a harness-created tab into the task's Chrome tab group (best effort).
    * User/work tabs are never touched: only the tab just created is grouped.
    */
-  async #groupOwnedTab(page, lane) {
+  async #groupOwnedTab(page: any, lane: any) {
     if (this.config.tabGroups === false) return;
     try {
       const state = await stateStore.readState(lane, this.config.stateDir);
@@ -226,10 +226,10 @@ export class Browser {
   }
 
   /** Switch to a tab by targetId or URL substring (attach only, no activation). */
-  async use(targetIdOrUrlSubstring, { lane = this.lane } = {} as any) {
+  async use(targetIdOrUrlSubstring: any, { lane = this.lane }: any = {} as any) {
     const targets = await this.transport.send("Target.getTargets", {}, { timeoutMs: 5_000 });
-    const match = (targets.targetInfos || []).find((target) => target.targetId === targetIdOrUrlSubstring)
-      || (targets.targetInfos || []).find((target) => String(target.url || "").includes(String(targetIdOrUrlSubstring)));
+    const match = (targets.targetInfos || []).find((target: any) => target.targetId === targetIdOrUrlSubstring)
+      || (targets.targetInfos || []).find((target: any) => String(target.url || "").includes(String(targetIdOrUrlSubstring)));
     if (!match) throw elementNotFound(String(targetIdOrUrlSubstring), { kind: "tab" });
     const page = await this.attach(match.targetId);
     await this.#rememberCurrent(page, lane);
@@ -238,11 +238,11 @@ export class Browser {
   }
 
   /** Close a tab; only tabs created by this harness unless `force` is set. */
-  async closeTab(targetId, { force = false, lane = this.lane } = {} as any) {
+  async closeTab(targetId: any, { force = false, lane = this.lane }: any = {} as any) {
     const state = await this.#currentState(lane);
     const id = targetId || (state.current && state.current.targetId);
     if (!id) throw noTab("no tab to close; pass a targetId");
-    const owned = state.ownedTabs.some((tab) => tab.targetId === id);
+    const owned = state.ownedTabs.some((tab: any) => tab.targetId === id);
     if (!owned && !force) throw policyDenied("refusing to close a tab this harness did not create; pass force:true explicitly", { targetId: id });
     await this.transport.send("Target.closeTarget", { targetId: id }, { timeoutMs: 5_000 });
     await stateStore.forgetTab(lane, id, this.config.stateDir);
@@ -251,7 +251,7 @@ export class Browser {
   }
 
   /** Explicitly bring a tab to the foreground (user-requested only). */
-  async activate(targetId, { lane = this.lane } = {} as any) {
+  async activate(targetId: any, { lane = this.lane }: any = {} as any) {
     const id = targetId || ((await this.#currentState(lane)).current || {}).targetId;
     if (!id) throw noTab("activate needs a targetId");
     await this.transport.send("Target.activateTarget", { targetId: id }, { timeoutMs: 5_000 });
@@ -259,7 +259,7 @@ export class Browser {
   }
 
   /** Browser-scoped download behavior. */
-  async setDownloadBehavior({ behavior = "default", downloadPath, eventsEnabled = false } = {} as any) {
+  async setDownloadBehavior({ behavior = "default", downloadPath, eventsEnabled = false }: any = {} as any) {
     const params: any = { behavior };
     if (downloadPath) params.downloadPath = downloadPath;
     if (eventsEnabled) params.eventsEnabled = true;
@@ -267,7 +267,7 @@ export class Browser {
   }
 
   /** Re-read the attached tab and persist its url/title for one lane. */
-  async #rememberCurrent(page, lane) {
+  async #rememberCurrent(page: any, lane: any) {
     let info: any = null;
     try {
       info = await page.info();
@@ -283,13 +283,13 @@ export class Browser {
   }
 
   /** Mark harness-owned tabs in the title so a later call can find them. */
-  async #ensureMarker(page, lane) {
+  async #ensureMarker(page: any, lane: any) {
     if (this.config.marker === false) return;
     const state = await this.#currentState(lane);
-    const owned = state.ownedTabs.some((tab) => tab.targetId === page.targetId);
+    const owned = state.ownedTabs.some((tab: any) => tab.targetId === page.targetId);
     if (!owned) return;
     try {
-      await page.evaluate((marker) => {
+      await page.evaluate((marker: any) => {
         if (document.title && !document.title.startsWith(marker)) document.title = marker + " " + document.title;
       }, { args: [this.config.marker] });
     } catch { /* marker is best-effort */ }
@@ -300,7 +300,7 @@ export class Browser {
     const pages = [...this.pages.values()];
     this.pages.clear();
     await this.tabGroups.dispose().catch(() => {});
-    await Promise.all(pages.map((page) => page.detach().catch(() => {})));
+    await Promise.all(pages.map((page: any) => page.detach().catch(() => {})));
     this.transport.close();
   }
 }

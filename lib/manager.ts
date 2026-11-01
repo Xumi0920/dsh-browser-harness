@@ -16,7 +16,7 @@ export class BrowserManager {
   config: any;
   connection: any;
   connecting: any;
-  constructor(config = {} as any) {
+  constructor(config: any = {} as any) {
     this.config = {
       browser: undefined,
       cdpUrl: undefined,
@@ -69,7 +69,7 @@ export class BrowserManager {
   }
 
   /** State-file lane for one DSH session (sanitized, stable, bounded). */
-  laneFor(sessionId) {
+  laneFor(sessionId: any) {
     const id = sessionId ? String(sessionId).replace(/[^a-zA-Z0-9_-]+/g, "-") : "default";
     return "dsh-" + id.slice(-40);
   }
@@ -80,7 +80,7 @@ export class BrowserManager {
   }
 
   /** Best-effort network capture so browser_extract network sees this tab's requests. */
-  async #ensureNetworkCapture(page) {
+  async #ensureNetworkCapture(page: any) {
     if (page.networkEnabled) return page;
     try {
       await page.startNetworkCapture();
@@ -91,7 +91,7 @@ export class BrowserManager {
   }
 
   /** Attach to the session's current tab, or fail with an actionable hint. */
-  async pageFor(sessionId) {
+  async pageFor(sessionId: any) {
     const lane = this.laneFor(sessionId);
     const browser = await this.ensure();
     const current = await browser.current(lane);
@@ -99,7 +99,7 @@ export class BrowserManager {
     return this.#ensureNetworkCapture(await browser.attach(current.targetId));
   }
 
-  async navigate(sessionId, url, options = {} as any) {
+  async navigate(sessionId: any, url: any, options: any = {} as any) {
     const browser = await this.ensure();
     const page = await browser.open(String(url), {
       newTab: options.newTab,
@@ -111,32 +111,32 @@ export class BrowserManager {
   }
 
   /** Tabs plus the session's current tab pointer. */
-  async listTabs(sessionId) {
+  async listTabs(sessionId: any) {
     const browser = await this.ensure();
     const lane = this.laneFor(sessionId);
     return { tabs: await browser.listTabs({ lane }), current: await browser.current(lane) };
   }
 
   /** Attach the session to an existing tab by id or URL substring. */
-  async useTab(sessionId, targetId) {
+  async useTab(sessionId: any, targetId: any) {
     const browser = await this.ensure();
     return browser.use(targetId, { lane: this.laneFor(sessionId) });
   }
 
   /** Create a background tab for the session. */
-  async openTab(sessionId, url = "about:blank") {
+  async openTab(sessionId: any, url: any = "about:blank") {
     const browser = await this.ensure();
     const page = await browser.newTab(url || "about:blank", { lane: this.laneFor(sessionId) });
     return this.#ensureNetworkCapture(page);
   }
 
   /** Close a tab this harness created (policy is enforced by Browser). */
-  async closeTab(sessionId, targetId) {
+  async closeTab(sessionId: any, targetId: any) {
     const browser = await this.ensure();
     return browser.closeTab(targetId, { lane: this.laneFor(sessionId) });
   }
 
-  async status(sessionId) {
+  async status(sessionId: any) {
     const endpoints = await listEndpoints({});
     let current = null;
     let tabs = [];

@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 const SKILL_FILE = fileURLToPath(new URL("../../skills/browser-harness/SKILL.md", import.meta.url));
 
 /** Minimal frontmatter reader: "key: value" pairs plus a quoted-scalar unwrap. */
-export function parseSkillFile(raw) {
+export function parseSkillFile(raw: any) {
   const text = String(raw ?? "");
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(text);
   if (!match) return { meta: {}, body: text.trim() };

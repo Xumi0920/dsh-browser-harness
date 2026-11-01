@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -6,13 +6,17 @@ import { join } from "node:path";
 import { Browser, assertNavigableUrl } from "../../dist/src/browser.js";
 import { readState, rememberOwnedTab, setCurrent } from "../../dist/src/state.js";
 import { FakeTransport } from "./helpers/fake-transport.mjs";
+import { cleanupTempDirs, tempDir } from "../helpers/temp.mjs";
+
+
+after(cleanupTempDirs);
 
 function pageTarget(targetId, url = "https://example.com/" + targetId) {
   return { targetId, type: "page", url, title: targetId };
 }
 
 async function setup({ targets = [], owned = [] } = {}) {
-  const stateDir = await mkdtemp(join(tmpdir(), "bh-browser-"));
+  const stateDir = await tempDir("bh-browser-");
   const transport = new FakeTransport();
   const live = { targets };
   transport.on("Target.getTargets", () => ({ targetInfos: live.targets }));

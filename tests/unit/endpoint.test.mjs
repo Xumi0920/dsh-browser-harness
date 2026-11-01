@@ -1,9 +1,13 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_PORTS, listEndpoints, probeVersion, readRegistry, registryPath, resolveEndpoint } from "../../dist/src/cdp/endpoint.js";
+import { cleanupTempDirs, tempDir } from "../helpers/temp.mjs";
+
+
+after(cleanupTempDirs);
 
 function jsonResponse(body, status = 200) {
   return {
@@ -18,7 +22,7 @@ function fakeFetch(handler) {
 }
 
 async function dshHomeWithRegistry(registry) {
-  const home = await mkdtemp(join(tmpdir(), "bh-endpoint-"));
+  const home = await tempDir("bh-endpoint-");
   await mkdir(join(home, "browser-cdp"), { recursive: true });
   await writeFile(registryPath(home), JSON.stringify(registry), "utf8");
   return home;
@@ -169,7 +173,7 @@ test("known Chromium browsers share the port convention", () => {
 });
 
 test("browser selector accepts any known Chromium browser id", async () => {
-  const home = await mkdtemp(join(tmpdir(), "bh-endpoint-"));
+  const home = await tempDir("bh-endpoint-");
   const endpoint = await resolveEndpoint({
     browser: "brave",
     dshHome: home,
@@ -229,7 +233,7 @@ test("unknown browser selectors list every supported browser", async () => {
 });
 
 test("listEndpoints without a registry lists every known Chromium browser", async () => {
-  const home = await mkdtemp(join(tmpdir(), "bh-endpoint-empty-"));
+  const home = await tempDir("bh-endpoint-empty-");
   const rows = await listEndpoints({
     dshHome: home,
     fetchImpl: fakeFetch((url) => {
@@ -244,4 +248,37 @@ test("listEndpoints without a registry lists every known Chromium browser", asyn
   const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
   assert.equal(byId.chrome.status, "live");
   assert.equal(byId.brave.status, "down");
+});
+
+test("resolveEndpoint honors BH_WS and BH_CDP_URL", async () => {
+  const ws = await resolveEndpoint({ env: { BH_WS: "ws://127.0.0.1:9999/devtools/browser/x" } });
+  assert.equal(ws.source, "env:BH_WS");
+  assert.equal(ws.wsUrl, "ws://127.0.0.1:9999/devtools/browser/x");
+
+  const cdp = await resolveEndpoint({
+    env: { BH_CDP_URL: "http://127.0.0.1:9333" },
+    fetchImpl: fakeFetch(() => jsonResponse({ webSocketDebuggerUrl: "ws://127.0.0.1:9333/devtools/browser/y", Browser: "Chrome/1" })),
+  });
+  assert.equal(cdp.source, "cdp-url");
+  assert.equal(cdp.wsUrl, "ws://127.0.0.1:9333/devtools/browser/y");
+});
+
+test("resolveEndpoint rejects an unknown BH_BROWSER selector", async () => {
+  const home = await tempDir("bh-env-");
+  await assert.rejects(resolveEndpoint({ env: { BH_BROWSER: "nope" }, dshHome: home }), (error) => {
+    assert.equal(error.code, "E_NO_BROWSER");
+    assert.match(error.message, /unknown browser selector/);
+    return true;
+  });
+});
+
+test("probeVersion maps an aborted probe to E_NO_BROWSER", async () => {
+  const fetchImpl = (url, init) => new Promise((resolve, reject) => {
+    init.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+  });
+  await assert.rejects(probeVersion("http://127.0.0.1:1", { fetchImpl, timeoutMs: 20 }), (error) => {
+    assert.equal(error.code, "E_NO_BROWSER");
+    assert.match(error.message, /probe timed out/);
+    return true;
+  });
 });

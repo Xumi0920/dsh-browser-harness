@@ -16,6 +16,10 @@ import { startFixtureServer } from "../fixtures/server.mjs";
 import { launchChrome } from "./helpers/launch-chrome.mjs";
 import { BrowserManager } from "../../dist/lib/manager.js";
 import { createTools } from "../../dist/lib/tools.js";
+import { cleanupTempDirs, tempDir } from "../helpers/temp.mjs";
+
+
+after(cleanupTempDirs);
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const runCli = promisify(execFile);
@@ -27,7 +31,7 @@ let tools;
 
 before(async () => {
   server = await startFixtureServer();
-  const stateDir = await mkdtemp(join(tmpdir(), "bh-tools-"));
+  const stateDir = await tempDir("bh-tools-");
   chrome = await launchChrome();
   if (chrome) {
     manager = new BrowserManager({ cdpUrl: chrome.httpUrl, stateDir });
@@ -148,7 +152,7 @@ test("T06 browser_snapshot filters by role and reports refs", async (t) => {
   assert.ok(snap.nodes >= 1, "form has at least one button");
   assert.match(snap.text, /button/);
   assert.equal(snap.truncated, false);
-  const byName = await run("browser_snapshot", { name: "submit", exact: false });
+  const byName = await run("browser_snapshot", { name: "submit" });
   assert.ok(byName.nodes >= 1, "name filter finds the submit button");
   await run("browser_tabs", { action: "close", targetId: nav.targetId });
 });
@@ -202,7 +206,7 @@ test("T09 browser_tabs new/use/close manage harness tabs only", async (t) => {
 
 test("T10 CLI open/snapshot/info/close drive a real tab", async (t) => {
   if (needChrome(t)) return;
-  const stateDir = await mkdtemp(join(tmpdir(), "bh-cli-"));
+  const stateDir = await tempDir("bh-cli-");
   const env = { ...process.env, BH_CDP_URL: chrome.httpUrl, BH_STATE_DIR: stateDir };
   const bh = join(ROOT, "dist", "bin", "bh.js");
   const exec = (args) => runCli(process.execPath, [bh, ...args], { env, timeout: 30_000 });

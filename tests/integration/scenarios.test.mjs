@@ -15,6 +15,10 @@ import { startFixtureServer } from "../fixtures/server.mjs";
 import { launchChrome } from "./helpers/launch-chrome.mjs";
 import { Browser } from "../../dist/src/browser.js";
 import { findByRole, snapshotToText } from "../../dist/src/ax.js";
+import { cleanupTempDirs, tempDir } from "../helpers/temp.mjs";
+
+
+after(cleanupTempDirs);
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SAMPLE_UPLOAD = join(HERE, "..", "fixtures", "upload-sample.txt");
@@ -27,7 +31,7 @@ const openedTabs = new Set();
 
 before(async () => {
   server = await startFixtureServer();
-  stateDir = await mkdtemp(join(tmpdir(), "bh-state-"));
+  stateDir = await tempDir("bh-state-");
   chrome = await launchChrome();
   if (chrome) {
     browser = await Browser.connect({ cdpUrl: chrome.httpUrl, stateDir, lane: "integration" });
@@ -218,6 +222,10 @@ test("S11 stale target: external close is recovered by the next call", async (t)
   const other = await Browser.connect({ cdpUrl: chrome.httpUrl, stateDir: join(stateDir, "other"), lane: "other" });
   await other.transport.send("Target.closeTarget", { targetId: page.targetId });
   await other.close();
+  const pruneDeadline = Date.now() + 5_000;
+  while ((await browser.current()) !== null && Date.now() < pruneDeadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
   assert.equal(await browser.current(), null, "closed tab is pruned from state");
   const recovered = await browser.open(server.url + "/b.html");
   assert.match((await recovered.info()).title, /Page B/);

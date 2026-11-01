@@ -17,7 +17,7 @@ export function defaultStateDir() {
   return process.env.BH_STATE_DIR || join(process.env.DSH_HOME || join(homedir(), ".dsh"), "browser-harness");
 }
 
-export function statePath(lane = "default", dir = defaultStateDir()) {
+export function statePath(lane: any = "default", dir: any = defaultStateDir()) {
   const safeLane = String(lane || "default")
     .replace(/[^a-zA-Z0-9._-]+/g, "-")
     .replace(/^[.-]+/, "")
@@ -37,14 +37,14 @@ export function emptyState() {
   };
 }
 
-function normalizeState(value) {
+function normalizeState(value: any) {
   const base = emptyState();
   if (!value || typeof value !== "object") return base;
   return {
     ...base,
     ...value,
     version: STATE_VERSION,
-    ownedTabs: Array.isArray(value.ownedTabs) ? value.ownedTabs.filter((tab) => tab && typeof tab.targetId === "string") : [],
+    ownedTabs: Array.isArray(value.ownedTabs) ? value.ownedTabs.filter((tab: any) => tab && typeof tab.targetId === "string") : [],
     current: value.current && typeof value.current.targetId === "string" ? value.current : null,
     group: value.group && Number.isFinite(value.group.id) ? value.group : null,
   };
@@ -55,7 +55,7 @@ function normalizeState(value) {
  * @param {string} [lane]
  * @param {string} [dir]
  */
-export async function readState(lane = "default", dir = defaultStateDir()) {
+export async function readState(lane: any = "default", dir: any = defaultStateDir()) {
   try {
     const raw = await readFile(statePath(lane, dir), "utf8");
     return normalizeState(JSON.parse(raw));
@@ -70,12 +70,12 @@ export async function readState(lane = "default", dir = defaultStateDir()) {
  * @param {string} [lane]
  * @param {string} [dir]
  */
-export async function writeState(state, lane = "default", dir = defaultStateDir()) {
-  await mkdir(dir, { recursive: true });
+export async function writeState(state: any, lane: any = "default", dir: any = defaultStateDir()) {
+  await mkdir(dir, { recursive: true, mode: 0o700 });
   const file = statePath(lane, dir);
   const tmp = file + "." + process.pid + "." + Date.now() + ".tmp";
   const payload = JSON.stringify(normalizeState({ ...state, updatedAt: new Date().toISOString() }), null, 2);
-  await writeFile(tmp, payload, "utf8");
+  await writeFile(tmp, payload, { encoding: "utf8", mode: 0o600 });
   await rename(tmp, file);
   return normalizeState(JSON.parse(payload));
 }
@@ -84,12 +84,12 @@ const LOCK_STALE_MS = 10_000;
 const LOCK_RETRIES = 40;
 const LOCK_RETRY_MS = 25;
 
-async function acquireLock(lane, dir) {
-  await mkdir(dir, { recursive: true });
+async function acquireLock(lane: any, dir: any) {
+  await mkdir(dir, { recursive: true, mode: 0o700 });
   const lock = statePath(lane, dir) + ".lock";
   for (let attempt = 0; attempt < LOCK_RETRIES; attempt++) {
     try {
-      await writeFile(lock, String(process.pid) + "\n" + Date.now() + "\n", { encoding: "utf8", flag: "wx" });
+      await writeFile(lock, String(process.pid) + "\n" + Date.now() + "\n", { encoding: "utf8", flag: "wx", mode: 0o600 });
       return lock;
     } catch (error: any) {
       if (!error || error.code !== "EEXIST") throw error;
@@ -103,7 +103,7 @@ async function acquireLock(lane, dir) {
       } catch {
         /* lock disappeared; retry */
       }
-      await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
+      await new Promise((resolve: any) => setTimeout(resolve, LOCK_RETRY_MS));
     }
   }
   throw new Error("state lock timeout for lane " + lane);
@@ -117,7 +117,7 @@ async function acquireLock(lane, dir) {
  * @param {string} [dir]
  * @returns {Promise<T>}
  */
-export async function withStateLock(lane, fn, dir = defaultStateDir()) {
+export async function withStateLock(lane: any, fn: any, dir: any = defaultStateDir()) {
   const lock = await acquireLock(lane, dir);
   try {
     return await fn();
@@ -132,7 +132,7 @@ export async function withStateLock(lane, fn, dir = defaultStateDir()) {
  * @param {(state: object) => object | Promise<object>} mutate
  * @param {string} [dir]
  */
-export async function updateState(lane, mutate, dir = defaultStateDir()) {
+export async function updateState(lane: any, mutate: any, dir: any = defaultStateDir()) {
   return withStateLock(lane, async () => {
     const state = await readState(lane, dir);
     const next = await mutate(state);
@@ -141,7 +141,7 @@ export async function updateState(lane, mutate, dir = defaultStateDir()) {
 }
 
 /** Remember a tab this harness created. */
-export async function rememberOwnedTab(lane: any, tab: any, dir = defaultStateDir()) {
+export async function rememberOwnedTab(lane: any, tab: any, dir: any = defaultStateDir()) {
   return updateState(lane, (state: any) => {
     const owned = state.ownedTabs.filter((item: any) => item.targetId !== tab.targetId);
     owned.push({ ...tab, createdAt: tab.createdAt || new Date().toISOString() });
@@ -150,17 +150,17 @@ export async function rememberOwnedTab(lane: any, tab: any, dir = defaultStateDi
 }
 
 /** Set the current tab pointer. */
-export async function setCurrent(lane: any, current: any, dir = defaultStateDir()) {
+export async function setCurrent(lane: any, current: any, dir: any = defaultStateDir()) {
   return updateState(lane, (state: any) => ({ ...state, current }), dir);
 }
 
 /** Remember the Chrome tab group created for a lane (task/session). */
-export async function setGroup(lane: any, group: any, dir = defaultStateDir()) {
+export async function setGroup(lane: any, group: any, dir: any = defaultStateDir()) {
   return updateState(lane, (state: any) => ({ ...state, group: group ? { ...group, updatedAt: new Date().toISOString() } : null }), dir);
 }
 
 /** Forget a closed tab. */
-export async function forgetTab(lane: any, targetId: any, dir = defaultStateDir()) {
+export async function forgetTab(lane: any, targetId: any, dir: any = defaultStateDir()) {
   return updateState(lane, (state: any) => ({
     ...state,
     current: state.current && state.current.targetId === targetId ? null : state.current,

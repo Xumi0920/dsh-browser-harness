@@ -45,8 +45,8 @@
 
 ## 维护约定
 
-- 源码是 TypeScript（`strict: true`，`noImplicitAny` 分阶段开启）：先 `npm install` 再 `npm run build`；改代码后跑 `npm run test:all`（自动构建，当前 96 单测 + 27 集成场景 = 123 条）。
-- CI：`npm ci` + build 后单测跑 ubuntu/windows；集成场景跑 ubuntu（xvfb 提供 display），门禁要求正好 27 条且 S15/S16 必须实际执行；publish 校验 tag==v版本并做打包冒烟（含 `dist/` 产物）。
+- 源码是 TypeScript（`strict: true`，含 `noImplicitAny`）：先 `npm install` 再 `npm run build`；改代码后跑 `npm run test:all`（自动构建，当前 100 单测 + 27 集成场景 = 127 条）。
+- CI：`npm ci` + build 后单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场景跑 ubuntu（xvfb 提供 display），门禁要求正好 27 条且 S15/S16 必须实际执行；publish 校验 tag==v版本并做打包冒烟（含 `dist/` 产物）。
 - 版本与发布：GitHub Release 触发 `.github/workflows/publish.yml`，发布到 GitHub Packages（`@xumi0920/dsh-browser-harness`）；版本号需与 tag 一致。
 - 提交信息用 conventional commits（`feat:` / `fix:` / `docs:` / `test:` / `chore:`）。
 - 新增浏览器相关能力时，优先扩展 `src/`；插件层只做 DSH 适配。
