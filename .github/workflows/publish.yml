@@ -40,6 +40,7 @@ jobs:
         run: node --test "tests/unit/**/*.test.mjs"
       - name: Pack smoke test
         run: |
+          mkdir -p /tmp/pack
           npm pack --pack-destination /tmp/pack
           tar -xzf /tmp/pack/*.tgz -C /tmp
           for file in cordis.patch.yml icon.svg extension/sw.js extension/manifest.json skills/browser-harness/SKILL.md docs/install.md; do
