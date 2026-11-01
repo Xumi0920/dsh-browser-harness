@@ -175,3 +175,89 @@ test("browser_tabs routes use/new/close through the manager", async () => {
   assert.deepEqual(await tabs.execute({ action: "close", targetId: "T1" }, exec), { ok: true, closed: "T1" });
   assert.deepEqual(calls, [["use", "s9", "T1"], ["new", "s9", "https://x.test"], ["close", "s9", "T1"]]);
 });
+
+const LONG = "x".repeat(200_001);
+
+test("browser_extract caps text, html and js output at 200k chars", async () => {
+  const tools = build();
+  const extract = tools.find((definition) => definition.name === "browser_extract");
+  const htmlManager = fakeManager();
+  htmlManager.pageFor = async () => ({ evaluate: async () => LONG, text: async () => LONG });
+  const htmlTools = build(htmlManager);
+  const htmlExtract = htmlTools.find((definition) => definition.name === "browser_extract");
+  const html = await htmlExtract.execute({ mode: "html" }, {});
+  assert.equal(html.value.length, 200_000);
+  assert.equal(html.truncated, true);
+  const text = await htmlExtract.execute({ mode: "text" }, {});
+  assert.equal(text.value.length, 200_000);
+  assert.equal(text.truncated, true);
+
+  const jsManager = fakeManager();
+  jsManager.pageFor = async () => ({ evaluate: async () => LONG });
+  const jsTools = build(jsManager);
+  const jsExtract = jsTools.find((definition) => definition.name === "browser_extract");
+  const js = await jsExtract.execute({ mode: "js", expression: "longString()" }, {});
+  assert.equal(js.truncated, true);
+  assert.equal(js.value.length, 200_000);
+
+  const objManager = fakeManager();
+  objManager.pageFor = async () => ({ evaluate: async () => ({ text: LONG }) });
+  const objTools = build(objManager);
+  const objExtract = objTools.find((definition) => definition.name === "browser_extract");
+  const obj = await objExtract.execute({ mode: "js", expression: "bigObject()" }, {});
+  assert.equal(obj.truncated, true);
+  assert.equal(obj.format, "json");
+  assert.equal(obj.value.length, 200_000);
+});
+
+test("browser_act routes type, fill, press and scroll to the page", async () => {
+  const seen = [];
+  const manager = fakeManager();
+  manager.pageFor = async () => ({
+    type: async (text) => { seen.push(["type", text]); return { ok: true }; },
+    fill: async (target, options) => { seen.push(["fill", target, options]); return { ok: true }; },
+    press: async (key, options) => { seen.push(["press", key, options]); return { ok: true }; },
+    scroll: async (delta) => { seen.push(["scroll", delta]); return { ok: true }; },
+  });
+  const act = build(manager).find((definition) => definition.name === "browser_act");
+  await act.execute({ action: "type", text: "hi" }, {});
+  await act.execute({ action: "fill", ref: "e1", text: "x" }, {});
+  await act.execute({ action: "press", key: "Enter", modifiers: "Control,Shift" }, {});
+  await act.execute({ action: "scroll", dx: 1, dy: 200 }, {});
+  assert.deepEqual(seen[0], ["type", "hi"]);
+  assert.deepEqual(seen[1], ["fill", { ref: "e1", selector: undefined, text: "x" }, { verify: true }]);
+  assert.deepEqual(seen[2], ["press", "Enter", { modifiers: ["Control", "Shift"] }]);
+  assert.deepEqual(seen[3], ["scroll", { dx: 1, dy: 200 }]);
+});
+
+test("browser_act fill requires ref or selector", async () => {
+  const act = build().find((definition) => definition.name === "browser_act");
+  await assert.rejects(act.execute({ action: "fill", text: "x" }, {}), /E_BAD_ARG/);
+});
+
+test("browser_screenshot returns the page screenshot result", async () => {
+  const manager = fakeManager();
+  manager.pageFor = async () => ({ screenshot: async (options) => ({ path: "/tmp/shot.png", bytes: 12, options }) });
+  const tool = build(manager).find((definition) => definition.name === "browser_screenshot");
+  const value = await tool.execute({ fullPage: true }, {});
+  assert.equal(value.path, "/tmp/shot.png");
+  assert.equal(value.bytes, 12);
+});
+
+test("browser_navigate forwards newTab/waitUntil and reports truncation", async () => {
+  let seen = null;
+  const manager = fakeManager();
+  manager.navigate = async (sessionId, url, options) => {
+    seen = { sessionId, url, options };
+    return {
+      targetId: "T9",
+      info: async () => ({ url, title: "T", readyState: "complete", viewport: { width: 800, height: 600 } }),
+      snapshot: async () => ({ nodes: Array.from({ length: 250 }, (_, index) => ({ ref: "e" + (index + 1), role: "button", name: "b" + index })), truncated: false }),
+    };
+  };
+  const navigate = build(manager).find((definition) => definition.name === "browser_navigate");
+  const value = await navigate.execute({ url: "https://example.com", newTab: true, waitUntil: "domcontentloaded" }, { agent: { session: { id: "s1" } } });
+  assert.deepEqual(seen, { sessionId: "s1", url: "https://example.com", options: { newTab: true, waitUntil: "domcontentloaded" } });
+  assert.equal(value.nodes, 250);
+  assert.equal(value.truncated, true);
+});
