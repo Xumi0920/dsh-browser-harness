@@ -14,6 +14,26 @@ import { badArgument, elementNotFound, noTab, policyDenied, targetGone } from ".
 const INTERNAL_URL = /^(chrome|devtools|edge|about:blank|chrome-extension):/;
 const DEFAULT_TIMEOUT_MS = 15_000;
 
+/**
+ * Only real web pages may be opened through the high-level API. Local file://,
+ * data:, javascript: and browser-internal schemes would let a tool read files
+ * outside the CDP sandbox or control browser UI, so they are rejected.
+ */
+export function assertNavigableUrl(url) {
+  const raw = String(url ?? "");
+  if (raw === "about:blank") return raw;
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw badArgument(`invalid URL: ${raw}`);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw policyDenied(`refusing to open a ${parsed.protocol} URL; only http(s) pages and about:blank are allowed`, { url: raw });
+  }
+  return raw;
+}
+
 function isRealPage(target) {
   return target && target.type === "page" && !INTERNAL_URL.test(String(target.url || "")) && !String(target.url || "").includes("omnibox-popup");
 }
@@ -71,6 +91,11 @@ export class Browser {
         dialogPolicy: options.dialogPolicy,
         focusEmulation: options.focusEmulation,
         marker: options.marker,
+        tabGroups: options.tabGroups,
+        tabGroupTitle: options.tabGroupTitle,
+        tabGroupColor: options.tabGroupColor,
+        extensionPath: options.extensionPath,
+        extensionId: options.extensionId,
       },
     });
     browser.version = await browser.transport.send("Browser.getVersion", {}, { timeoutMs: 5_000 }).catch(() => null);
@@ -143,6 +168,7 @@ export class Browser {
   /** Reuse the remembered tab when it matches, otherwise open a new one. */
   async open(url, { newTab = false, waitUntil = "load", timeoutMs = 30_000, lane = this.lane } = {}) {
     if (typeof url !== "string" || url.length === 0) throw badArgument("open(url) needs a URL");
+    assertNavigableUrl(url);
     if (!newTab) {
       const existing = await this.current(lane);
       if (existing) {
@@ -157,6 +183,7 @@ export class Browser {
 
   /** Create a background tab (never foregrounded) and optionally navigate it. */
   async newTab(url = "about:blank", { waitUntil = "load", timeoutMs = 30_000, lane = this.lane } = {}) {
+    assertNavigableUrl(url);
     const created = await this.transport.send("Target.createTarget", { url: "about:blank", background: true }, { timeoutMs: 10_000 });
     const page = await this.attach(created.targetId);
     await stateStore.rememberOwnedTab(lane, { targetId: created.targetId, url: "about:blank" }, this.config.stateDir);

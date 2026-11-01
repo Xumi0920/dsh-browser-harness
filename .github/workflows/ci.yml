@@ -8,6 +8,7 @@ on:
 jobs:
   unit:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -21,6 +22,7 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,17 +47,27 @@ jobs:
         run: |
           set -o pipefail
           xvfb-run -a -s "-screen 0 1280x800x24" node --test --test-reporter=tap "tests/integration/**/*.test.mjs" | tee tap.txt
-      - name: Fail when the scenario suite did not really run
+      - name: Verify the scenario suite really ran
+        shell: bash
         run: |
           tests=$(grep -E '^# tests [0-9]+' tap.txt | awk '{print $3}')
-          passed=$(grep -E '^# pass [0-9]+' tap.txt | awk '{print $3}')
+          failed=$(grep -E '^# fail [0-9]+' tap.txt | awk '{print $3}')
           skipped=$(grep -E '^# skipped [0-9]+' tap.txt | awk '{print $3}')
-          echo "tests=${tests:-?} pass=${passed:-?} skipped=${skipped:-?}"
-          if [ -z "${passed}" ] || [ "${passed}" -eq 0 ] || [ "${skipped:-0}" -eq "${tests:-1}" ]; then
-            echo "::error::Integration scenarios were skipped (no Chromium browser?); refusing a false-green run."
-            exit 1
-          fi
-          if [ "${skipped:-0}" -gt 2 ]; then
-            echo "::error::Unexpected number of skipped scenarios: ${skipped}"
-            exit 1
-          fi
+          echo "tests=${tests:-?} failed=${failed:-?} skipped=${skipped:-?}"
+          # The suite is complete at 27 scenarios, and both tab-group scenarios
+          # must actually execute on Linux: S15 (headless degradation) and S16
+          # (headful grouping under xvfb). T11 may skip when no alternate
+          # Chromium is installed, so at most one skip is tolerated.
+          [ "${tests:-0}" = "27" ] || { echo "::error::expected 27 integration scenarios, got ${tests:-0}"; exit 1; }
+          [ "${failed:-1}" = "0" ] || { echo "::error::${failed:-?} integration scenario(s) failed"; exit 1; }
+          s15=$(grep -E '^ok [0-9]+ - S15 ' tap.txt || true)
+          s16=$(grep -E '^ok [0-9]+ - S16 ' tap.txt || true)
+          case "${s15}" in
+            "") echo "::error::S15 (headless tab-group degradation) did not run"; exit 1 ;;
+            *"# SKIP"*) echo "::error::S15 was skipped"; exit 1 ;;
+          esac
+          case "${s16}" in
+            "") echo "::error::S16 (headful tab grouping) did not run; xvfb or the MV3 extension regressed"; exit 1 ;;
+            *"# SKIP"*) echo "::error::S16 was skipped; xvfb/headful Chrome is broken"; exit 1 ;;
+          esac
+          [ "${skipped:-0}" -le 1 ] || { echo "::error::unexpected number of skipped scenarios: ${skipped}"; exit 1; }

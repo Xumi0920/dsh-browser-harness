@@ -20,32 +20,32 @@ browser_tabs        list / use / new / close
 - **Your logged-in browser.** Point it at a dedicated Chromium instance (Chrome / Chromium / Edge / Brave / Vivaldi / Opera / Arc); sign in once and it persists.
 - **Text-first.** Accessibility-tree snapshots and refs beat screenshot-VLM loops for actions; screenshots stay optional.
 - **Per-task tab groups.** Tabs the harness creates are grouped by DSH session; work tabs are never touched, and headless browsers skip grouping.
-- **Tested.** 90 unit tests + 27 integration scenarios = 117, all against real headless/headful Chromium.
+- **Tested.** 92 unit tests (fake CDP double, no browser) + 27 integration scenarios (real headless/headful Chromium) = 119.
 
 ## Install
 
-Published to **GitHub Packages** as `@xumi0920/dsh-browser-harness` (the same-named npmjs.org package is an unrelated project). Pick one way to install.
+Published to **GitHub Packages** as `@xumi0920/dsh-browser-harness` (the same-named npmjs.org package is an unrelated project); it needs **DSH 0.2.1-rc.5 + Node 22** (enforced through `engines`). Pick one way to install.
 
-**Easiest: ask DSH to install it in one sentence** (Creator-mode session; `plugin_manager` is a Creator-mode tool and each operation needs danger-full-access or per-call approval):
+**Option 1: ask DSH to install it in one sentence** (Creator-mode session; `plugin_manager` is a Creator-mode tool and each operation needs danger-full-access or per-call approval):
 
 > Install `@xumi0920/dsh-browser-harness` into the current DSH profile.
 
-For a local checkout, use the absolute path instead of the package name: `Install <path-to-your-clone> into the current profile`.
+> The GitHub Packages source **requires the two npm config commands from option 2 first** (a read:packages token). To skip the token, use the absolute path of a local checkout instead: `Install <path-to-your-clone> into the current profile`.
 
-**Or install manually (GitHub Packages):**
+**Option 2: manual install (GitHub Packages):**
 
 ```powershell
-npm config set @xumi0920:registry https://npm.pkg.github.com
-npm config set //npm.pkg.github.com/:_authToken "<YOUR_GITHUB_TOKEN>"
+npm config set "@xumi0920:registry" "https://npm.pkg.github.com"
+npm config set "//npm.pkg.github.com/:_authToken" "<YOUR_GITHUB_TOKEN>"
 & "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" `
   plugin --profile desktop add "@xumi0920/dsh-browser-harness"
 ```
 
-Local checkout, Linux / macOS, one-click scripts, verify and uninstall: see **[docs/install.md](docs/install.md)**.
+> Exit DeepSeek Harness before installing from the CLI, then restart it. Local checkout, Linux / macOS, one-click scripts (token only in a temporary npm config), verify and uninstall: see **[docs/install.md](docs/install.md)**.
 
 ## Quick start
 
-Once installed, let the model call the tools in **any DSH session** (all presets; Creator mode only affects the `plugin_manager` install step):
+After installing, **restart DSH** and start the dedicated Chromium browser (ports and launch commands: [docs/configuration.md](docs/configuration.md); default 9331). Then let the model call the tools in **any DSH session** (all presets; Creator mode only affects the `plugin_manager` install step):
 
 ```
 browser_status → browser_navigate {url} → browser_snapshot → browser_act {action:"click", ref}
@@ -70,7 +70,7 @@ Standalone library / CLI examples: [docs/usage.md](docs/usage.md). Starting the 
 ```sh
 npm test                    # unit (no browser)
 npm run test:integration    # 27 integration scenarios
-npm run test:all            # unit + integration (117 tests)
+npm run test:all            # unit + integration (119 tests)
 ```
 
 CI: unit on ubuntu/windows; integration on ubuntu (xvfb, including the headful tab-group scenario).
@@ -84,6 +84,6 @@ CI: unit on ubuntu/windows; integration on ubuntu (xvfb, including the headful t
 
 ## Status
 
-v0.3.3: the install docs gained a "let DSH install it in one sentence" option, and the quick start now states that once installed every preset can use the tools (`plugin_manager` is only needed for the install step, in Creator mode). Behaviour is unchanged from v0.3.1. See the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog.
+v0.3.4: fixed tab-group config pass-through (`tabGroups` / `tabGroupTitle` / `tabGroupColor` now actually apply); non-http(s) navigation such as `file://` is rejected; the installers keep the token in a temporary npm config instead of writing it to disk; install docs got prerequisite/quoting/restart fixes; CI now demands 27 scenarios with the headful S16 truly running; publish verifies tag↔version and smoke-tests the packed artifact. See the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog.
 
 MIT (c) 2026 Xumi0920

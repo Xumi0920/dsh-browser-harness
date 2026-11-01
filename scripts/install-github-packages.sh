@@ -4,8 +4,11 @@
 #   export GITHUB_TOKEN=ghp_...   # needs read:packages
 #   ./scripts/install-github-packages.sh [profile] [dsh-binary]
 #
-# Never commit the token. The script only writes npm registry/auth config and
-# runs the DSH CLI plugin install.
+# The token is written only to a temporary npm userconfig that is deleted on
+# exit; it is never persisted to your real ~/.npmrc.
+# If you ran an older version of this script, remove the stored token with:
+#   npm config delete "//npm.pkg.github.com/:_authToken"
+# and revoke that token on GitHub.
 set -euo pipefail
 profile="${1:-desktop}"
 token="${GITHUB_TOKEN:-${NPM_TOKEN:-}}"
@@ -22,8 +25,12 @@ else
   echo "  ./scripts/install-github-packages.sh desktop /path/to/dsh" >&2
   exit 1
 fi
-npm config set "@xumi0920:registry" "https://npm.pkg.github.com"
-npm config set "//npm.pkg.github.com/:_authToken" "${token}"
+tmpdir="$(mktemp -d)"
+cleanup() { rm -rf "${tmpdir}"; }
+trap cleanup EXIT
+umask 077
+npmrc="${tmpdir}/.npmrc"
+printf '@xumi0920:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=%s\n' "${token}" > "${npmrc}"
 echo "Installing @xumi0920/dsh-browser-harness into profile '${profile}'..."
-"${dsh}" plugin --profile "${profile}" add "@xumi0920/dsh-browser-harness"
+NPM_CONFIG_USERCONFIG="${npmrc}" NODE_AUTH_TOKEN="${token}" "${dsh}" plugin --profile "${profile}" add "@xumi0920/dsh-browser-harness"
 echo "Done. Restart DeepSeek Harness, then check the plugin list."

@@ -57,6 +57,7 @@ CDP 没有标签组 API，因此随包带一个极小 MV3 扩展（仅 `tabs` / 
 ## 安全边界
 
 - 只关闭 harness 自建标签页（`E_POLICY_DENIED` 兜底）；
+- 只允许 `http(s)` / `about:blank` 导航；`file://`、`data:`、`javascript:`、`chrome://` 一律 `E_POLICY_DENIED`（防止绕过 DSH 文件策略）；
 - Cookie API 默认脱敏；不主动打印 cookie/token；
 - `browser_extract` 的 `network` / `js` 只在显式请求时返回页面暴露的数据；
 - 全部后台操作，不抢前台；遇登录墙停手问人；

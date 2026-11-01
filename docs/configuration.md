@@ -9,6 +9,8 @@
 - registry 文件：`~/.dsh/browser-cdp/registry.json`
 - `browser: "auto"`（或不指定）：先按配置实例顺序探测；都不通时并行回退其它已知 Chromium 端口与标准 `9222` / `9223`
 
+> auto 回退会探测任意本地 CDP 端口：如果日常浏览器也开了 remote debugging，可能附着到它。普通日常浏览器默认不开启 remote debugging；请确认 9222/9223 不属于你要保护的工作浏览器。
+
 ## 2. 支持的浏览器与默认端口
 
 任何**基于 Chromium 内核、支持 CDP remote debugging** 的浏览器都可以（Chrome、Chromium、Edge、Brave、Vivaldi、Opera、Arc……）。端口只是本项目的本地约定：
@@ -27,20 +29,29 @@
 
 ## 3. 启动专用实例
 
-Windows（PowerShell）：
+Windows（PowerShell；`chrome.exe` 等通常不在 PATH，用完整路径，按本机安装位置调整）：
 
 ```powershell
-chrome.exe --remote-debugging-port=9331 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\chrome"
-msedge.exe --remote-debugging-port=9332 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\edge"
-brave.exe  --remote-debugging-port=9335 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\brave"
+& "$env:ProgramFiles\Google\Chrome\Application\chrome.exe" `
+  --remote-debugging-port=9331 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\chrome"
+& "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe" `
+  --remote-debugging-port=9332 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\edge"
+& "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\Application\brave.exe" `
+  --remote-debugging-port=9335 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\brave"
 ```
 
-Linux / macOS：
+Linux（以下命令名以发行版安装为准）：
 
 ```bash
 google-chrome  --remote-debugging-port=9331 --user-data-dir="$HOME/.dsh/browser-cdp/profiles/chrome"
 chromium       --remote-debugging-port=9334 --user-data-dir="$HOME/.dsh/browser-cdp/profiles/chromium"
 microsoft-edge --remote-debugging-port=9332 --user-data-dir="$HOME/.dsh/browser-cdp/profiles/edge"
+```
+
+macOS（未实测）：
+
+```bash
+open -na "Google Chrome" --args --remote-debugging-port=9331 "--user-data-dir=$HOME/.dsh/browser-cdp/profiles/chrome"
 ```
 
 用任意端口（如 9222）也可以：`browser: "auto"` 会自动回退探测，或直接配 `cdpUrl: "http://127.0.0.1:9222"`。
@@ -74,7 +85,8 @@ microsoft-edge --remote-debugging-port=9332 --user-data-dir="$HOME/.dsh/browser-
 | `browser` | — | 目标实例选择器（见上表） |
 | `cdpUrl` / `ws` | — | 直连端点（二选一，优先于 `browser`） |
 | `maxSnapshotNodes` | 250 | 快照节点上限（`browser_snapshot` 可单独指定，最多 400） |
-| `stateDir` / `downloadDir` | `~/.dsh/browser-harness` | 状态文件与下载目录 |
+| `stateDir` | `~/.dsh/browser-harness` | 状态文件目录（per-lane JSON） |
+| `downloadDir` | `<stateDir>/downloads` | 下载目录 |
 | `dialogPolicy` | `auto-dismiss` | 对话框策略 |
 | `tabGroups` | `true` | 按任务标签页分组，见 [tab-groups.md](tab-groups.md) |
 | `tabGroupTitle` | `DSH · {session}` | 组名模板，支持 `{session}` / `{lane}` |
@@ -107,4 +119,6 @@ microsoft-edge --remote-debugging-port=9332 --user-data-dir="$HOME/.dsh/browser-
 ## 7. 安全提醒
 
 - 不要把 `cdpUrl` 指向日常浏览器；专用实例的 profile 与工作 profile 分离。
+- `browser_tabs {action:"use"}` 可把会话指向已有标签页（含非自建页），之后 `browser_navigate` 会复用该页——请只对自己可操作的页面显式使用。
+- 只允许打开 `http(s)` 页面（`about:blank` 除外）；`file://`、`data:`、`javascript:`、`chrome://` 等会被 `E_POLICY_DENIED` 拒绝。
 - harness 探测失败会报 `E_NO_BROWSER`，不会自行启动浏览器。
