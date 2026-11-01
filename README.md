@@ -2,7 +2,11 @@
 
 **简体中文** | [English](README.en.md)
 
-**DeepSeek Harness（DSH）原生浏览器工具。** 零依赖 CDP 内核，把 7 个 `browser_*` 工具挂到 DSH 上，直连一个**专用、已登录**的 Chromium 内核真实浏览器，提供带引用编号（e1、e2…）的紧凑无障碍树快照，并按任务给自建标签页分组。
+[![ci](https://github.com/Xumi0920/dsh-browser-harness/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Xumi0920/dsh-browser-harness/actions/workflows/ci.yml)
+
+**DeepSeek Harness（DSH）原生浏览器工具。** 零依赖 CDP 内核 + 7 个 `browser_*` 工具，直连**专用、已登录**的 Chromium 内核浏览器，提供 e1/e2 引用快照，并按任务给自建标签页分组。
+
+## 工具
 
 ```
 browser_status      端点 / 浏览器版本 / 标签页 / 当前标签页
@@ -16,79 +20,84 @@ browser_tabs        list / use / new / close
 
 ## 亮点
 
-- **运行时零依赖**：构建产物只用 Node 22+ 内置能力（`fetch`、`WebSocket`、`node:test`），不下载浏览器；**源码是 TypeScript**，`tsc` 构建到 `dist/`，开发依赖仅 `typescript` + `@types/node`，插件入口仅用宿主提供的 `@deepseek-ai/dsh-tools` peer。
-- **真实登录态**：连自己起好的专用 Chromium 实例（Chrome / Chromium / Edge / Brave / Vivaldi / Opera / Arc 都可以），登录一次长期有效。
-- **文本优先**：无障碍树 + ref 比“截图喂视觉模型”更准更省；截图只是可选补充。
+- **运行时零依赖**：构建产物只用 Node 内置的 `fetch` / `WebSocket`，不下载浏览器；源码为 **TypeScript**，`tsc` 构建到 `dist/`，插件入口仅用宿主提供的 `@deepseek-ai/dsh-tools` peer。
+- **真实登录态**：接自己起好的专用 Chromium 实例，登录一次长期有效；不碰日常浏览器。
+- **文本优先**：无障碍树 + ref 比“截图喂视觉模型”更准更省，截图只是补充。
 - **按任务标签组**：插件自建的标签页自动按 DSH 会话分组，工作标签页不受影响；headless 自动跳过。
-- **可验证**：102 个单测（fake CDP 替身，无需浏览器）+ 27 个集成场景（真实 headless / headful Chromium）= 129 条。
+- **可验证**：102 单测（fake CDP）+ 27 集成场景（真实 headless/headful Chromium）= 129 条，CI 覆盖三平台。
+
+## 环境要求
+
+| 要求 | 说明 |
+|---|---|
+| DSH | `>=0.2.1-rc.5`（不设上限） |
+| Node | `>=22` |
+| 浏览器 | 任一 Chromium 内核 + remote debugging（默认 9331，见 [配置](docs/configuration.md)） |
+| 平台 | Windows / Linux 已验证；macOS 未实测 |
 
 ## 安装
 
-插件发布在 **GitHub Packages**：`@xumi0920/dsh-browser-harness`（npmjs.org 上的同名包属于其他项目）；需要 **DSH >= 0.2.1-rc.5 + Node 22（不设上限）**。任选一种方式：
+插件发布于 **GitHub Packages**：`@xumi0920/dsh-browser-harness`（npmjs 同名包是别人的项目）。三种方式任选，详见 **[docs/install.md](docs/install.md)**：
 
-**方式一（推荐，图形界面）：DSH Web 插件页**
-
-打开 DSH Web 的**插件页**（左侧/设置里的「插件」入口；会话菜单里的「浏览更多插件」也能进入），在「已安装」标签页点 **添加插件** → **安装第三方插件**，支持 **npm 包名 / Git 仓库 / 本地目录**；官方市场条目在 **发现** 标签页搜索并安装。
-
-**方式二：一句话交给 DSH 安装**（创造模式会话；`plugin_manager` 是创造模式专用工具，每次操作需要 danger-full-access 或当次批准）：
-
-> 把 `@xumi0920/dsh-browser-harness` 安装到当前 DSH profile。
-
-> GitHub Packages 来源**需要先完成「方式三」里的两条 npm config**（read:packages token）；不想配 token 的话，把包名换成你本机 clone 的绝对路径即可：`把 <本机 clone 路径> 安装到当前 profile`（本地目录需先 `npm install && npm run build`，源码是 TypeScript）。
-
-**方式三：手动安装（GitHub Packages / CLI）**
+1. **插件页（推荐）**：DSH Web → 插件页 → 添加插件 → 安装第三方插件，支持 npm 包名 / Git 仓库 / 本地目录；或在「发现」标签页安装市场条目。
+2. **一句话交给 DSH**（创造模式会话）：`把 @xumi0920/dsh-browser-harness 安装到当前 profile`。
+3. **手动安装（GitHub Packages）**：
 
 ```powershell
 npm config set "@xumi0920:registry" "https://npm.pkg.github.com"
 npm config set "//npm.pkg.github.com/:_authToken" "<YOUR_GITHUB_TOKEN>"
-& "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" `
+& "$env:LOCALAPPDATA\\Programs\\DeepSeek Harness\\resources\\runtime\\cli\\bin\\dsh.cmd" `
   plugin --profile desktop add "@xumi0920/dsh-browser-harness"
 ```
 
-> CLI 直接改 profile 时请先退出 DeepSeek Harness，装完重启。本地目录安装、Linux / macOS、一键脚本（token 只写临时 npm 配置）、验证与卸载见 **[docs/install.md](docs/install.md)**。
-
-**热插拔**：安装结果的 `application` 为 `applied` 时已经热生效，不必重启；为 `restart-required` 时才重启（`restartReason` 会解释原因：`no-hmr` / `package-moved` / `host-module` / `unmanaged-plugin` / `module-comparison`）。**替换已安装的包**（升级、换目录、本地 link 改代码）通常需要重启才能加载新的 JS 模块；图形界面会直接提示「请重启 DSH 使更改生效。{原因}」。
+> GitHub Packages 需要 read:packages token；本地目录安装前先 `npm install && npm run build`；CLI 改 profile 前先退出 DSH。**热插拔**：`application: applied` 已生效，`restart-required` 才需重启（替换已安装包通常需要重启加载新的 JS 模块，原因见返回的 `restartReason`）。
 
 ## 快速开始
 
-安装生效后（`applied` 或重启完成），先启动专用 Chromium 浏览器（端口/启动命令见 [docs/configuration.md](docs/configuration.md)；默认 9331）。之后在**任意 DSH 会话**里让模型直接调用即可（所有预设都能用，不限于创造模式；创造模式只影响用 `plugin_manager` 安装这一步）：
+安装生效后，先启动专用 Chromium 浏览器（默认 9331），然后在**任意 DSH 会话**里让模型调用（所有预设可用，创造模式只影响 `plugin_manager` 安装）：
 
 ```
 browser_status → browser_navigate {url} → browser_snapshot → browser_act {action:"click", ref}
 browser_extract {mode:"text" | "html" | "js" | "network"}
 ```
 
-独立库与 CLI（不装 DSH 也能用）示例见 [docs/usage.md](docs/usage.md)；专用浏览器怎么起、端口和配置见 [docs/configuration.md](docs/configuration.md)。
+首调 `connected:false`？确认专用浏览器已启动且 `http://127.0.0.1:9331/json/version` 可访问（见 [docs/configuration.md](docs/configuration.md)）。
+
+## 适用场景
+
+| 场景 | 建议 |
+|---|---|
+| 登录态页面、点击/填表、上传下载、多标签、截图 | 用本插件 |
+| 公开页面纯读取 | 优先 `web_fetch`（更快，不占浏览器） |
+| headless 环境 | 标签组自动跳过；其它工具正常 |
+| 日常浏览器 | 不要指向它；使用专用 profile 实例 |
 
 ## 文档
 
 | 文档 | 内容 |
 |---|---|
-| [安装与验证](docs/install.md) | 插件页 / 一句话交给 DSH / GitHub Packages / 本地 / Linux / 卸载 / 升级 / FAQ |
+| [安装与验证](docs/install.md) | 插件页 / 一句话 / GitHub Packages / 本地 / Linux / 卸载 / 升级 / FAQ |
 | [配置](docs/configuration.md) | 浏览器发现、端口约定、registry、profile patch 配置键 |
 | [按任务标签组](docs/tab-groups.md) | 行为边界、配置、排查、实现方式 |
 | [使用](docs/usage.md) | DSH 工作流、独立库、CLI |
 | [架构](docs/architecture.md) | 分层、关键流程、错误模型、安全边界 |
-| [扩展与语言](docs/extending.md) | 插件语言、热插拔/HMR、用 MCP 接入 Python 等其它语言 |
+| [扩展与语言](docs/extending.md) | 原生 JS/TS 插件、热插拔/HMR、MCP 接 Python 等 |
 | [仓库结构](docs/README.md) | 目录约定、维护与发布流程 |
 
 ## 扩展与语言
 
-- **原生插件**：Node 22+ 的 ESM 包（JS/TS；TS 需先构建），通过 bundle patch 注册，热插拔由 DSH 的 HMR 协调。
-- **其它语言**：写一个 MCP server（stdio 或 Streamable HTTP，Python / Go / Rust / Node 均可），在 profile 里加 `@deepseek-ai/dsh-mcp-client` 条目，工具会以 `mcp__<serverName>__<tool>` 暴露。
-- **技能**：Markdown（`SKILL.md`），不需要写代码；**UI 插件**：JS/TS（DSH Web Client）。
-- 为什么插件是 JS/TS：它是宿主运行时（Node 22 / V8）加载的模块语言，模型本身并不"运行 JS"；TS/零构建 JS 对 Agent 编写插件最省事。Python 的数据/ML 生态走 MCP 更合适。细节见 [docs/extending.md](docs/extending.md)。
+- **原生插件**：Node 22+ ESM 包（JS/TS，TS 需构建），bundle patch 注册，HMR 协调热插拔。
+- **其它语言**：写 MCP server（stdio / Streamable HTTP，Python / Go / Rust / Node 均可），profile 里加 `@deepseek-ai/dsh-mcp-client`，工具以 `mcp__<serverName>__<tool>` 暴露。
+- **技能**：Markdown（`SKILL.md`）；**UI 插件**：JS/TS。细节见 [docs/extending.md](docs/extending.md)。
 
-## 测试
+## 测试与 CI
 
 ```sh
-npm install                 # 开发依赖（TypeScript 构建），运行时零依赖
-npm test                    # 构建 + 102 单测（无浏览器）
-npm run test:integration    # 构建 + 27 个集成场景
-npm run test:all            # 构建 + 单测 + 场景（共 129 条）
+npm install                 # 开发依赖（TypeScript），运行时零依赖
+npm run test:all            # 构建 + 102 单测 + 27 集成场景 = 129 条
 ```
 
-CI：单测跑 ubuntu / windows / macOS（含 Node 24 任务）；集成场景跑 ubuntu（xvfb，含 headful 标签组）。
+CI：单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场景跑 ubuntu + xvfb（门禁 27 条，S15/S16 必须实跑）。
 
 ## 安全边界
 
@@ -97,8 +106,6 @@ CI：单测跑 ubuntu / windows / macOS（含 Node 24 任务）；集成场景�
 - 只在显式请求时返回页面内容；不要把 `cdpUrl` 指向日常浏览器。
 - 全部后台操作，不抢前台；遇到登录墙停手问人。
 
-## 状态
+## 许可
 
-v0.4.3：DSH 版本约束放宽为 `>=0.2.1-rc.5`（不设上限），`peerDependencies` 同步；新增 2 个 semver 兼容性单测（模拟 DSH plugin-manager 的 `includePrerelease` 检查）；102 单测 + 27 集成 = 129 条。从 v0.4.0 起源码为 TypeScript、`tsc` 构建到 `dist/`，运行时仍零依赖。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
-
-MIT © 2026 Xumi0920
+MIT © 2026 Xumi0920 · 当前版本 **v0.4.4** · 更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)

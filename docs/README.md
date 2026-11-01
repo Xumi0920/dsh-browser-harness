@@ -48,13 +48,14 @@
 - 源码是 TypeScript（`strict: true`，含 `noImplicitAny`）：先 `npm install` 再 `npm run build`；改代码后跑 `npm run test:all`（自动构建，当前 102 单测 + 27 集成场景 = 129 条）。
 - CI：`npm ci` + build 后单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场景跑 ubuntu（xvfb 提供 display），门禁要求正好 27 条且 S15/S16 必须实际执行；publish 校验 tag==v版本并做打包冒烟（含 `dist/` 产物）。
 - 版本与发布：GitHub Release 触发 `.github/workflows/publish.yml`，发布到 GitHub Packages（`@xumi0920/dsh-browser-harness`）；版本号需与 tag 一致。
+- 依赖升级（Dependabot，weekly）：逐个 PR `gh pr checkout <n>` → `npm ci` → `npx tsc --noEmit` → `npm run build` → 全量 `npm run test:all`（102 单测 + 27 集成）；分支落后 main 时先 `gh pr update-branch <n>` 再复测；通过后 `gh pr merge <n> --squash --delete-branch`。仅 devDependencies/lockfile 变化时**不必发版**（`dist/` 与运行时依赖不变）；typescript / @types/node 等工具链升级必须同时通过类型检查与集成场景。
 - DSH 版本兼容：`engines.dsh` 与 DSH peer 均为 `>=0.2.1-rc.5`（不设上限）；`tests/unit/package.test.mjs` 按 DSH plugin-manager 的 `semver.satisfies(..., { includePrerelease: true })` 逻辑校验。
 - 提交信息用 conventional commits（`feat:` / `fix:` / `docs:` / `test:` / `chore:`）。
 - 新增浏览器相关能力时，优先扩展 `src/`；插件层只做 DSH 适配。
 
 ## 下一步规划
 
-- 标签组：扩展 worker 掉线后的自动重挂（当前 `ensure` 会短路复用旧 session）；headless 支持取决于 Chrome 是否开放标签组。
-- 测试：插件入口可测化（factory + fake `defineTool`）；env 发现/probe 超时、配置键与 manager 错误路径；临时测试目录清理；更多 CLI/工具参数端到端覆盖。
+- 标签组：headless 支持取决于 Chrome 是否开放标签组；组名模板 `{session}`/`{lane}` 与颜色已支持。
+- 测试：更多 CLI 命令/工具参数端到端覆盖；macOS 真机集成场景；插件入口的 DSH 运行时冒烟。
 - 文档：architecture.md 补时序图；install.md 增 macOS 实测步骤。
 - 发布：npm 可选发布评估（npmjs 名称冲突仍在，GitHub Packages 已发布）。
