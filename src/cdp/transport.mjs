@@ -75,7 +75,6 @@ export class CDPTransport extends Emitter {
         try { ws.close(); } catch { /* ignore */ }
         reject(connectTimeout(this.wsUrl, this.defaultTimeoutMs));
       }, this.defaultTimeoutMs);
-      if (typeof timer.unref === "function") timer.unref();
 
       const finish = (error) => {
         if (settled) return;
@@ -171,7 +170,6 @@ export class CDPTransport extends Emitter {
         this.pending.delete(id);
         reject(cdpTimeout(method, timeoutMs));
       }, timeoutMs);
-      if (typeof timer.unref === "function") timer.unref();
       this.pending.set(id, { resolve, reject, timer, method });
       try {
         this.ws.send(json);
@@ -199,7 +197,6 @@ export class CDPTransport extends Emitter {
         off();
         reject(cdpTimeout(method + " (event)", timeoutMs));
       }, timeoutMs);
-      if (typeof timer.unref === "function") timer.unref();
       const off = this.onEvent(method, (params, sessionId) => {
         let matched = true;
         if (typeof predicate === "function") {
