@@ -1,58 +1,66 @@
 # dsh-browser-harness
 
-**Native browser tools for DeepSeek Harness (DSH).** A zero-dependency CDP core exposes `browser_*` tools that drive a *dedicated, already-running* Chrome — a real browser with real login state — plus a compact accessibility snapshot with clickable refs.
+**简体中文** | [English](README.en.md)
+
+**DeepSeek Harness（DSH）原生浏览器工具。** 零依赖 CDP 内核，把 `browser_*` 工具挂到 DSH 上，直连一个**专用、已登录**的真实 Chrome，并提供带引用编号（e1、e2…）的紧凑无障碍树快照。
 
 ```
-browser_status      endpoint, Chrome version, tabs, current tab
-browser_navigate    open a URL, return info + snapshot
-browser_snapshot    compact refs (e1 ...) with role/name/viewport center
+browser_status      端点 / Chrome 版本 / 标签页 / 当前标签页
+browser_navigate    打开 URL，返回页面信息 + 快照
+browser_snapshot    紧凑引用（e1…），含角色、名称、视口中心坐标
 browser_act         click / type / fill / press / scroll
 browser_extract     text / html / JS / network
-browser_screenshot  PNG path
+browser_screenshot  PNG 路径
 browser_tabs        list / use / new / close
 ```
 
-## Why not just Playwright?
+## 为什么不用 Playwright
 
-- **Zero dependencies.** Node 22+ built-ins only (`fetch`, `WebSocket`, `node:test`). No browser download, no build step. The DSH plugin entry imports the host-provided `@deepseek-ai/dsh-tools` peer — nothing else.
-- **Your logged-in Chrome.** Point it at a dedicated instance (e.g. `--remote-debugging-port=9331 --user-data-dir=...`) that the user signed in once.
-- **Text-first.** Accessibility-tree snapshots and refs beat screenshot-VLM loops for actions; screenshots stay optional.
-- **Scene-tested.** 37 unit tests + 14 end-to-end scenarios (51 total: login, async render, tabs, iframe, shadow DOM, download, upload, dialogs, validation, timeout, stale-tab recovery, screenshots, network capture, cookies) run against a real headless Chrome and a local fixture site.
+- **零依赖**：只用 Node 22+ 内置能力（`fetch`、`WebSocket`、`node:test`），不下载浏览器、不需要构建；插件入口仅使用宿主提供的 `@deepseek-ai/dsh-tools` peer。
+- **真实登录态**：连用户自己起好的专用 Chrome 实例（默认 `chrome`，端口 9331），登录一次长期有效。
+- **文本优先**：无障碍树 + ref 比“截图喂视觉模型”更准更省；截图只是可选补充。
+- **场景测试**：37 个单测 + 14 个端到端场景（共 51 条；登录、异步渲染、多标签、iframe、Shadow DOM、下载、上传、对话框、表单校验、选择器超时、标签页被关恢复、截图、网络捕获、Cookie），全部跑在真实 headless Chrome + 本地 fixture 站上。
 
-## Install (DSH 0.2.1-rc.5)
+## 环境要求
+
+- DSH `0.2.1-rc.5`（`engines.dsh`）
+- Node.js >= 22
+- 一个已开启 remote debugging 的**专用** Chrome（默认端口 9331 / 9333）
+
+## 安装（DSH 0.2.1-rc.5）
 
 ```powershell
-# From a local checkout (Creator mode / plugin manager):
-#   plugin_manager { action: "install_bundle", target: "G:\\path\\to\\dsh-browser-harness" }
-# Or CLI (restart DSH afterwards):
+# 本地目录（创造模式 / 插件管理器）：
+#   plugin_manager { action: "install_bundle", target: "C:\\path\\to\\dsh-browser-harness" }
+# 或 CLI（装完重启 DSH）：
 & "$env:LOCALAPPDATA\\Programs\\DeepSeek Harness\\resources\\runtime\\cli\\bin\\dsh.cmd" `
-  plugin --profile desktop add "G:\\path\\to\\dsh-browser-harness"
+  plugin --profile desktop add "C:\\path\\to\\dsh-browser-harness"
 ```
 
-The plugin is a DSH bundle (`dsh.bundle.patch` -> `cordis.patch.yml`), so it registers `browser_*` tools at profile level and embeds the `browser-harness` skill.
+插件是 DSH bundle（`dsh.bundle.patch` → `cordis.patch.yml`），安装后在 profile 级注册 `browser_*` 工具，并内嵌 `browser-harness` 技能。更细的安装、验证与卸载步骤见 [install.md](install.md)。
 
-## Configure the target browser
+## 配置目标浏览器
 
-Defaults read `~/.dsh/browser-cdp/registry.json` and attach to the default dedicated instance (`chrome` on port 9331). Override in the patch row:
+默认读取 `~/.dsh/browser-cdp/registry.json`，附着到默认专用实例（`chrome`，端口 9331）。可在 patch 行覆盖：
 
 ```yaml
 - insert:
     - id: browser-harness
       name: dsh-browser-harness
       config:
-        browser: chrome-beta      # or chrome
+        browser: chrome-beta      # 或 chrome
         # cdpUrl: http://127.0.0.1:9333
         # ws: ws://127.0.0.1:9333/devtools/browser/<id>
         maxSnapshotNodes: 250
 ```
 
-The harness only *probes* running browsers; it never launches, kills, or reconfigures one. Start a dedicated instance yourself:
+本插件只**探测**已运行浏览器，绝不启动、杀死或重配用户的浏览器。需要自启时手动起一个专用实例：
 
 ```powershell
-chrome.exe --remote-debugging-port=9331 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\chrome"
+chrome.exe --remote-debugging-port=9331 "--user-data-dir=$env:USERPROFILE\\.dsh\\browser-cdp\\profiles\\chrome"
 ```
 
-## Standalone library / CLI
+## 独立库 / CLI（不装 DSH 也能用）
 
 ```js
 import { connect } from "./src/index.mjs";
@@ -70,29 +78,29 @@ node bin/bh.mjs open https://example.com
 node bin/bh.mjs snapshot
 ```
 
-## Test
+## 测试
 
-Run from a source checkout (npm-packed installs ship the runtime only):
+需从源码 checkout 运行（npm 打包安装只含运行时）：
 
 ```sh
-npm test                    # unit: CDP protocol, endpoint, state, AX, tools (no browser)
-npm run test:integration    # 14 scenarios on a throwaway headless Chrome
-npm run test:all            # unit + integration (51 tests)
-node scripts/verify.mjs     # smoke against a live dedicated Chrome
+npm test                    # 单测（无浏览器）
+npm run test:integration    # 14 个场景（临时 headless Chrome）
+npm run test:all            # 单测 + 场景（共 51 条）
+node scripts/verify.mjs     # 对 live 专用 Chrome 冒烟
 ```
 
-Integration tests launch their own Chrome with a temporary profile and never touch the user's browser; if no Chrome is found they skip.
+集成测试自起临时 profile 的 Chrome，不碰用户浏览器；找不到 Chrome 时自动跳过。
 
-## Safety
+## 安全边界
 
-- Only tabs this harness creates are closed; `browser_tabs` never closes user tabs.
-- The cookies API redacts values by default; the harness does not log secrets.
-- `browser_extract` modes `network` and `js` return exactly what the page exposes when explicitly asked (response headers may contain `Set-Cookie`); `browser_tabs {action:"use"}` can attach the session to an existing tab, after which `browser_act` operates on it. Use these intentionally, and never point `cdpUrl` at a daily-driver Chrome.
-- Background operations only — no `Page.bringToFront` unless explicitly requested.
-- Login walls stop the workflow and ask the user.
+- 只关闭本 harness 创建的标签页；`browser_tabs` 绝不关闭用户标签页。
+- Cookie API 默认脱敏；harness 不打印任何密钥。
+- `browser_extract` 的 `network` / `js` 模式只在你显式请求时返回页面本身暴露的内容（响应头可能含 `Set-Cookie`）；`browser_tabs {action:"use"}` 可把会话附着到既有标签页，之后 `browser_act` 会在其上操作。请显式使用，且不要把 `cdpUrl` 指向日常 Chrome。
+- 全部后台操作，不抢前台。
+- 遇到登录墙停手问人。
 
-## Status
+## 状态
 
-v0.1.0 — first native-plugin release, pinned to DSH `0.2.1-rc.5` through `engines.dsh`. Downloads/uploads/cookies exist in the core library but are intentionally not exposed as tools yet.
+v0.1.0：首个原生插件版本，通过 `engines.dsh` 精确绑定 DSH `0.2.1-rc.5`。下载/上传/Cookie 能力已在内核库中，但一期不作为工具暴露。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
 
-MIT (c) 2026 Xumi0920
+MIT © 2026 Xumi0920
