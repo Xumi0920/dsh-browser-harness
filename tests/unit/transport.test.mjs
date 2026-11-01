@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CDPTransport } from "../../src/cdp/transport.mjs";
-import { FakeWebSocket } from "./fake-websocket.mjs";
+import { FakeWebSocket } from "./helpers/fake-websocket.mjs";
 
 test.beforeEach(() => FakeWebSocket.reset());
 

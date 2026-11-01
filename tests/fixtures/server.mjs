@@ -1,7 +1,7 @@
 /**
  * Local scenario server for integration tests. Zero dependencies, port 0.
  *
- * Run directly to get a URL: node fixtures/server.mjs
+ * Run directly to get a URL: node tests/fixtures/server.mjs
  */
 
 import { createServer } from "node:http";

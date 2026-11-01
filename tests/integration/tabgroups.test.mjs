@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { startFixtureServer } from "../../fixtures/server.mjs";
+import { startFixtureServer } from "../fixtures/server.mjs";
 import { launchChrome } from "./helpers/launch-chrome.mjs";
 import { Browser } from "../../src/browser.mjs";
 import { tabGroupTitleFor } from "../../src/tabgroups.mjs";

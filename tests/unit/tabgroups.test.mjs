@@ -9,7 +9,7 @@ import {
   tabGroupColorFor,
   tabGroupTitleFor,
 } from "../../src/tabgroups.mjs";
-import { FakeTransport } from "./fake-transport.mjs";
+import { FakeTransport } from "./helpers/fake-transport.mjs";
 
 const EXTENSION_PATH = join(tmpdir(), "bh-package", "extension");
 const EXTENSION_URL = "chrome-extension://ext-1/sw.js";

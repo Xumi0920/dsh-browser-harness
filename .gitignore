@@ -1,5 +1,8 @@
 node_modules/
-work-int.log
-work-debug*.mjs
+coverage/
 reports/
+*.tgz
 *.log
+work-debug*.mjs
+.DS_Store
+Thumbs.db

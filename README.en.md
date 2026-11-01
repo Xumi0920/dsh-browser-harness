@@ -19,7 +19,7 @@ browser_tabs        list / use / new / close
 - **Zero dependencies.** Node 22+ built-ins only (`fetch`, `WebSocket`, `node:test`). No browser download, no build step. The DSH plugin entry imports the host-provided `@deepseek-ai/dsh-tools` peer — nothing else.
 - **Your logged-in browser.** Point it at a dedicated Chromium-based instance (default `chrome` = 9331; Edge/Brave/Chromium/... also supported — see *Supported browsers*) that the user signed in once.
 - **Text-first.** Accessibility-tree snapshots and refs beat screenshot-VLM loops for actions; screenshots stay optional.
-- **Scene-tested.** 88 unit tests + 27 end-to-end scenarios (14 browser scenarios + 11 tool-layer/CLI/compat scenarios + 2 tab-group scenarios, 115 total: login, async render, tabs, iframe, shadow DOM, download, upload, dialogs, validation, timeout, stale-tab recovery, screenshots, network capture, cookies) run against a real headless Chromium and a local fixture site.
+- **Scene-tested.** 87 unit tests + 27 end-to-end scenarios (14 browser scenarios + 11 tool-layer/CLI/compat scenarios + 2 tab-group scenarios, 114 total: login, async render, tabs, iframe, shadow DOM, download, upload, dialogs, validation, timeout, stale-tab recovery, screenshots, network capture, cookies) run against a real headless Chromium and a local fixture site.
 
 ## Requirements
 
@@ -82,7 +82,7 @@ git clone https://github.com/Xumi0920/dsh-browser-harness.git C:\path\to\dsh-bro
 
 > Each `plugin_manager` operation needs a danger-full-access sandbox or per-call approval. Its `target` accepts an npm package name, a git URL, a tarball, or a local absolute directory.
 
-The plugin is a DSH bundle (`dsh.bundle.patch` -> `cordis.patch.yml`), so it registers `browser_*` tools at profile level and embeds the `browser-harness` skill. See [install.md](install.md) (currently Chinese) for the full install, verify and uninstall steps.
+The plugin is a DSH bundle (`dsh.bundle.patch` -> `cordis.patch.yml`), so it registers `browser_*` tools at profile level and embeds the `browser-harness` skill. See [docs/install.md](docs/install.md) (currently Chinese) for the full install, verify and uninstall steps.
 
 ## Configure the target browser
 
@@ -155,16 +155,35 @@ CLI subcommands: `doctor`, `tabs`, `open <url>`, `info`, `snapshot`, `text [sele
 
 ## Test
 
-Run from a source checkout. The packed artifact (`npm pack`) contains the runtime only — no `tests/`, `scripts/`, or `fixtures/`. The plugin is published to GitHub Packages, and can also be installed from source or a local directory.
+Run from a source checkout. The packed artifact (`npm pack`) contains the runtime only — no `tests/` or `scripts/`. The plugin is published to GitHub Packages, and can also be installed from source or a local directory.
 
 ```sh
 npm test                    # unit: CDP protocol, endpoint, state, AX, tools (no browser)
 npm run test:integration    # 27 scenarios on throwaway headless/headful Chromium browsers
-npm run test:all            # unit + integration (115 tests)
+npm run test:all            # unit + integration (114 tests)
 node scripts/verify.mjs     # smoke against a live dedicated browser
 ```
 
 Integration tests launch their own Chromium browser with a temporary profile and never touch the user's browser; they skip when none is available.
+
+## Repository layout
+
+```
+.
+├─ bin/                 standalone CLI (bh doctor/open/snapshot/close ...)
+├─ docs/                docs: install/verify (install.md) plus structure conventions
+├─ extension/           MV3 extension used for tab groups (runtime asset, shipped)
+├─ lib/                 DSH plugin layer: tool definitions, skill registration, BrowserManager
+├─ locale/              DSH plugin display metadata (en/zh)
+├─ scripts/             smoke scripts (verify.mjs)
+├─ skills/              runtime skill body (SKILL.md, single source of truth)
+├─ src/                 zero-dependency core: CDP, Page, AX snapshot, state, tabgroups
+├─ tests/               unit tests + integration scenarios + fixtures
+├─ cordis.patch.yml     DSH bundle registration
+└─ README*.md / package.json / LICENSE / icon.svg
+```
+
+Maintenance conventions (single sources, release flow, next steps) are in [docs/README.md](docs/README.md) (Chinese).
 
 ## Safety
 
