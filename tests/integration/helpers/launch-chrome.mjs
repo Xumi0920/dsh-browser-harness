@@ -119,6 +119,21 @@ async function killByUserDataDir(userDataDir) {
   await new Promise((resolve) => execFile("pkill", ["-f", userDataDir], () => resolve()));
 }
 
+/** Wait until the freshly launched browser answers /json/version. */
+async function waitForCdpReady(httpUrl, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(httpUrl + "/json/version");
+      if (response.ok) return;
+    } catch {
+      /* not ready yet */
+    }
+    await sleep(100);
+  }
+  throw new Error("CDP endpoint did not answer at " + httpUrl);
+}
+
 /**
  * @param {{ headless?: boolean, extraArgs?: string[], executable?: string }} [options]
  * @returns {Promise<null | { proc: any, port: number, httpUrl: string, userDataDir: string, executable: string, close: () => Promise<void> }>}
@@ -168,6 +183,7 @@ export async function launchChrome(options = {}) {
   const [portLine] = text.trim().split(/\r?\n/);
   const port = Number(portLine);
   if (!Number.isFinite(port) || port <= 0) throw new Error("invalid DevToolsActivePort: " + text.slice(0, 80));
+  await waitForCdpReady("http://127.0.0.1:" + port);
   return {
     proc,
     port,
