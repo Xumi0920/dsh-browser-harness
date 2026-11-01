@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SKILL_CONTENT, SKILL_DESCRIPTION, SKILL_NAME, parseSkillFile } from "../../lib/skill.js";
+import { SKILL_CONTENT, SKILL_DESCRIPTION, SKILL_NAME, parseSkillFile } from "../../dist/lib/skill.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SKILLS_FILE = join(ROOT, "skills", "browser-harness", "SKILL.md");

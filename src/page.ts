@@ -18,8 +18,8 @@ import {
   selectorTimeout,
   uploadFailed,
   waitTimeout,
-} from "./errors.mjs";
-import { buildSnapshot, boxCenter, findRef } from "./ax.mjs";
+} from "./errors.js";
+import { buildSnapshot, boxCenter, findRef } from "./ax.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_LOAD_TIMEOUT_MS = 30_000;
@@ -76,8 +76,27 @@ function jsonSafe(value) {
 }
 
 export class Page {
+  browser: any;
+  transport: any;
+  sessionId: string;
+  targetId: string;
+  lastSnapshot: any;
+  nextRef: number;
+  pendingDialog: any;
+  dialogHistory: any[];
+  networkLog: any[];
+  networkEnabled: boolean;
+  networkStarting: any;
+  closed: boolean;
+  dialogPolicy: string;
+  focusEmulation: boolean;
+  downloadDir: string;
+  executionContexts: any[];
+  runtimeEnabled: boolean;
+  ownedListeners: any[];
+  maxNetworkEvents: number;
   /**
-   * @param {import("./browser.mjs").Browser} browser
+   * @param {import("./browser.js").Browser} browser
    * @param {{ sessionId: string, targetId: string }} ids
    */
   constructor(browser, ids) {
@@ -111,7 +130,7 @@ export class Page {
   }
 
   /** Send a CDP command on this page session. */
-  send(method, params = {}, options = {}) {
+  send(method, params = {} as any, options = {} as any) {
     return this.transport.send(method, params, { sessionId: this.sessionId, ...options });
   }
 
@@ -125,7 +144,7 @@ export class Page {
   }
 
   /** Enable the CDP domains this harness depends on. */
-  async enableDomains({ runtime = true } = {}) {
+  async enableDomains({ runtime = true } = {} as any) {
     const domains = [this.send("Page.enable", {}, { timeoutMs: 5_000 }).catch(() => null), this.send("DOM.enable", {}, { timeoutMs: 5_000 }).catch(() => null)];
     if (runtime && !this.runtimeEnabled) {
       this.runtimeEnabled = true;
@@ -175,8 +194,8 @@ export class Page {
   }
 
   /** Handle the currently open dialog. */
-  async handleDialog({ accept = true, promptText } = {}) {
-    const params = { accept };
+  async handleDialog({ accept = true, promptText } = {} as any) {
+    const params: any = { accept };
     if (typeof promptText === "string") params.promptText = promptText;
     await this.send("Page.handleJavaScriptDialog", params, { timeoutMs: 5_000 });
     this.pendingDialog = null;
@@ -201,13 +220,13 @@ export class Page {
    * @param {string | Function} expressionOrFn
    * @param {{ awaitPromise?: boolean, timeoutMs?: number, returnByValue?: boolean, contextId?: number }} [options]
    */
-  async evaluate(expressionOrFn, options = {}) {
+  async evaluate(expressionOrFn, options = {} as any) {
     if (this.pendingDialog) throw dialogOpen(this.pendingDialog);
     const callArgs = options.args === undefined ? null : JSON.stringify(options.args);
     const expression = typeof expressionOrFn === "function"
       ? "(" + expressionOrFn.toString() + ").apply(null, " + (callArgs === null ? "[]" : callArgs) + ")"
       : String(expressionOrFn);
-    const params = {
+    const params: any = {
       expression,
       returnByValue: options.returnByValue !== false,
       awaitPromise: options.awaitPromise !== false,
@@ -225,7 +244,7 @@ export class Page {
   }
 
   /** Navigate and optionally wait for the load state. */
-  async navigate(url, { waitUntil = "load", timeoutMs = DEFAULT_LOAD_TIMEOUT_MS } = {}) {
+  async navigate(url, { waitUntil = "load", timeoutMs = DEFAULT_LOAD_TIMEOUT_MS } = {} as any) {
     if (typeof url !== "string" || url.length === 0) throw badArgument("navigate(url) needs a URL");
     const result = await this.send("Page.navigate", { url }, { timeoutMs });
     if (result.errorText && !/^net::ERR_ABORTED/.test(result.errorText)) {
@@ -237,7 +256,7 @@ export class Page {
   }
 
   /** Poll document.readyState until it reaches `complete`. */
-  async waitForLoad({ timeoutMs = DEFAULT_LOAD_TIMEOUT_MS } = {}) {
+  async waitForLoad({ timeoutMs = DEFAULT_LOAD_TIMEOUT_MS } = {} as any) {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
       try {
@@ -255,7 +274,7 @@ export class Page {
    * Accessibility snapshot with stable refs and optional box centers.
    * @param {{ maxNodes?: number, includeBoxes?: boolean, roles?: string[] }} [options]
    */
-  async snapshot(options = {}) {
+  async snapshot(options = {} as any) {
     const raw = await this.send("Accessibility.getFullAXTree", {}, { timeoutMs: 15_000 });
     const refStart = this.nextRef;
     const first = buildSnapshot(raw.nodes || [], { maxNodes: options.maxNodes ?? 400, roles: options.roles, refStart });
@@ -336,7 +355,7 @@ export class Page {
    * @param {{ ref?: string, selector?: string, at?: {x:number,y:number} }} target
    * @param {{ button?: string, clicks?: number, timeoutMs?: number }} [options]
    */
-  async click(target, options = {}) {
+  async click(target, options = {} as any) {
     let point = null;
     if (target && target.at) {
       point = { x: Number(target.at.x), y: Number(target.at.y) };
@@ -353,7 +372,7 @@ export class Page {
   }
 
   /** Dispatch a real mouse click at viewport CSS coordinates. */
-  async clickAt(x, y, { button = "left", clicks = 1 } = {}) {
+  async clickAt(x, y, { button = "left", clicks = 1 } = {} as any) {
     const mouseButton = String(button).toLowerCase();
     await this.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y }, { timeoutMs: 5_000 });
     for (let index = 1; index <= clicks; index += 1) {
@@ -380,7 +399,7 @@ export class Page {
   }
 
   /** Press a key with optional modifiers. */
-  async press(key, { modifiers = 0 } = {}) {
+  async press(key, { modifiers = 0 } = {} as any) {
     const spec = KEY_CODES[key] || (key.length === 1 ? { code: /[a-z]/i.test(key) ? "Key" + key.toUpperCase() : key, key, vk: key.toUpperCase().charCodeAt(0), text: key } : null);
     if (!spec) throw badArgument("unsupported key: " + key);
     const mask = modifierMask(modifiers);
@@ -397,7 +416,7 @@ export class Page {
    * React/Vue controlled components stay in sync. This is not per-character
    * typing (use type() for that).
    */
-  async fill({ ref, selector, text, clearFirst = true }, options = {}) {
+  async fill({ ref, selector, text, clearFirst = true }, options = {} as any) {
     const value = String(text ?? "");
     const target = await this.#resolveTargetHandle({ ref, selector });
     await this.send("DOM.focus", { backendNodeId: target.backendNodeId }, { timeoutMs: 5_000 });
@@ -431,7 +450,7 @@ export class Page {
   }
 
   /** Wheel scroll at a point (defaults to the current viewport center). */
-  async scroll({ dx = 0, dy = 0, x, y } = {}) {
+  async scroll({ dx = 0, dy = 0, x, y } = {} as any) {
     const info = await this.evaluate(() => ({ cx: Math.floor(window.innerWidth / 2), cy: Math.floor(window.innerHeight / 2) }));
     const pointX = typeof x === "number" ? x : info.cx;
     const pointY = typeof y === "number" ? y : info.cy;
@@ -440,7 +459,7 @@ export class Page {
   }
 
   /** Poll a selector until it exists (and is visible). */
-  async waitForSelector(selector, { timeoutMs = DEFAULT_TIMEOUT_MS, visible = false } = {}) {
+  async waitForSelector(selector, { timeoutMs = DEFAULT_TIMEOUT_MS, visible = false } = {} as any) {
     const deadline = Date.now() + timeoutMs;
     let lastError = null;
     while (Date.now() < deadline) {
@@ -463,7 +482,7 @@ export class Page {
   }
 
   /** Poll an expression until it is truthy. */
-  async waitForFunction(expression, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+  async waitForFunction(expression, { timeoutMs = DEFAULT_TIMEOUT_MS } = {} as any) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       try {
@@ -478,7 +497,7 @@ export class Page {
   }
 
   /** Wait until network activity has been quiet for `idleMs`. */
-  async waitForNetworkIdle({ timeoutMs = 10_000, idleMs = 500 } = {}) {
+  async waitForNetworkIdle({ timeoutMs = 10_000, idleMs = 500 } = {} as any) {
     const deadline = Date.now() + timeoutMs;
     let lastCount = this.networkLog.length;
     let lastChange = Date.now();
@@ -503,7 +522,7 @@ export class Page {
   }
 
   /** Capture a PNG screenshot and return its path and pixel size. */
-  async screenshot({ path: filePath, fullPage = false } = {}) {
+  async screenshot({ path: filePath, fullPage = false } = {} as any) {
     const result = await this.send("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: Boolean(fullPage) }, { timeoutMs: 60_000 });
     const buffer = Buffer.from(result.data, "base64");
     const target = filePath ? resolve(filePath) : join(tmpdir(), "bh-shot-" + Date.now() + ".png");
@@ -514,7 +533,7 @@ export class Page {
   }
 
   /** Override the viewport metrics (rendering and screenshot size). */
-  async setViewport({ width, height, deviceScaleFactor = 1, mobile = false } = {}) {
+  async setViewport({ width, height, deviceScaleFactor = 1, mobile = false } = {} as any) {
     if (!Number.isFinite(width) || !Number.isFinite(height)) throw badArgument("setViewport needs numeric width and height");
     await this.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor, mobile }, { timeoutMs: 5_000 });
     return { ok: true, width, height, deviceScaleFactor };
@@ -540,7 +559,7 @@ export class Page {
   }
 
   /** Evaluate inside a frame selected by id or URL substring. */
-  async evaluateInFrame(frameMatch, expressionOrFn, options = {}) {
+  async evaluateInFrame(frameMatch, expressionOrFn, options = {} as any) {
     const contexts = this.executionContexts;
     let context = null;
     const frames = await this.frames();
@@ -564,7 +583,7 @@ export class Page {
    * Idempotent: the log lives on the (cached) Page, so events survive across
    * tool calls while the tab stays attached.
    */
-  async startNetworkCapture({ maxEvents = 2000 } = {}) {
+  async startNetworkCapture({ maxEvents = 2000 } = {} as any) {
     this.maxNetworkEvents = maxEvents;
     if (this.networkEnabled) return { ok: true, capturing: true };
     if (this.networkStarting) return this.networkStarting;
@@ -603,7 +622,7 @@ export class Page {
    * @param {any[]} events events from networkEvents()
    * @param {{ limit?: number, maxBytes?: number }} [options]
    */
-  async networkBodies(events, { limit = 10, maxBytes = 200_000 } = {}) {
+  async networkBodies(events, { limit = 10, maxBytes = 200_000 } = {} as any) {
     const out = [];
     for (const event of (events || []).slice(-limit)) {
       const entry = { ...event };
@@ -630,7 +649,7 @@ export class Page {
   }
 
   /** Wait for a response whose URL matches a string or RegExp. */
-  async waitForResponse(pattern, { timeoutMs = 15_000, includeBody = false } = {}) {
+  async waitForResponse(pattern, { timeoutMs = 15_000, includeBody = false } = {} as any) {
     const matcher = typeof pattern === "string" ? (url) => String(url || "").includes(pattern) : (url) => pattern.test(String(url || ""));
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -662,7 +681,7 @@ export class Page {
   }
 
   /** Cookies for a URL. Values are redacted unless includeValues is true. */
-  async cookies({ url, includeValues = false } = {}) {
+  async cookies({ url, includeValues = false } = {} as any) {
     const params = url ? { urls: [url] } : {};
     const result = await this.send("Network.getCookies", params, { timeoutMs: 5_000 });
     return (result.cookies || []).map((cookie) => ({
@@ -686,7 +705,7 @@ export class Page {
   }
 
   /** Clear cookies (all with `all`, or matching a URL). */
-  async clearCookies({ url, all = false } = {}) {
+  async clearCookies({ url, all = false } = {} as any) {
     if (all) {
       const result = await this.send("Network.getAllCookies", {}, { timeoutMs: 5_000 });
       for (const cookie of result.cookies || []) {
@@ -726,7 +745,7 @@ export class Page {
    * Click something and wait for the resulting download.
    * @param {{ dir?: string, trigger: () => Promise<any>, timeoutMs?: number }} options
    */
-  async download({ dir, trigger, timeoutMs = 30_000 } = {}) {
+  async download({ dir, trigger, timeoutMs = 30_000 } = {} as any) {
     if (typeof trigger !== "function") throw badArgument("download needs a trigger() function");
     const directory = resolve(dir || this.downloadDir || join(this.browser.config.stateDir || tmpdir(), "downloads"));
     await mkdir(directory, { recursive: true });

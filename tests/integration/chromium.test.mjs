@@ -13,8 +13,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startFixtureServer } from "../fixtures/server.mjs";
 import { findAlternateChromium, launchChrome } from "./helpers/launch-chrome.mjs";
-import { BrowserManager } from "../../lib/manager.js";
-import { createTools } from "../../lib/tools.js";
+import { BrowserManager } from "../../dist/lib/manager.js";
+import { createTools } from "../../dist/lib/tools.js";
 
 const SESSION = "it-alternate-browser";
 let server;

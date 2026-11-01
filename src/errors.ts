@@ -7,12 +7,15 @@
  */
 
 export class HarnessError extends Error {
+  code: string;
+  details: Record<string, any>;
+  cause?: any;
   /**
    * @param {string} code stable code, one of `codes`
    * @param {string} message human readable
    * @param {{ cause?: unknown, details?: Record<string, unknown> }} [extra]
    */
-  constructor(code, message, extra = {}) {
+  constructor(code, message, extra = {} as any) {
     super(message);
     this.name = "HarnessError";
     this.code = code;
@@ -45,13 +48,13 @@ export const codes = Object.freeze({
   E_EVAL: "E_EVAL",
 });
 
-export function badArgument(message, details = {}) {
+export function badArgument(message, details = {} as any) {
   return new HarnessError(codes.E_BAD_ARG, message, { details });
 }
 export function notConnected(message = "browser connection is not open") {
   return new HarnessError(codes.E_NOT_CONNECTED, message);
 }
-export function noBrowser(message, details = {}) {
+export function noBrowser(message, details = {} as any) {
   return new HarnessError(codes.E_NO_BROWSER, message, { details });
 }
 export function connectTimeout(wsUrl, timeoutMs) {
@@ -59,7 +62,7 @@ export function connectTimeout(wsUrl, timeoutMs) {
     details: { wsUrl, timeoutMs },
   });
 }
-export function cdpError(method, error, details = {}) {
+export function cdpError(method, error, details = {} as any) {
   const message = error && error.message ? error.message : String(error);
   return new HarnessError(codes.E_CDP, `CDP ${method} failed: ${message}`, {
     cause: error,
@@ -71,17 +74,17 @@ export function cdpTimeout(method, timeoutMs) {
     details: { method, timeoutMs },
   });
 }
-export function waitTimeout(what, timeoutMs, details = {}) {
+export function waitTimeout(what, timeoutMs, details = {} as any) {
   return new HarnessError(codes.E_TIMEOUT, `timed out after ${timeoutMs}ms while waiting for ${what}`, {
     details: { what, timeoutMs, ...details },
   });
 }
-export function targetGone(targetId, message) {
+export function targetGone(targetId: string, message?: string) {
   return new HarnessError(codes.E_TARGET_CLOSED, message ?? `target ${targetId} no longer exists`, {
     details: { targetId },
   });
 }
-export function staleTarget(targetId, message) {
+export function staleTarget(targetId: string, message?: string) {
   return new HarnessError(codes.E_STALE_TARGET, message ?? `target ${targetId} is stale; call open() again`, {
     details: { targetId },
   });
@@ -89,10 +92,10 @@ export function staleTarget(targetId, message) {
 export function noTab(message = "no page tab is available; call open(url) first") {
   return new HarnessError(codes.E_NO_TAB, message);
 }
-export function elementNotFound(selector, details = {}) {
+export function elementNotFound(selector, details = {} as any) {
   return new HarnessError(codes.E_ELEMENT_NOT_FOUND, `element not found: ${selector}`, { details: { selector, ...details } });
 }
-export function selectorTimeout(selector, timeoutMs, details = {}) {
+export function selectorTimeout(selector, timeoutMs, details = {} as any) {
   return new HarnessError(codes.E_SELECTOR_TIMEOUT, `waiting for ${JSON.stringify(selector)} timed out after ${timeoutMs}ms`, {
     details: { selector, timeoutMs, ...details },
   });
@@ -108,16 +111,16 @@ export function evalFailure(expression, error) {
     details: { expression: String(expression).slice(0, 800) },
   });
 }
-export function policyDenied(message, details = {}) {
+export function policyDenied(message, details = {} as any) {
   return new HarnessError(codes.E_POLICY_DENIED, message, { details });
 }
 export function frameNotFound(what) {
   return new HarnessError(codes.E_FRAME_NOT_FOUND, `frame not found: ${what}`, { details: { frame: what } });
 }
-export function downloadFailed(message, details = {}) {
+export function downloadFailed(message, details = {} as any) {
   return new HarnessError(codes.E_DOWNLOAD_FAILED, message, { details });
 }
-export function uploadFailed(message, details = {}) {
+export function uploadFailed(message, details = {} as any) {
   return new HarnessError(codes.E_UPLOAD_FAILED, message, { details });
 }
 export function asHarnessError(error, fallback = "unexpected harness failure") {

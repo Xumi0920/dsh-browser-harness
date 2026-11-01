@@ -14,8 +14,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFixtureServer } from "../fixtures/server.mjs";
 import { launchChrome } from "./helpers/launch-chrome.mjs";
-import { BrowserManager } from "../../lib/manager.js";
-import { createTools } from "../../lib/tools.js";
+import { BrowserManager } from "../../dist/lib/manager.js";
+import { createTools } from "../../dist/lib/tools.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const runCli = promisify(execFile);
@@ -204,7 +204,7 @@ test("T10 CLI open/snapshot/info/close drive a real tab", async (t) => {
   if (needChrome(t)) return;
   const stateDir = await mkdtemp(join(tmpdir(), "bh-cli-"));
   const env = { ...process.env, BH_CDP_URL: chrome.httpUrl, BH_STATE_DIR: stateDir };
-  const bh = join(ROOT, "bin", "bh.mjs");
+  const bh = join(ROOT, "dist", "bin", "bh.js");
   const exec = (args) => runCli(process.execPath, [bh, ...args], { env, timeout: 30_000 });
 
   const opened = await exec(["open", server.url + "/a.html"]);

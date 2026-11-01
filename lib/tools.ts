@@ -6,8 +6,8 @@
  * `defineTool` from @deepseek-ai/dsh-tools, tests pass an identity stub.
  */
 
-import { HarnessError } from "../src/errors.mjs";
-import { findByRole, formatSnapshot } from "../src/ax.mjs";
+import { HarnessError } from "../src/errors.js";
+import { findByRole, formatSnapshot } from "../src/ax.js";
 
 const textOutput = (value) => (typeof value === "string" ? value : JSON.stringify(value, null, 2));
 
@@ -46,7 +46,7 @@ function wrap(handler) {
  * @param {(definition: any) => any} defineTool
  * @returns {any[]}
  */
-export function createTools(ctx, manager, config = {}, defineTool) {
+export function createTools(ctx, manager, config = {} as any, defineTool) {
   const tool = (definition) => defineTool(definition);
   const maxSnapshotNodes = Number(config.maxSnapshotNodes) || 250;
 

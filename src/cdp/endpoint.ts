@@ -11,7 +11,7 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { noBrowser } from "../errors.mjs";
+import { noBrowser } from "../errors.js";
 
 const DEFAULT_PROBE_TIMEOUT_MS = 2_500;
 
@@ -52,7 +52,7 @@ export function registryPath(dshHome = defaultDshHome()) {
  * Read the local browser-cdp registry. Missing/invalid file returns `null`.
  * @param {{ dshHome?: string }} [options]
  */
-export async function readRegistry(options = {}) {
+export async function readRegistry(options = {} as any) {
   const file = registryPath(options.dshHome);
   try {
     const raw = await readFile(file, "utf8");
@@ -69,7 +69,7 @@ function normalizeBaseUrl(value) {
 }
 
 /** HTTP DevTools base URL for a registry entry or a known browser. */
-function candidateFor(id, entry = {}) {
+function candidateFor(id, entry = {} as any) {
   const known = KNOWN_BROWSERS[id] || {};
   const httpUrl = typeof entry.httpUrl === "string" && entry.httpUrl.length > 0
     ? normalizeBaseUrl(entry.httpUrl)
@@ -87,7 +87,7 @@ function candidateFor(id, entry = {}) {
 /** Candidates from a registry file; disabled entries are skipped. */
 function registryCandidates(registry) {
   const out = [];
-  for (const [id, entry] of Object.entries((registry && registry.browsers) || {})) {
+  for (const [id, entry] of Object.entries(((registry && registry.browsers) || {}) as Record<string, any>)) {
     if (!entry || entry.enabled === false) continue;
     const candidate = candidateFor(id, entry);
     if (candidate) out.push(candidate);
@@ -122,7 +122,7 @@ function fallbackCandidates(configured, disabledIds) {
 
 function disabledBrowserIds(registry) {
   const ids = new Set();
-  for (const [id, entry] of Object.entries((registry && registry.browsers) || {})) {
+  for (const [id, entry] of Object.entries(((registry && registry.browsers) || {}) as Record<string, any>)) {
     if (entry && entry.enabled === false) ids.add(id);
   }
   return ids;
@@ -134,7 +134,7 @@ function disabledBrowserIds(registry) {
  * @param {{ fetchImpl?: typeof fetch, timeoutMs?: number }} [options]
  * @returns {Promise<{ webSocketDebuggerUrl: string, browser?: string, userAgent?: string }>}
  */
-export async function probeVersion(httpUrl, options = {}) {
+export async function probeVersion(httpUrl, options = {} as any) {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const timeoutMs = options.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS;
   if (typeof fetchImpl !== "function") throw noBrowser("no fetch implementation available to probe the CDP endpoint");
@@ -175,7 +175,7 @@ export async function probeVersion(httpUrl, options = {}) {
  * }} [options]
  * @returns {Promise<{ wsUrl: string, httpUrl?: string, browser?: string, source: string }>}
  */
-export async function resolveEndpoint(options = {}) {
+export async function resolveEndpoint(options = {} as any) {
   const env = options.env ?? process.env;
   const fetchImpl = options.fetchImpl;
   const probeOptions = { fetchImpl, timeoutMs: options.probeTimeoutMs };
@@ -241,7 +241,7 @@ export async function resolveEndpoint(options = {}) {
  * Probe every registry (or default) browser for `doctor`/`browser_status`.
  * @param {{ dshHome?: string, fetchImpl?: typeof fetch, probeTimeoutMs?: number }} [options]
  */
-export async function listEndpoints(options = {}) {
+export async function listEndpoints(options = {} as any) {
   const registry = await readRegistry({ dshHome: options.dshHome });
   const entries = registry && registry.browsers
     ? Object.entries(registry.browsers)
@@ -250,7 +250,7 @@ export async function listEndpoints(options = {}) {
   const rows = await Promise.all(entries.map(async ([id, entry]) => {
     const candidate = candidateFor(id, entry || {});
     const enabled = !(entry && entry.enabled === false);
-    const row = {
+    const row: any = {
       id,
       label: (entry && entry.label) || (KNOWN_BROWSERS[id] && KNOWN_BROWSERS[id].label) || id,
       port: candidate ? candidate.port : null,

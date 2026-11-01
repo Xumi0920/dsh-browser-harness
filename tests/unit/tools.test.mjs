@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createTools } from "../../lib/tools.js";
-import { HarnessError } from "../../src/errors.mjs";
+import { createTools } from "../../dist/lib/tools.js";
+import { HarnessError } from "../../dist/src/errors.js";
 
 function makeCtx() {
   return {

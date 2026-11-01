@@ -74,7 +74,7 @@ export function boxCenter(model) {
  * }} [options]
  * @returns {{ nodes: Array<{ref: string, role: string, name: string, value?: unknown, disabled?: boolean, backendDOMNodeId: number, center?: {x:number,y:number}, size?: {width:number,height:number}}>, truncated: boolean, total: number }}
  */
-export function buildSnapshot(nodes, options = {}) {
+export function buildSnapshot(nodes, options = {} as any) {
   const maxNodes = options.maxNodes ?? 400;
   const roleSet = options.roles ? new Set(options.roles) : INTERACTIVE_ROLES;
   const boxes = options.boxes;
@@ -95,8 +95,7 @@ export function buildSnapshot(nodes, options = {}) {
     const value = axValue(node, "value");
     const box = boxes ? boxes.get(node.backendDOMNodeId) : undefined;
     const center = box ? boxCenter(box) : null;
-    /** @type {Record<string, unknown>} */
-    const row = {
+    const row: any = {
       ref: "e" + (refStart + out.length + 1),
       role,
       name,
@@ -143,7 +142,7 @@ export function findRef(snapshotNodes, ref) {
  * @param {any[]} snapshotNodes
  * @param {{ role?: string, name?: string, exact?: boolean }} query
  */
-export function findByRole(snapshotNodes, query = {}) {
+export function findByRole(snapshotNodes, query = {} as any) {
   const wanted = query.name ? String(query.name).toLowerCase() : null;
   return (snapshotNodes || []).filter((node) => {
     if (query.role && node.role !== query.role) return false;
@@ -177,7 +176,7 @@ export function snapshotLine(node) {
  * @param {{ maxLines?: number }} [options]
  * @returns {{ text: string, truncated: boolean, shown: number }}
  */
-export function formatSnapshot(snapshot, options = {}) {
+export function formatSnapshot(snapshot, options = {} as any) {
   const maxLines = options.maxLines ?? MAX_SNAPSHOT_TEXT_LINES;
   const nodes = (snapshot && snapshot.nodes) || [];
   const shown = nodes.slice(0, maxLines);
@@ -195,6 +194,6 @@ export function formatSnapshot(snapshot, options = {}) {
  * @param {{ nodes: any[], truncated?: boolean, total?: number }} snapshot
  * @param {{ maxLines?: number }} [options]
  */
-export function snapshotToText(snapshot, options = {}) {
+export function snapshotToText(snapshot, options = {} as any) {
   return formatSnapshot(snapshot, options).text;
 }

@@ -14,15 +14,18 @@
 
 ## 目录
 
-本仓库按「运行时资产 / DSH 插件层 / 零依赖核心 / 测试与开发工具 / 文档」分层。
+本仓库按「TypeScript 源码 / 构建产物 / 运行时资产 / 测试与开发工具 / 文档」分层。
 
-| 目录 | 职责 | 随包发布 |
+| 目录/文件 | 职责 | 随包发布 |
 |---|---|---|
-| `src/` | 零依赖核心：CDP 传输、endpoint 发现、Page、AX 快照、state、标签组桥 | ✅ |
-| `lib/` | DSH 插件层：工具定义、skill 注册、`BrowserManager` | ✅ |
-| `bin/` | 独立 CLI（`bh doctor/open/snapshot/close/groups …`） | ✅ |
+| `src/` | 零依赖核心（**TypeScript**）：CDP 传输、endpoint 发现、Page、AX 快照、state、标签组桥 | ❌（只发构建产物） |
+| `lib/` | DSH 插件层（**TypeScript**）：工具定义、skill 注册、`BrowserManager` | ❌（只发构建产物） |
+| `bin/` | 独立 CLI（**TypeScript**，`bh doctor/open/snapshot/close/groups …`） | ❌（只发构建产物） |
+| `dist/` | `tsc` 构建产物（ESM JS + `.d.ts`），`package.json` 的 main/exports/bin 都指向这里 | ✅ |
+| `types/` | 宿主 peer 的最小环境声明（`@deepseek-ai/dsh-tools`） | ❌ |
+| `tsconfig.json` | TypeScript 构建配置（`npm run build`） | ❌ |
 | `extension/` | 标签组用的 MV3 扩展（仅 `tabs`/`tabGroups` 权限） | ✅ |
-| `skills/browser-harness/` | 运行时技能正文（**单一来源**，`lib/skill.js` 直接读取） | ✅ |
+| `skills/browser-harness/` | 运行时技能正文（**单一来源**，`lib/skill.ts` 编译后从 `dist/lib/skill.js` 读取） | ✅ |
 | `locale/` | DSH 插件展示元数据（en/zh） | ✅ |
 | `docs/` | 本目录：安装/配置/标签组/使用/架构/结构约定 | ✅ |
 | `tests/fixtures/` | 集成测试用的本地 fixture 站 | ❌ |
@@ -30,19 +33,20 @@
 | `tests/integration/helpers/` | 真机测试辅助（任意 Chromium 启动器） | ❌ |
 | `scripts/` | 冒烟（`verify.mjs`）与 GitHub Packages 一键安装脚本 | ❌ |
 
-`package.json` 的 `files` 字段就是发布白名单：运行时资产 + `docs/` + README/LICENSE，测试与脚本不进包。
+`package.json` 的 `files` 字段就是发布白名单：`dist/` 构建产物 + 运行时资产（extension/skills/locale）+ `docs/` + README/LICENSE；**源码、测试、脚本、tsconfig 不进包**。
 
 ## 单一来源
 
 - 技能正文：只维护 `skills/browser-harness/SKILL.md`（不保留根目录副本）。
 - README：`README.md`（中文，默认）与 `README.en.md`（英文镜像），改一处要同步另一处。
 - 文档按主题拆分：安装 → `docs/install.md`；配置 → `docs/configuration.md`；标签组 → `docs/tab-groups.md`；使用 → `docs/usage.md`；架构 → `docs/architecture.md`。
-- 标签组标题/颜色逻辑：`src/tabgroups.mjs`；扩展侧代码只在 `extension/`。
+- 标签组标题/颜色逻辑：`src/tabgroups.ts`；扩展侧代码只在 `extension/`。
+- 发布产物唯一来源：`npm run build`（`tsc`）→ `dist/`；不要手改 `dist/`，也不要提交它（已 gitignore）。
 
 ## 维护约定
 
-- 改代码后跑 `npm run test:all`（当前 92 单测 + 27 集成场景 = 119 条）。
-- CI：单测跑 ubuntu/windows；集成场景跑 ubuntu（xvfb 提供 display），门禁要求正好 27 条且 S15/S16 必须实际执行；publish 校验 tag==v版本并做打包冒烟。
+- 源码是 TypeScript：先 `npm install` 再 `npm run build`；改代码后跑 `npm run test:all`（自动构建，当前 92 单测 + 27 集成场景 = 119 条）。
+- CI：`npm ci` + build 后单测跑 ubuntu/windows；集成场景跑 ubuntu（xvfb 提供 display），门禁要求正好 27 条且 S15/S16 必须实际执行；publish 校验 tag==v版本并做打包冒烟（含 `dist/` 产物）。
 - 版本与发布：GitHub Release 触发 `.github/workflows/publish.yml`，发布到 GitHub Packages（`@xumi0920/dsh-browser-harness`）；版本号需与 tag 一致。
 - 提交信息用 conventional commits（`feat:` / `fix:` / `docs:` / `test:` / `chore:`）。
 - 新增浏览器相关能力时，优先扩展 `src/`；插件层只做 DSH 适配。

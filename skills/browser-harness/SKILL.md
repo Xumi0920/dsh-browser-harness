@@ -50,4 +50,4 @@ A plain public read needs no browser. If `web_fetch` can read it, use `web_fetch
 - Long pages: prefer snapshot refs (they include viewport centers) over guessing selectors.
 - Network: `browser_extract {mode:"network"}` returns the current tab's most recent request events since the connection (up to 100); set `includeBody:true` to attach response bodies (slower).
 - Tab groups: by default the tabs this harness creates are grouped per task (`DSH · <session>`). User/work tabs are never moved, renamed, closed or grouped. Disable with config `tabGroups: false`; grouping is skipped in headless browsers.
-- Downloads, uploads and cookies are intentionally out of the current tool surface; use the library (`src/index.mjs`) or a CLI script for those.
+- Downloads, uploads and cookies are intentionally out of the current tool surface; use the library (`dist/src/index.js`, after `npm run build`) or a CLI script for those.

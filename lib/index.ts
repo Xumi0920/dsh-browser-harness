@@ -13,7 +13,7 @@ export const name = "browser-harness";
 export const inject = ["tools"];
 
 /** Defaults; the bundle patch can override any key through `config`. */
-function resolveConfig(config = {}) {
+function resolveConfig(config = {} as any) {
   return {
     browser: config.browser,
     cdpUrl: config.cdpUrl,
@@ -30,7 +30,7 @@ function resolveConfig(config = {}) {
   };
 }
 
-export function apply(ctx, config = {}) {
+export function apply(ctx, config = {} as any) {
   const settings = resolveConfig(config);
   const manager = new BrowserManager(settings);
   const definitions = createTools(ctx, manager, settings, defineTool);

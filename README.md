@@ -16,7 +16,7 @@ browser_tabs        list / use / new / close
 
 ## 亮点
 
-- **零依赖**：只用 Node 22+ 内置能力（`fetch`、`WebSocket`、`node:test`），不下载浏览器、不需要构建；插件入口仅用宿主提供的 `@deepseek-ai/dsh-tools` peer。
+- **运行时零依赖**：构建产物只用 Node 22+ 内置能力（`fetch`、`WebSocket`、`node:test`），不下载浏览器；**源码是 TypeScript**，`tsc` 构建到 `dist/`，开发依赖仅 `typescript` + `@types/node`，插件入口仅用宿主提供的 `@deepseek-ai/dsh-tools` peer。
 - **真实登录态**：连自己起好的专用 Chromium 实例（Chrome / Chromium / Edge / Brave / Vivaldi / Opera / Arc 都可以），登录一次长期有效。
 - **文本优先**：无障碍树 + ref 比“截图喂视觉模型”更准更省；截图只是可选补充。
 - **按任务标签组**：插件自建的标签页自动按 DSH 会话分组，工作标签页不受影响；headless 自动跳过。
@@ -34,7 +34,7 @@ browser_tabs        list / use / new / close
 
 > 把 `@xumi0920/dsh-browser-harness` 安装到当前 DSH profile。
 
-> GitHub Packages 来源**需要先完成「方式三」里的两条 npm config**（read:packages token）；不想配 token 的话，把包名换成你本机 clone 的绝对路径即可：`把 <本机 clone 路径> 安装到当前 profile`。
+> GitHub Packages 来源**需要先完成「方式三」里的两条 npm config**（read:packages token）；不想配 token 的话，把包名换成你本机 clone 的绝对路径即可：`把 <本机 clone 路径> 安装到当前 profile`（本地目录需先 `npm install && npm run build`，源码是 TypeScript）。
 
 **方式三：手动安装（GitHub Packages / CLI）**
 
@@ -82,9 +82,10 @@ browser_extract {mode:"text" | "html" | "js" | "network"}
 ## 测试
 
 ```sh
-npm test                    # 单测（无浏览器）
-npm run test:integration    # 27 个集成场景
-npm run test:all            # 单测 + 场景（共 119 条）
+npm install                 # 开发依赖（TypeScript 构建），运行时零依赖
+npm test                    # 构建 + 92 单测（无浏览器）
+npm run test:integration    # 构建 + 27 个集成场景
+npm run test:all            # 构建 + 单测 + 场景（共 119 条）
 ```
 
 CI：单测跑 ubuntu / windows；集成场景跑 ubuntu（xvfb，含 headful 标签组）。
@@ -98,6 +99,6 @@ CI：单测跑 ubuntu / windows；集成场景跑 ubuntu（xvfb，含 headful �
 
 ## 状态
 
-v0.3.5：文档更新——补充 DSH Web **插件页**官方安装入口（添加插件 / 安装第三方插件 / 发现市场）、修正热插拔说明（`application: applied` 已热生效，`restart-required` 才需重启）、新增 [docs/extending.md](docs/extending.md) 说明扩展语言（原生 JS/TS + MCP 接入 Python 等）；功能与 v0.3.4 一致。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
+v0.4.0：**源码迁移到 TypeScript**——`src/`、`lib/`、`bin/` 改为 `.ts`，`tsc` 构建到 `dist/`（发布包只含构建产物），开发依赖仅 `typescript` + `@types/node`，运行时仍零依赖；同步更新 `package.json`（main/exports/bin/files）、CI（`npm ci` + build）、publish 打包冒烟与文档；行为与 v0.3.5 一致。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
 
 MIT © 2026 Xumi0920

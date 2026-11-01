@@ -14,7 +14,7 @@ import {
   statePath,
   updateState,
   writeState,
-} from "../../src/state.mjs";
+} from "../../dist/src/state.js";
 
 async function tempDir() {
   return mkdtemp(join(tmpdir(), "bh-state-"));

@@ -1,6 +1,6 @@
 {
   "name": "@xumi0920/dsh-browser-harness",
-  "version": "0.3.5",
+  "version": "0.4.0",
   "description": "DSH native browser tools (browser_*) backed by a zero-dependency CDP core driving a dedicated, logged-in Chromium-based browser (Chrome, Edge, Brave, Chromium, Vivaldi, Opera, Arc), with per-task Chrome tab groups for harness-created tabs.",
   "type": "module",
   "license": "MIT",
@@ -17,21 +17,20 @@
   "bugs": {
     "url": "https://github.com/Xumi0920/dsh-browser-harness/issues"
   },
-  "main": "./lib/index.js",
+  "main": "./dist/lib/index.js",
+  "types": "./dist/lib/index.d.ts",
   "exports": {
-    ".": "./lib/index.js",
+    ".": "./dist/lib/index.js",
     "./package.json": "./package.json",
-    "./core": "./src/index.mjs",
+    "./core": "./dist/src/index.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "bin": {
-    "bh": "./bin/bh.mjs"
+    "bh": "./dist/bin/bh.js"
   },
   "files": [
-    "lib/",
-    "src/",
-    "bin/",
+    "dist/",
     "cordis.patch.yml",
     "extension/",
     "skills/",
@@ -60,11 +59,12 @@
     }
   },
   "scripts": {
-    "test": "node --test \"tests/unit/**/*.test.mjs\"",
-    "test:integration": "node --test \"tests/integration/**/*.test.mjs\"",
-    "test:all": "node --test \"tests/**/*.test.mjs\"",
-    "verify": "node scripts/verify.mjs",
-    "doctor": "node bin/bh.mjs doctor"
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test \"tests/unit/**/*.test.mjs\"",
+    "test:integration": "npm run build && node --test \"tests/integration/**/*.test.mjs\"",
+    "test:all": "npm run build && node --test \"tests/**/*.test.mjs\"",
+    "verify": "npm run build && node scripts/verify.mjs",
+    "doctor": "node dist/bin/bh.js doctor"
   },
   "keywords": [
     "dsh",
@@ -79,6 +79,11 @@
     "tab-groups",
     "automation",
     "agent",
-    "skill"
-  ]
+    "skill",
+    "typescript"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3"
+  }
 }
