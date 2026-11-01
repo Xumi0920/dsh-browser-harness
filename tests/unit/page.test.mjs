@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Page } from "../../src/page.mjs";
-import { FakeTransport, quad } from "./fake-transport.mjs";
+import { FakeTransport, quad } from "./helpers/fake-transport.mjs";
 
 const AX_NODES = [
   { role: { value: "button" }, backendDOMNodeId: 10, name: { value: "Go" } },

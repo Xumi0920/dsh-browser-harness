@@ -11,13 +11,13 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { startFixtureServer } from "../../fixtures/server.mjs";
+import { startFixtureServer } from "../fixtures/server.mjs";
 import { launchChrome } from "./helpers/launch-chrome.mjs";
 import { Browser } from "../../src/browser.mjs";
 import { findByRole, snapshotToText } from "../../src/ax.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SAMPLE_UPLOAD = join(HERE, "..", "..", "fixtures", "upload-sample.txt");
+const SAMPLE_UPLOAD = join(HERE, "..", "fixtures", "upload-sample.txt");
 
 let server;
 let chrome;

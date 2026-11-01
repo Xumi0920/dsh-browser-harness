@@ -19,7 +19,7 @@ browser_tabs        list / use / new / close
 - **零依赖**：只用 Node 22+ 内置能力（`fetch`、`WebSocket`、`node:test`），不下载浏览器、不需要构建；插件入口仅使用宿主提供的 `@deepseek-ai/dsh-tools` peer。
 - **真实登录态**：连用户自己起好的专用 Chromium 浏览器实例（默认 `chrome`=9331，也支持 Edge/Brave/Chromium 等，见下方「适用浏览器」），登录一次长期有效。
 - **文本优先**：无障碍树 + ref 比“截图喂视觉模型”更准更省；截图只是可选补充。
-- **场景测试**：88 个单测 + 27 个端到端场景（14 条浏览器场景 + 11 条工具层/CLI/兼容性场景 + 2 条标签组场景，共 115 条；登录、异步渲染、多标签、iframe、Shadow DOM、下载、上传、对话框、表单校验、选择器超时、标签页被关恢复、截图、网络捕获、Cookie），全部跑在真实 headless Chromium + 本地 fixture 站上。
+- **场景测试**：87 个单测 + 27 个端到端场景（14 条浏览器场景 + 11 条工具层/CLI/兼容性场景 + 2 条标签组场景，共 114 条；登录、异步渲染、多标签、iframe、Shadow DOM、下载、上传、对话框、表单校验、选择器超时、标签页被关恢复、截图、网络捕获、Cookie），全部跑在真实 headless Chromium + 本地 fixture 站上。
 
 ## 环境要求
 
@@ -82,7 +82,7 @@ git clone https://github.com/Xumi0920/dsh-browser-harness.git C:\path\to\dsh-bro
 
 > `plugin_manager` 的每次操作需要 danger-full-access 沙箱或当次批准；其 `target` 支持 npm 包名、git 地址、tarball 和本地绝对目录。
 
-插件是 DSH bundle（`dsh.bundle.patch` → `cordis.patch.yml`），安装后在 profile 级注册 `browser_*` 工具，并内嵌 `browser-harness` 技能。更细的安装、验证与卸载步骤见 [install.md](install.md)。
+插件是 DSH bundle（`dsh.bundle.patch` → `cordis.patch.yml`），安装后在 profile 级注册 `browser_*` 工具，并内嵌 `browser-harness` 技能。更细的安装、验证与卸载步骤见 [docs/install.md](docs/install.md)。
 
 ## 配置目标浏览器
 
@@ -155,16 +155,35 @@ CLI 子命令：`doctor`、`tabs`、`open <url>`、`info`、`snapshot`、`text [
 
 ## 测试
 
-需从源码 checkout 运行。打包（`npm pack`）产物只含运行时，不含 `tests/`、`scripts/`、`fixtures/`。插件已发布到 GitHub Packages，也支持从源码或本地目录安装。
+需从源码 checkout 运行。打包（`npm pack`）产物只含运行时，不含 `tests/`、`scripts/`。插件已发布到 GitHub Packages，也支持从源码或本地目录安装。
 
 ```sh
 npm test                    # 单测（无浏览器）
 npm run test:integration    # 27 个场景（临时 headless / headful Chromium）
-npm run test:all            # 单测 + 场景（共 115 条）
+npm run test:all            # 单测 + 场景（共 114 条）
 node scripts/verify.mjs     # 对 live 专用浏览器冒烟
 ```
 
 集成测试自起临时 profile 的 Chromium 浏览器（Chrome，或本机其它 Chromium 内核浏览器），不碰用户浏览器；没有可用浏览器时自动跳过。
+
+## 仓库结构
+
+```
+.
+├─ bin/                 独立 CLI（bh doctor/open/snapshot/close …）
+├─ docs/                文档：安装/验证（install.md）与仓库结构约定
+├─ extension/           标签组用的 MV3 扩展（运行时资产，随包发布）
+├─ lib/                 DSH 插件层：工具定义、skill 注册、BrowserManager
+├─ locale/              DSH 插件展示元数据（中/英）
+├─ scripts/             冒烟脚本（verify.mjs）
+├─ skills/              运行时技能正文（SKILL.md，单一来源）
+├─ src/                 零依赖核心：CDP、Page、AX 快照、state、tabgroups
+├─ tests/               单测 + 集成场景 + fixtures
+├─ cordis.patch.yml     DSH bundle 注册
+└─ README*.md / package.json / LICENSE / icon.svg
+```
+
+维护约定（单一来源、发布流程、下一步规划）见 [docs/README.md](docs/README.md)。
 
 ## 安全边界
 

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Browser } from "../../src/browser.mjs";
 import { readState, rememberOwnedTab, setCurrent } from "../../src/state.mjs";
-import { FakeTransport } from "./fake-transport.mjs";
+import { FakeTransport } from "./helpers/fake-transport.mjs";
 
 function pageTarget(targetId, url = "https://example.com/" + targetId) {
   return { targetId, type: "page", url, title: targetId };

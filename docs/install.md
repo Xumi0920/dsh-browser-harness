@@ -27,7 +27,7 @@ cd C:\path\to\dsh-browser-harness
 
 node --test "tests/unit/**/*.test.mjs"        # 单测
 node --test "tests/integration/**/*.test.mjs" # 27 场景（含标签组 headful 场景）
-npm run test:all                              # 单测 + 场景（共 115 条）
+npm run test:all                              # 单测 + 场景（共 114 条）
 node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟（需源码 checkout；也可用 edge/brave 等）
 ```
 
