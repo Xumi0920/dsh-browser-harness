@@ -1,9 +1,11 @@
 /**
- * CDP endpoint discovery.
+ * CDP endpoint discovery for Chromium-based browsers.
  *
- * Resolution order: explicit ws -> explicit cdpUrl -> environment -> browser
- * selector -> registry default / auto. The module only *probes* running
- * browsers; it never launches, kills, or reconfigures one.
+ * Any browser that exposes a Chrome DevTools Protocol endpoint works here
+ * (Chrome, Chromium, Edge, Brave, Vivaldi, Opera, Arc, ...). Resolution order:
+ * explicit ws -> explicit cdpUrl -> environment -> browser selector ->
+ * registry default / auto. The module only *probes* running browsers; it never
+ * launches, kills, or reconfigures one.
  */
 
 import { readFile } from "node:fs/promises";
@@ -13,8 +15,30 @@ import { noBrowser } from "../errors.mjs";
 
 const DEFAULT_PROBE_TIMEOUT_MS = 2_500;
 
-/** Ports used by the local dedicated automation instances (read-only convention). */
-export const DEFAULT_PORTS = Object.freeze({ chrome: 9331, edge: 9332, "chrome-beta": 9333 });
+/**
+ * Known Chromium-based browsers and the local ports this harness uses for a
+ * dedicated automation instance. The ports are a convenience convention only:
+ * any CDP endpoint can be used through `cdpUrl`, `ws`, or a registry entry
+ * with `httpUrl`.
+ */
+export const KNOWN_BROWSERS = Object.freeze({
+  chrome: { port: 9331, label: "Google Chrome" },
+  edge: { port: 9332, label: "Microsoft Edge" },
+  "chrome-beta": { port: 9333, label: "Chrome Beta" },
+  chromium: { port: 9334, label: "Chromium" },
+  brave: { port: 9335, label: "Brave" },
+  vivaldi: { port: 9336, label: "Vivaldi" },
+  opera: { port: 9337, label: "Opera" },
+  arc: { port: 9338, label: "Arc" },
+});
+
+/** Convention ports keyed by browser id (kept for compatibility). */
+export const DEFAULT_PORTS = Object.freeze(
+  Object.fromEntries(Object.entries(KNOWN_BROWSERS).map(([id, entry]) => [id, entry.port])),
+);
+
+/** Standard `--remote-debugging-port` values probed as a last-resort fallback. */
+export const STANDARD_CDP_PORTS = Object.freeze([9222, 9223]);
 
 export function defaultDshHome() {
   return process.env.DSH_HOME || join(homedir(), ".dsh");
@@ -40,6 +64,70 @@ export async function readRegistry(options = {}) {
   }
 }
 
+function normalizeBaseUrl(value) {
+  return String(value).replace(/\/$/, "");
+}
+
+/** HTTP DevTools base URL for a registry entry or a known browser. */
+function candidateFor(id, entry = {}) {
+  const known = KNOWN_BROWSERS[id] || {};
+  const httpUrl = typeof entry.httpUrl === "string" && entry.httpUrl.length > 0
+    ? normalizeBaseUrl(entry.httpUrl)
+    : null;
+  const port = Number(entry.port) || known.port || null;
+  if (!httpUrl && !port) return null;
+  return {
+    id,
+    label: entry.label || known.label || id,
+    httpUrl: httpUrl || "http://127.0.0.1:" + port,
+    port,
+  };
+}
+
+/** Candidates from a registry file; disabled entries are skipped. */
+function registryCandidates(registry) {
+  const out = [];
+  for (const [id, entry] of Object.entries((registry && registry.browsers) || {})) {
+    if (!entry || entry.enabled === false) continue;
+    const candidate = candidateFor(id, entry);
+    if (candidate) out.push(candidate);
+  }
+  return out;
+}
+
+/** Candidates when no registry file exists: every known Chromium browser. */
+function defaultCandidates() {
+  return Object.entries(KNOWN_BROWSERS)
+    .map(([id]) => candidateFor(id))
+    .filter(Boolean);
+}
+
+/** Extra endpoints to try when every configured candidate is down. */
+function fallbackCandidates(configured, disabledIds) {
+  const tried = new Set(configured.map((candidate) => candidate.httpUrl));
+  const out = [];
+  for (const [id, entry] of Object.entries(KNOWN_BROWSERS)) {
+    if (disabledIds.has(id)) continue;
+    const httpUrl = "http://127.0.0.1:" + entry.port;
+    if (tried.has(httpUrl)) continue;
+    out.push({ id, label: entry.label, httpUrl, port: entry.port });
+  }
+  for (const port of STANDARD_CDP_PORTS) {
+    const httpUrl = "http://127.0.0.1:" + port;
+    if (tried.has(httpUrl)) continue;
+    out.push({ id: "cdp-" + port, label: "CDP on port " + port, httpUrl, port });
+  }
+  return out;
+}
+
+function disabledBrowserIds(registry) {
+  const ids = new Set();
+  for (const [id, entry] of Object.entries((registry && registry.browsers) || {})) {
+    if (entry && entry.enabled === false) ids.add(id);
+  }
+  return ids;
+}
+
 /**
  * Probe an HTTP DevTools endpoint.
  * @param {string} httpUrl e.g. http://127.0.0.1:9331
@@ -53,7 +141,7 @@ export async function probeVersion(httpUrl, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetchImpl(httpUrl.replace(/\/$/, "") + "/json/version", { signal: controller.signal });
+    const response = await fetchImpl(normalizeBaseUrl(httpUrl) + "/json/version", { signal: controller.signal });
     if (response.status === 403) {
       throw noBrowser("remote debugging is disabled or needs approval (HTTP 403) for " + httpUrl, { httpUrl, status: 403 });
     }
@@ -62,7 +150,7 @@ export async function probeVersion(httpUrl, options = {}) {
     }
     const body = await response.json();
     if (!body || typeof body.webSocketDebuggerUrl !== "string" || !body.webSocketDebuggerUrl.startsWith("ws://")) {
-      throw noBrowser("endpoint " + httpUrl + " is not a usable Chrome DevTools endpoint", { httpUrl });
+      throw noBrowser("endpoint " + httpUrl + " is not a usable Chromium DevTools endpoint", { httpUrl });
     }
     return { webSocketDebuggerUrl: body.webSocketDebuggerUrl, browser: body.Browser, userAgent: body["User-Agent"] };
   } catch (error) {
@@ -72,10 +160,6 @@ export async function probeVersion(httpUrl, options = {}) {
   } finally {
     clearTimeout(timer);
   }
-}
-
-function normalizeBaseUrl(value) {
-  return String(value).replace(/\/$/, "");
 }
 
 /**
@@ -94,81 +178,98 @@ function normalizeBaseUrl(value) {
 export async function resolveEndpoint(options = {}) {
   const env = options.env ?? process.env;
   const fetchImpl = options.fetchImpl;
-  const probeTimeoutMs = options.probeTimeoutMs;
+  const probeOptions = { fetchImpl, timeoutMs: options.probeTimeoutMs };
 
   const explicitWs = options.ws ?? env.BH_WS;
   if (explicitWs) return { wsUrl: explicitWs, source: "env:BH_WS" };
 
   const explicitCdp = options.cdpUrl ?? env.BH_CDP_URL;
   if (explicitCdp) {
-    const version = await probeVersion(normalizeBaseUrl(explicitCdp), { fetchImpl, timeoutMs: probeTimeoutMs });
+    const version = await probeVersion(normalizeBaseUrl(explicitCdp), probeOptions);
     return { wsUrl: version.webSocketDebuggerUrl, httpUrl: normalizeBaseUrl(explicitCdp), browser: version.browser, source: "cdp-url" };
   }
 
   const registry = await readRegistry({ dshHome: options.dshHome });
-  /** @type {Array<{ id: string, port: number, label?: string }>} */
-  const candidates = [];
-  if (registry && registry.browsers) {
-    for (const [id, entry] of Object.entries(registry.browsers)) {
-      if (!entry || entry.enabled === false) continue;
-      const port = Number(entry.port) || DEFAULT_PORTS[id];
-      if (port) candidates.push({ id, port, label: entry.label || id });
-    }
-  } else {
-    for (const [id, port] of Object.entries(DEFAULT_PORTS)) candidates.push({ id, port, label: id });
-  }
-
+  const configured = registry && registry.browsers ? registryCandidates(registry) : defaultCandidates();
   const selector = options.browser ?? env.BH_BROWSER;
+
   if (selector && selector !== "auto") {
-    const wanted = candidates.find((candidate) => candidate.id === selector);
-    const port = wanted ? wanted.port : DEFAULT_PORTS[selector];
-    if (!port) throw noBrowser(`unknown browser selector "${selector}"`, { selector, known: Object.keys(DEFAULT_PORTS) });
-    const httpUrl = "http://127.0.0.1:" + port;
-    const version = await probeVersion(httpUrl, { fetchImpl, timeoutMs: probeTimeoutMs });
-    return { wsUrl: version.webSocketDebuggerUrl, httpUrl, browser: wanted ? wanted.id : selector, source: "browser:" + selector };
+    const fromRegistry = registry && registry.browsers ? registry.browsers[selector] : undefined;
+    const known = KNOWN_BROWSERS[selector] || KNOWN_BROWSERS[String(selector).toLowerCase()];
+    const candidate = fromRegistry ? candidateFor(selector, fromRegistry) : known ? candidateFor(selector) : null;
+    if (!candidate) {
+      const knownIds = new Set([
+        ...Object.keys(KNOWN_BROWSERS),
+        ...Object.keys((registry && registry.browsers) || {}),
+      ]);
+      throw noBrowser('unknown browser selector "' + selector + '"', { selector, known: [...knownIds] });
+    }
+    const version = await probeVersion(candidate.httpUrl, probeOptions);
+    return { wsUrl: version.webSocketDebuggerUrl, httpUrl: candidate.httpUrl, browser: version.browser || candidate.id, source: "browser:" + selector };
   }
 
   const preferred = registry && typeof registry.default === "string" ? registry.default : null;
-  const ordered = preferred ? [...candidates].sort((a, b) => (a.id === preferred ? -1 : b.id === preferred ? 1 : 0)) : candidates;
+  const ordered = preferred
+    ? [...configured].sort((a, b) => (a.id === preferred ? -1 : b.id === preferred ? 1 : 0))
+    : configured;
   const failures = [];
   for (const candidate of ordered) {
-    const httpUrl = "http://127.0.0.1:" + candidate.port;
     try {
-      const version = await probeVersion(httpUrl, { fetchImpl, timeoutMs: probeTimeoutMs });
-      return { wsUrl: version.webSocketDebuggerUrl, httpUrl, browser: candidate.id, source: "auto:" + candidate.id };
+      const version = await probeVersion(candidate.httpUrl, probeOptions);
+      return { wsUrl: version.webSocketDebuggerUrl, httpUrl: candidate.httpUrl, browser: candidate.id, source: "auto:" + candidate.id };
     } catch (error) {
-      failures.push(candidate.id + "(" + candidate.port + "): " + (error && error.message));
+      failures.push(candidate.id + "(" + candidate.httpUrl + "): " + (error && error.message));
     }
   }
-  throw noBrowser("no reachable CDP endpoint; start a dedicated automation browser or pass --cdp-url/--ws", { tried: failures });
+
+  // Nothing configured answered: try the other known Chromium ports and the
+  // standard --remote-debugging-port values in parallel.
+  const fallbacks = fallbackCandidates(configured, disabledBrowserIds(registry));
+  const settled = await Promise.allSettled(fallbacks.map((candidate) => probeVersion(candidate.httpUrl, probeOptions)));
+  for (let index = 0; index < settled.length; index += 1) {
+    const result = settled[index];
+    if (result.status === "fulfilled") {
+      const candidate = fallbacks[index];
+      return { wsUrl: result.value.webSocketDebuggerUrl, httpUrl: candidate.httpUrl, browser: candidate.id, source: "auto-fallback:" + candidate.id };
+    }
+    failures.push(fallbacks[index].id + "(" + fallbacks[index].httpUrl + "): " + (result.reason && result.reason.message));
+  }
+  throw noBrowser("no reachable CDP endpoint; start a dedicated Chromium-based browser (Chrome, Edge, Brave, Chromium, Vivaldi, Opera, Arc) with --remote-debugging-port, or pass browser/cdpUrl/ws", { tried: failures });
 }
 
 /**
- * Probe every registry browser for `doctor`.
+ * Probe every registry (or default) browser for `doctor`/`browser_status`.
  * @param {{ dshHome?: string, fetchImpl?: typeof fetch, probeTimeoutMs?: number }} [options]
  */
 export async function listEndpoints(options = {}) {
   const registry = await readRegistry({ dshHome: options.dshHome });
-  const browserEntries = registry && registry.browsers ? registry.browsers : Object.fromEntries(
-    Object.entries(DEFAULT_PORTS).map(([id, port]) => [id, { label: id, port, enabled: id !== "edge", mode: "cdp" }]),
-  );
-  const rows = [];
-  for (const [id, entry] of Object.entries(browserEntries)) {
-    const port = Number(entry && entry.port) || DEFAULT_PORTS[id];
-    const httpUrl = port ? "http://127.0.0.1:" + port : null;
-    const row = { id, label: entry && entry.label || id, port, enabled: !(entry && entry.enabled === false), httpUrl, status: "disabled", browser: null };
-    if (row.enabled && httpUrl) {
-      try {
-        const version = await probeVersion(httpUrl, { fetchImpl: options.fetchImpl, timeoutMs: options.probeTimeoutMs });
-        row.status = "live";
-        row.browser = version.browser;
-        row.wsUrl = version.webSocketDebuggerUrl;
-      } catch (error) {
-        row.status = "down";
-        row.error = error && error.message;
-      }
+  const entries = registry && registry.browsers
+    ? Object.entries(registry.browsers)
+    : Object.entries(KNOWN_BROWSERS).map(([id, entry]) => [id, { label: entry.label, port: entry.port, enabled: true, mode: "cdp" }]);
+  const probeOptions = { fetchImpl: options.fetchImpl, timeoutMs: options.probeTimeoutMs };
+  const rows = await Promise.all(entries.map(async ([id, entry]) => {
+    const candidate = candidateFor(id, entry || {});
+    const enabled = !(entry && entry.enabled === false);
+    const row = {
+      id,
+      label: (entry && entry.label) || (KNOWN_BROWSERS[id] && KNOWN_BROWSERS[id].label) || id,
+      port: candidate ? candidate.port : null,
+      enabled,
+      httpUrl: candidate ? candidate.httpUrl : null,
+      status: "disabled",
+      browser: null,
+    };
+    if (!enabled || !candidate) return row;
+    try {
+      const version = await probeVersion(candidate.httpUrl, probeOptions);
+      row.status = "live";
+      row.browser = version.browser;
+      row.wsUrl = version.webSocketDebuggerUrl;
+    } catch (error) {
+      row.status = "down";
+      row.error = error && error.message;
     }
-    rows.push(row);
-  }
+    return row;
+  }));
   return rows;
 }

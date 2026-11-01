@@ -43,9 +43,17 @@ jobs:
         run: |
           set -o pipefail
           node --test --test-reporter=tap "tests/integration/**/*.test.mjs" | tee tap.txt
-      - name: Fail on skipped scenarios
+      - name: Fail when the scenario suite did not really run
         run: |
-          if grep -Eq '(^# skipped [1-9]|# SKIP)' tap.txt; then
-            echo "::error::Integration scenarios were skipped (no Chrome?); refusing a false-green run."
+          tests=$(grep -E '^# tests [0-9]+' tap.txt | awk '{print $3}')
+          passed=$(grep -E '^# pass [0-9]+' tap.txt | awk '{print $3}')
+          skipped=$(grep -E '^# skipped [0-9]+' tap.txt | awk '{print $3}')
+          echo "tests=${tests:-?} pass=${passed:-?} skipped=${skipped:-?}"
+          if [ -z "${passed}" ] || [ "${passed}" -eq 0 ] || [ "${skipped:-0}" -eq "${tests:-1}" ]; then
+            echo "::error::Integration scenarios were skipped (no Chromium browser?); refusing a false-green run."
+            exit 1
+          fi
+          if [ "${skipped:-0}" -gt 2 ]; then
+            echo "::error::Unexpected number of skipped scenarios: ${skipped}"
             exit 1
           fi

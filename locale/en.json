@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Browser Harness",
-    "description": "Zero-dependency CDP browser tools (browser_*) for a dedicated, logged-in Chrome."
+    "description": "Zero-dependency CDP browser tools (browser_*) for a dedicated, logged-in Chromium-based browser (Chrome, Edge, Brave, ...)."
   }
 }

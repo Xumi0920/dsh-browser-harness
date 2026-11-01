@@ -111,7 +111,10 @@ test("auto mode reports every tried endpoint when nothing is reachable", async (
     resolveEndpoint({ dshHome: home, fetchImpl: fakeFetch(() => { throw new Error("down"); }) }),
     (error) => {
       assert.equal(error.code, "E_NO_BROWSER");
-      assert.equal(error.details.tried.length, 2);
+      // 2 configured candidates + the other known Chromium ports + 9222/9223
+      assert.ok(error.details.tried.length >= 2);
+      assert.ok(error.details.tried.some((entry) => entry.startsWith("chrome(")));
+      assert.ok(error.details.tried.some((entry) => entry.startsWith("brave(")));
       return true;
     },
   );
@@ -143,4 +146,102 @@ test("listEndpoints marks live, down, and disabled browsers", async () => {
   assert.equal(byId["chrome-beta"].status, "down");
   assert.equal(byId.edge.status, "disabled");
   assert.equal(DEFAULT_PORTS.chrome, 9331);
+});
+
+const chromiumRegistry = {
+  version: 1,
+  default: "brave",
+  browsers: {
+    chrome: { label: "Chrome", port: 9331, enabled: true },
+    edge: { label: "Edge", port: 9332, enabled: false },
+    "chrome-beta": { label: "Chrome Beta", port: 9333, enabled: false },
+    brave: { label: "Brave", httpUrl: "http://127.0.0.1:9555", enabled: true },
+  },
+};
+
+test("known Chromium browsers share the port convention", () => {
+  for (const id of ["chrome", "chrome-beta", "edge", "chromium", "brave", "vivaldi", "opera", "arc"]) {
+    assert.equal(typeof DEFAULT_PORTS[id], "number", id + " has a convention port");
+  }
+  assert.equal(DEFAULT_PORTS.chrome, 9331);
+  assert.equal(DEFAULT_PORTS.edge, 9332);
+  assert.equal(DEFAULT_PORTS.brave, 9335);
+});
+
+test("browser selector accepts any known Chromium browser id", async () => {
+  const home = await mkdtemp(join(tmpdir(), "bh-endpoint-"));
+  const endpoint = await resolveEndpoint({
+    browser: "brave",
+    dshHome: home,
+    fetchImpl: fakeFetch((url) => {
+      assert.equal(url, "http://127.0.0.1:9335/json/version");
+      return jsonResponse({ webSocketDebuggerUrl: "ws://127.0.0.1:9335/devtools/browser/brave", Browser: "Brave/140" });
+    }),
+  });
+  assert.equal(endpoint.wsUrl, "ws://127.0.0.1:9335/devtools/browser/brave");
+  assert.equal(endpoint.source, "browser:brave");
+});
+
+test("registry entries can point at any CDP httpUrl (non-standard port/host)", async () => {
+  const home = await dshHomeWithRegistry(chromiumRegistry);
+  const seen = [];
+  const endpoint = await resolveEndpoint({
+    dshHome: home,
+    fetchImpl: fakeFetch((url) => {
+      seen.push(url);
+      assert.equal(url, "http://127.0.0.1:9555/json/version");
+      return jsonResponse({ webSocketDebuggerUrl: "ws://127.0.0.1:9555/devtools/browser/brave", Browser: "Brave/140" });
+    }),
+  });
+  assert.equal(endpoint.source, "auto:brave");
+  assert.deepEqual(seen, ["http://127.0.0.1:9555/json/version"]);
+});
+
+test("auto mode falls back to standard Chromium debugging ports", async () => {
+  const home = await dshHomeWithRegistry({
+    version: 1,
+    default: "chrome",
+    browsers: { chrome: { port: 9331, enabled: true } },
+  });
+  const endpoint = await resolveEndpoint({
+    dshHome: home,
+    fetchImpl: fakeFetch((url) => {
+      if (url.includes(":9222")) return jsonResponse({ webSocketDebuggerUrl: "ws://127.0.0.1:9222/devtools/browser/any", Browser: "Chromium/140" });
+      throw new Error("refused");
+    }),
+  });
+  assert.equal(endpoint.source, "auto-fallback:cdp-9222");
+  assert.equal(endpoint.wsUrl, "ws://127.0.0.1:9222/devtools/browser/any");
+});
+
+test("unknown browser selectors list every supported browser", async () => {
+  const home = await dshHomeWithRegistry(registry);
+  await assert.rejects(
+    resolveEndpoint({ browser: "safari", dshHome: home, fetchImpl: fakeFetch(() => jsonResponse({})) }),
+    (error) => {
+      assert.equal(error.code, "E_NO_BROWSER");
+      for (const id of ["chrome", "edge", "chrome-beta", "chromium", "brave", "vivaldi", "opera", "arc"]) {
+        assert.ok(error.details.known.includes(id), id + " is advertised");
+      }
+      return true;
+    },
+  );
+});
+
+test("listEndpoints without a registry lists every known Chromium browser", async () => {
+  const home = await mkdtemp(join(tmpdir(), "bh-endpoint-empty-"));
+  const rows = await listEndpoints({
+    dshHome: home,
+    fetchImpl: fakeFetch((url) => {
+      if (url.includes(":9331")) return jsonResponse({ webSocketDebuggerUrl: "ws://x/chrome", Browser: "Chrome/156" });
+      throw new Error("refused");
+    }),
+  });
+  const ids = rows.map((row) => row.id);
+  for (const id of ["chrome", "edge", "chrome-beta", "chromium", "brave", "vivaldi", "opera", "arc"]) {
+    assert.ok(ids.includes(id), id + " is listed");
+  }
+  const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
+  assert.equal(byId.chrome.status, "live");
+  assert.equal(byId.brave.status, "down");
 });

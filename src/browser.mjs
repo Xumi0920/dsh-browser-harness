@@ -17,7 +17,7 @@ function isRealPage(target) {
   return target && target.type === "page" && !INTERNAL_URL.test(String(target.url || "")) && !String(target.url || "").includes("omnibox-popup");
 }
 
-/** One connection to one running Chrome instance. */
+/** One connection to one running Chromium-based browser instance. */
 export class Browser {
   /**
    * @param {{
