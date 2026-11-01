@@ -123,3 +123,14 @@ test("only http(s) pages and about:blank may be opened", () => {
   }
   assert.throws(() => assertNavigableUrl("not a url"), (error) => error.code === "E_BAD_ARG");
 });
+
+test("open() creates a new tab instead of navigating a non-owned current tab", async () => {
+  const { browser, transport, stateDir } = await setup({ targets: [pageTarget("t-work", "https://work.example/")] });
+  await setCurrent("unit", { targetId: "t-work", url: "https://work.example/", title: "Work" }, stateDir);
+  const page = await browser.open("https://example.com/new", { waitUntil: "none" });
+  assert.equal(page.targetId, "t-new");
+  assert.equal(transport.count("Target.createTarget"), 1);
+  assert.ok(transport.calls.some((call) => call.method === "Page.navigate" && call.params.url === "https://example.com/new"));
+  assert.ok(browser.pages.has("t-new"));
+  assert.ok(!browser.pages.has("t-work"), "the work tab is never attached or navigated");
+});

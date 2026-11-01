@@ -143,7 +143,7 @@ export class Browser {
     let result;
     try {
       result = await this.transport.send("Target.attachToTarget", { targetId, flatten: true }, { timeoutMs: 5_000 });
-    } catch (error) {
+    } catch (error: any) {
       if (/No target|target.*(closed|not found)|Session with given id not found/i.test(String(error.message))) throw targetGone(targetId);
       throw error;
     }
@@ -179,10 +179,14 @@ export class Browser {
     if (!newTab) {
       const existing = await this.current(lane);
       if (existing) {
-        const page = await this.attach(existing.targetId);
-        await page.navigate(url, { waitUntil, timeoutMs });
-        await this.#rememberCurrent(page, lane);
-        return page;
+        const state = await this.#currentState(lane);
+        const owned = state.ownedTabs.some((tab) => tab.targetId === existing.targetId);
+        if (owned) {
+          const page = await this.attach(existing.targetId);
+          await page.navigate(url, { waitUntil, timeoutMs });
+          await this.#rememberCurrent(page, lane);
+          return page;
+        }
       }
     }
     return this.newTab(url, { waitUntil, timeoutMs, lane });
@@ -264,7 +268,7 @@ export class Browser {
 
   /** Re-read the attached tab and persist its url/title for one lane. */
   async #rememberCurrent(page, lane) {
-    let info = null;
+    let info: any = null;
     try {
       info = await page.info();
     } catch {

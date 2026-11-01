@@ -86,7 +86,7 @@ function candidateFor(id, entry = {} as any) {
 
 /** Candidates from a registry file; disabled entries are skipped. */
 function registryCandidates(registry) {
-  const out = [];
+  const out: any[] = [];
   for (const [id, entry] of Object.entries(((registry && registry.browsers) || {}) as Record<string, any>)) {
     if (!entry || entry.enabled === false) continue;
     const candidate = candidateFor(id, entry);
@@ -105,7 +105,7 @@ function defaultCandidates() {
 /** Extra endpoints to try when every configured candidate is down. */
 function fallbackCandidates(configured, disabledIds) {
   const tried = new Set(configured.map((candidate) => candidate.httpUrl));
-  const out = [];
+  const out: any[] = [];
   for (const [id, entry] of Object.entries(KNOWN_BROWSERS)) {
     if (disabledIds.has(id)) continue;
     const httpUrl = "http://127.0.0.1:" + entry.port;
@@ -153,7 +153,7 @@ export async function probeVersion(httpUrl, options = {} as any) {
       throw noBrowser("endpoint " + httpUrl + " is not a usable Chromium DevTools endpoint", { httpUrl });
     }
     return { webSocketDebuggerUrl: body.webSocketDebuggerUrl, browser: body.Browser, userAgent: body["User-Agent"] };
-  } catch (error) {
+  } catch (error: any) {
     if (error && error.code === "E_NO_BROWSER") throw error;
     const reason = error && error.name === "AbortError" ? "probe timed out" : String(error && error.message ? error.message : error);
     throw noBrowser("cannot reach CDP endpoint " + httpUrl + ": " + reason, { httpUrl });
@@ -212,12 +212,12 @@ export async function resolveEndpoint(options = {} as any) {
   const ordered = preferred
     ? [...configured].sort((a, b) => (a.id === preferred ? -1 : b.id === preferred ? 1 : 0))
     : configured;
-  const failures = [];
+  const failures: any[] = [];
   for (const candidate of ordered) {
     try {
       const version = await probeVersion(candidate.httpUrl, probeOptions);
       return { wsUrl: version.webSocketDebuggerUrl, httpUrl: candidate.httpUrl, browser: candidate.id, source: "auto:" + candidate.id };
-    } catch (error) {
+    } catch (error: any) {
       failures.push(candidate.id + "(" + candidate.httpUrl + "): " + (error && error.message));
     }
   }
@@ -243,9 +243,9 @@ export async function resolveEndpoint(options = {} as any) {
  */
 export async function listEndpoints(options = {} as any) {
   const registry = await readRegistry({ dshHome: options.dshHome });
-  const entries = registry && registry.browsers
+  const entries = (registry && registry.browsers
     ? Object.entries(registry.browsers)
-    : Object.entries(KNOWN_BROWSERS).map(([id, entry]) => [id, { label: entry.label, port: entry.port, enabled: true, mode: "cdp" }]);
+    : Object.entries(KNOWN_BROWSERS).map(([id, entry]) => [id, { label: entry.label, port: entry.port, enabled: true, mode: "cdp" }])) as [string, any][];
   const probeOptions = { fetchImpl: options.fetchImpl, timeoutMs: options.probeTimeoutMs };
   const rows = await Promise.all(entries.map(async ([id, entry]) => {
     const candidate = candidateFor(id, entry || {});
@@ -265,7 +265,7 @@ export async function listEndpoints(options = {} as any) {
       row.status = "live";
       row.browser = version.browser;
       row.wsUrl = version.webSocketDebuggerUrl;
-    } catch (error) {
+    } catch (error: any) {
       row.status = "down";
       row.error = error && error.message;
     }

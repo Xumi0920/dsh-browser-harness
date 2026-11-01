@@ -31,7 +31,7 @@ function wrap(handler) {
     const sessionId = exec && exec.agent && exec.agent.session ? exec.agent.session.id : undefined;
     try {
       return await handler(args, sessionId, exec);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof HarnessError) throw new Error(error.code + ": " + error.message);
       throw error;
     }
@@ -184,7 +184,7 @@ export function createTools(ctx, manager, config = {} as any, defineTool) {
           if (typeof value === "string" && value.length > 200_000) {
             return { mode, value: value.slice(0, 200_000), truncated: true };
           }
-          let serialized = null;
+          let serialized: any = null;
           try { serialized = JSON.stringify(value); } catch { serialized = null; }
           if (serialized && serialized.length > 200_000) {
             return { mode, value: serialized.slice(0, 200_000), truncated: true, format: "json" };
