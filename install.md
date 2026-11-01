@@ -3,11 +3,17 @@
 ## 0. 前置
 
 - Node >= 22（DSH 内嵌 Node 已满足）。
-- 一个**专用** Chrome 实例已开启 remote debugging（不要用日常 Chrome 主 profile）：
+- 一个**专用** Chromium 内核浏览器实例已开启 remote debugging（不要用日常浏览器主 profile）。支持 Chrome / Chromium / Edge / Brave / Vivaldi / Opera / Arc 等任何 Chromium 内核：
   ```powershell
   Invoke-RestMethod 'http://127.0.0.1:9331/json/version' | ConvertTo-Json -Compress
   ```
-  默认 registry 端口：`chrome` = 9331、`edge` = 9332（默认禁用）、`chrome-beta` = 9333；插件默认通过 `~/.dsh/browser-cdp/registry.json` 自动发现，可用 config 覆盖。
+  默认 registry 端口（本项目约定）：`chrome` = 9331、`edge` = 9332、`chrome-beta` = 9333、`chromium` = 9334、`brave` = 9335、`vivaldi` = 9336、`opera` = 9337、`arc` = 9338；未指定 `browser` 时会自动回退探测 9222/9223。插件默认通过 `~/.dsh/browser-cdp/registry.json` 自动发现，可用 config 覆盖；registry 条目也支持 `httpUrl`（任意 CDP 地址）。
+- 启动示例（任选本机已安装的浏览器）：
+  ```powershell
+  chrome.exe --remote-debugging-port=9331 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\chrome"
+  msedge.exe --remote-debugging-port=9332 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\edge"
+  brave.exe  --remote-debugging-port=9335 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\brave"
+  ```
 - 平台：优先在 Windows 上验证；macOS / Linux 未实测。
 
 ## 1. 本地自测（不需要 DSH）
@@ -19,9 +25,9 @@ git clone https://github.com/Xumi0920/dsh-browser-harness.git C:\path\to\dsh-bro
 cd C:\path\to\dsh-browser-harness
 
 node --test "tests/unit/**/*.test.mjs"        # 单测
-node --test "tests/integration/**/*.test.mjs" # 24 场景（临时 headless Chrome）
-npm run test:all                              # 单测 + 场景（共 98 条）
-node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟（需源码 checkout）
+node --test "tests/integration/**/*.test.mjs" # 25 场景（临时 headless Chromium）
+npm run test:all                              # 单测 + 场景（共 105 条）
+node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟（需源码 checkout；也可用 edge/brave 等）
 ```
 
 ## 2. 安装插件
@@ -68,9 +74,9 @@ $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\ds
 
 | 现象 | 处理 |
 |---|---|
-| `E_NO_BROWSER` | 专用 Chrome 没起/端口不对：确认 `/json/version`，或改 config 的 `cdpUrl`/`browser` |
+| `E_NO_BROWSER` | 专用浏览器没起/端口不对：确认 `/json/version`，或改 config 的 `cdpUrl`/`browser` |
 | 安装后工具不出现 | 重启 DSH；确认 `~/.dsh/profiles/desktop/package.json` 的 `dependencies` / `dsh.profile.bundles` 含 `dsh-browser-harness`（注册行在插件包自身的 `cordis.patch.yml`） |
-| Chrome 弹 "Allow remote debugging?" | 用的是日常 Chrome；改用专用 profile 实例 |
+| 浏览器弹 "Allow remote debugging?" | 用的是日常浏览器；改用专用 profile 实例 |
 | 工具报 `E_SELECTOR_TIMEOUT` | 先 `browser_snapshot` 重取 ref，再操作 |
 | 工具报 `E_POLICY_DENIED` | 试图关闭非本 harness 创建的标签页；需要 `force` 时先取得用户明确同意 |
 | 中文输入 | `browser_act {action:"fill"}` 会聚焦元素、Ctrl+A / Backspace 清空，再一次性 `insertText` 写入并派发 `input`/`change`；支持中文，能驱动 React/Vue 受控组件（不是逐字按键） |

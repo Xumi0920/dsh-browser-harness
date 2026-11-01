@@ -1,7 +1,7 @@
 {
   "name": "dsh-browser-harness",
-  "version": "0.1.2",
-  "description": "DSH native browser tools (browser_*) backed by a zero-dependency CDP core driving a dedicated, logged-in Chrome.",
+  "version": "0.2.0",
+  "description": "DSH native browser tools (browser_*) backed by a zero-dependency CDP core driving a dedicated, logged-in Chromium-based browser (Chrome, Edge, Brave, Chromium, Vivaldi, Opera, Arc).",
   "type": "module",
   "license": "MIT",
   "author": "Xumi0920",
@@ -72,6 +72,9 @@
     "browser",
     "cdp",
     "chrome",
+    "chromium",
+    "edge",
+    "brave",
     "automation",
     "agent",
     "skill"

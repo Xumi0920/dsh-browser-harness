@@ -4,8 +4,9 @@
     - id: browser-harness
       name: dsh-browser-harness
       config:
-        # Default: attach to the dedicated automation Chrome discovered through
-        # ~/.dsh/browser-cdp/registry.json (chrome=9331, chrome-beta=9333).
+        # Default: attach to the dedicated Chromium-based automation browser
+        # discovered through ~/.dsh/browser-cdp/registry.json
+        # (chrome=9331, edge=9332, chrome-beta=9333, chromium=9334, brave=9335).
         # Explicit alternatives:
         #   browser: chrome-beta
         #   cdpUrl: http://127.0.0.1:9333

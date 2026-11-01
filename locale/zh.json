@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "浏览器 Harness",
-    "description": "零依赖 CDP 浏览器工具（browser_*），直连专用真实 Chrome，保留登录态。"
+    "description": "零依赖 CDP 浏览器工具（browser_*），直连专用真实 Chromium 内核浏览器（Chrome / Edge / Brave 等），保留登录态。"
   }
 }
