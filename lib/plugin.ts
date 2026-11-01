@@ -22,6 +22,7 @@ export function resolveConfig(config: any = {}) {
     downloadDir: config.downloadDir,
     screenshotDir: config.screenshotDir,
     dialogPolicy: config.dialogPolicy || "auto-dismiss",
+    endpointCacheMs: config.endpointCacheMs === undefined ? 1_500 : Number(config.endpointCacheMs),
     maxSnapshotNodes: Number(config.maxSnapshotNodes) || 250,
     tabGroups: config.tabGroups !== false,
     tabGroupTitle: config.tabGroupTitle,

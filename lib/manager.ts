@@ -16,6 +16,7 @@ export class BrowserManager {
   config: any;
   connection: any;
   connecting: any;
+  endpointsCache: { at: number; value: any[] | null };
   constructor(config: any = {} as any) {
     this.config = {
       browser: undefined,
@@ -24,11 +25,13 @@ export class BrowserManager {
       stateDir: undefined,
       downloadDir: undefined,
       dialogPolicy: "auto-dismiss",
+      endpointCacheMs: 1_500,
       browserFactory: undefined,
       ...config,
     };
     this.connection = null;
     this.connecting = null;
+    this.endpointsCache = { at: 0, value: null };
   }
 
   /** Connect once and reuse; concurrent callers share the same promise. */
@@ -111,6 +114,22 @@ export class BrowserManager {
     return this.#ensureNetworkCapture(page);
   }
 
+  /**
+   * Endpoint discovery probes every known browser port. browser_status is a
+   * diagnostic call that users run repeatedly, so cache the probe result for a
+   * short TTL (configurable; 0 disables the cache).
+   */
+  async #endpoints() {
+    const ttl = Number(this.config.endpointCacheMs);
+    const now = Date.now();
+    if (ttl > 0 && this.endpointsCache.value && now - this.endpointsCache.at < ttl) {
+      return this.endpointsCache.value;
+    }
+    const value = await listEndpoints({});
+    this.endpointsCache = { at: now, value };
+    return value;
+  }
+
   /** Tabs plus the session's current tab pointer. */
   async listTabs(sessionId: any) {
     const browser = await this.ensure();
@@ -138,7 +157,7 @@ export class BrowserManager {
   }
 
   async status(sessionId: any) {
-    const endpoints = await listEndpoints({});
+    const endpoints = await this.#endpoints();
     let current = null;
     let tabs = [];
     let version = null;
@@ -159,6 +178,7 @@ export class BrowserManager {
   async close() {
     const connection = this.connection;
     this.connection = null;
+    this.endpointsCache = { at: 0, value: null };
     if (connection) {
       try { await connection.close(); } catch { /* ignore */ }
     }
