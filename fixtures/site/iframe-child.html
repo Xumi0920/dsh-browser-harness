@@ -1,0 +1,6 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Child frame</title></head>
+<body>
+  <button id="inner" onclick="document.getElementById('inner-out').textContent = 'clicked ' + (++window.clicks || (window.clicks = 1))">Inner button</button>
+  <p id="inner-out">not clicked</p>
+</body></html>

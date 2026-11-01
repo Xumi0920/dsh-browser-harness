@@ -1,0 +1,64 @@
+{
+  "name": "dsh-browser-harness",
+  "version": "0.1.0",
+  "description": "DSH native browser tools (browser_*) backed by a zero-dependency CDP core driving a dedicated, logged-in Chrome.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json",
+    "./core": "./src/index.mjs"
+  },
+  "bin": {
+    "bh": "./bin/bh.mjs"
+  },
+  "files": [
+    "lib/",
+    "src/",
+    "bin/",
+    "cordis.patch.yml",
+    "skills/",
+    "locale/",
+    "icon.svg",
+    "README.md",
+    "README.zh-CN.md",
+    "install.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22",
+    "dsh": "0.2.1-rc.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.5"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-tools": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "test": "node --test \"tests/unit/**/*.test.mjs\"",
+    "test:integration": "node --test \"tests/integration/**/*.test.mjs\"",
+    "test:all": "node --test \"tests/**/*.test.mjs\"",
+    "verify": "node scripts/verify.mjs",
+    "doctor": "node bin/bh.mjs doctor"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "dsh-bundle",
+    "browser",
+    "cdp",
+    "chrome",
+    "automation",
+    "agent",
+    "skill"
+  ]
+}

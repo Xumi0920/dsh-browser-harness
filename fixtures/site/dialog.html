@@ -1,0 +1,9 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Dialog - Fixture</title></head>
+<body>
+  <h1>Dialogs</h1>
+  <button id="alert" onclick="alert('hello alert')">Alert</button>
+  <button id="confirm" onclick="var ok = confirm('confirm me'); document.getElementById('out').textContent = 'confirm:' + ok">Confirm</button>
+  <button id="prompt" onclick="var value = prompt('your name', 'guest'); document.getElementById('out').textContent = 'prompt:' + value">Prompt</button>
+  <p id="out">ready</p>
+</body></html>
