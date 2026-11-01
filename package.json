@@ -1,7 +1,7 @@
 {
   "name": "@xumi0920/dsh-browser-harness",
-  "version": "0.5.0",
-  "description": "DSH native browser tools (browser_*) backed by a zero-dependency CDP core driving a dedicated, logged-in Chromium-based browser (Chrome, Edge, Brave, Chromium, Vivaldi, Opera, Arc), with per-task Chrome tab groups for harness-created tabs.",
+  "version": "0.5.1",
+  "description": "DSH native browser tools (browser_*) written in TypeScript on a zero-dependency CDP core, driving a dedicated, logged-in Chromium-based browser (Chrome, Edge, Brave, Chromium, Vivaldi, Opera, Arc) with per-task Chrome tab groups.",
   "type": "module",
   "license": "MIT",
   "author": "Xumi0920",
