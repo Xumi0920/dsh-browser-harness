@@ -8,6 +8,7 @@ import { CDPTransport } from "./cdp/transport.mjs";
 import { resolveEndpoint } from "./cdp/endpoint.mjs";
 import { Page } from "./page.mjs";
 import * as stateStore from "./state.mjs";
+import { TabGroupBridge, tabGroupColorFor, tabGroupTitleFor } from "./tabgroups.mjs";
 import { badArgument, elementNotFound, noTab, policyDenied, targetGone } from "./errors.mjs";
 
 const INTERNAL_URL = /^(chrome|devtools|edge|about:blank|chrome-extension):/;
@@ -37,6 +38,12 @@ export class Browser {
     this.version = null;
     /** @type {Map<string, Page>} one reused Page per target (CDP session) */
     this.pages = new Map();
+    /** Chrome tab groups for harness-created tabs (per DSH session/task). */
+    this.tabGroups = new TabGroupBridge(this, {
+      enabled: this.config.tabGroups !== false,
+      extensionPath: this.config.extensionPath,
+      extensionId: this.config.extensionId,
+    });
   }
 
   /**
@@ -155,7 +162,29 @@ export class Browser {
     await stateStore.rememberOwnedTab(lane, { targetId: created.targetId, url: "about:blank" }, this.config.stateDir);
     if (url && url !== "about:blank") await page.navigate(url, { waitUntil, timeoutMs });
     await this.#rememberCurrent(page, lane);
+    await this.#groupOwnedTab(page, lane);
     return page;
+  }
+
+  /**
+   * Put a harness-created tab into the task's Chrome tab group (best effort).
+   * User/work tabs are never touched: only the tab just created is grouped.
+   */
+  async #groupOwnedTab(page, lane) {
+    if (this.config.tabGroups === false) return;
+    try {
+      const state = await stateStore.readState(lane, this.config.stateDir);
+      const remembered = state.group && Number.isFinite(state.group.id) ? state.group.id : null;
+      const groupId = remembered !== null && (await this.tabGroups.groupExists(remembered)) ? remembered : null;
+      const title = this.config.tabGroupTitle || tabGroupTitleFor(lane);
+      const color = this.config.tabGroupColor || tabGroupColorFor(lane);
+      const result = await this.tabGroups.groupTab(page, { title, color, groupId });
+      if (result && result.ok && Number.isFinite(result.groupId) && result.groupId !== remembered) {
+        await stateStore.setGroup(lane, { id: result.groupId, title, color }, this.config.stateDir);
+      }
+    } catch {
+      /* grouping is best-effort and must never break tab creation */
+    }
   }
 
   /** Switch to a tab by targetId or URL substring (attach only, no activation). */
@@ -228,10 +257,11 @@ export class Browser {
     } catch { /* marker is best-effort */ }
   }
 
-  /** Detach every cached Page, then close the transport. */
+  /** Detach every cached Page and the tab-group worker, then close the transport. */
   async close() {
     const pages = [...this.pages.values()];
     this.pages.clear();
+    await this.tabGroups.dispose().catch(() => {});
     await Promise.all(pages.map((page) => page.detach().catch(() => {})));
     this.transport.close();
   }

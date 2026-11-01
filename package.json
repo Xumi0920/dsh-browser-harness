@@ -1,13 +1,13 @@
 {
-  "name": "dsh-browser-harness",
-  "version": "0.2.0",
-  "description": "DSH native browser tools (browser_*) backed by a zero-dependency CDP core driving a dedicated, logged-in Chromium-based browser (Chrome, Edge, Brave, Chromium, Vivaldi, Opera, Arc).",
+  "name": "@xumi0920/dsh-browser-harness",
+  "version": "0.3.0",
+  "description": "DSH native browser tools (browser_*) backed by a zero-dependency CDP core driving a dedicated, logged-in Chromium-based browser (Chrome, Edge, Brave, Chromium, Vivaldi, Opera, Arc), with per-task Chrome tab groups for harness-created tabs.",
   "type": "module",
   "license": "MIT",
   "author": "Xumi0920",
   "icon": "./icon.svg",
   "publishConfig": {
-    "access": "public"
+    "registry": "https://npm.pkg.github.com"
   },
   "repository": {
     "type": "git",
@@ -33,6 +33,7 @@
     "src/",
     "bin/",
     "cordis.patch.yml",
+    "extension/",
     "skills/",
     "locale/",
     "icon.svg",
@@ -75,6 +76,7 @@
     "chromium",
     "edge",
     "brave",
+    "tab-groups",
     "automation",
     "agent",
     "skill"

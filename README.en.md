@@ -19,7 +19,7 @@ browser_tabs        list / use / new / close
 - **Zero dependencies.** Node 22+ built-ins only (`fetch`, `WebSocket`, `node:test`). No browser download, no build step. The DSH plugin entry imports the host-provided `@deepseek-ai/dsh-tools` peer — nothing else.
 - **Your logged-in browser.** Point it at a dedicated Chromium-based instance (default `chrome` = 9331; Edge/Brave/Chromium/... also supported — see *Supported browsers*) that the user signed in once.
 - **Text-first.** Accessibility-tree snapshots and refs beat screenshot-VLM loops for actions; screenshots stay optional.
-- **Scene-tested.** 80 unit tests + 25 end-to-end scenarios (14 browser scenarios + 11 tool-layer/CLI/compat scenarios, 105 total: login, async render, tabs, iframe, shadow DOM, download, upload, dialogs, validation, timeout, stale-tab recovery, screenshots, network capture, cookies) run against a real headless Chromium and a local fixture site.
+- **Scene-tested.** 88 unit tests + 27 end-to-end scenarios (14 browser scenarios + 11 tool-layer/CLI/compat scenarios + 2 tab-group scenarios, 115 total: login, async render, tabs, iframe, shadow DOM, download, upload, dialogs, validation, timeout, stale-tab recovery, screenshots, network capture, cookies) run against a real headless Chromium and a local fixture site.
 
 ## Requirements
 
@@ -49,7 +49,20 @@ The ports are only a local convention: `browser: "brave"` probes 9335, and `cdpU
 
 ## Install (DSH 0.2.1-rc.5)
 
-This plugin is **not published to npm** — the same-named npm package belongs to an unrelated project, so install it from a local clone directory or directly from the GitHub repository.
+The plugin is published to **GitHub Packages** as `@xumi0920/dsh-browser-harness`. The `dsh-browser-harness` package on npmjs.org belongs to an unrelated project. Pick one of three install methods:
+
+**A. From GitHub Packages** (needs a GitHub token with `read:packages`):
+
+```powershell
+npm config set @xumi0920:registry https://npm.pkg.github.com
+npm config set //npm.pkg.github.com/:_authToken "<YOUR_GITHUB_TOKEN>"
+# Creator mode / plugin manager: plugin_manager { action: "install_bundle", target: "@xumi0920/dsh-browser-harness" }
+# or the CLI (restart DSH afterwards):
+& "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" `
+  plugin --profile desktop add "@xumi0920/dsh-browser-harness"
+```
+
+**B. From a local clone** (recommended for development / personal use):
 
 The example path `C:\path\to\dsh-browser-harness` is a placeholder; replace it with the absolute path of your local clone (an earlier doc revision used the author's own absolute path there; that is obsolete).
 
@@ -77,7 +90,7 @@ Defaults read `~/.dsh/browser-cdp/registry.json` and attach to the default dedic
 
 ```yaml
 - id: browser-harness
-  name: dsh-browser-harness
+  name: "@xumi0920/dsh-browser-harness"
   config:
     browser: chrome-beta      # or chrome
     # cdpUrl: http://127.0.0.1:9333
@@ -86,6 +99,9 @@ Defaults read `~/.dsh/browser-cdp/registry.json` and attach to the default dedic
     # stateDir: ~/.dsh/browser-harness
     # downloadDir: ~/.dsh/browser-harness/downloads
     # dialogPolicy: auto-dismiss
+    tabGroups: true                 # group harness-created tabs per task (default on)
+    # tabGroupTitle: "DSH · my-task"  # fixed group title; defaults to the session tag
+    # tabGroupColor: blue             # defaults to a stable per-session color
 ```
 
 > **Do not** add another `- insert:` row in the profile patch — that would register the plugin twice; `insert` is how the plugin package's own `cordis.patch.yml` registers it. Config keys: `browser` picks the target instance; `cdpUrl` / `ws` point directly at an endpoint (pick one); `maxSnapshotNodes` defaults to 250 (`browser_snapshot` caps at 400); `stateDir` / `downloadDir` control runtime state and downloads; `dialogPolicy` defaults to `auto-dismiss`.
@@ -102,6 +118,19 @@ brave.exe  --remote-debugging-port=9335 "--user-data-dir=$env:USERPROFILE\.dsh\b
 ```
 
 Any port works too (e.g. 9222): `browser: "auto"` falls back to it, or point `cdpUrl` at `http://127.0.0.1:9222`. Registry entries may use `httpUrl` instead of `port`, e.g. `"brave": { "label": "Brave", "httpUrl": "http://127.0.0.1:9222", "enabled": true }`.
+
+## Per-task tab groups (Chrome tab groups)
+
+By default the harness puts the tabs **it creates** into a Chrome tab group named after the task (DSH session): title `DSH · a1b2c3`, a stable per-session color. The boundaries are strict:
+
+- **Only tabs the harness created are touched**: user/work tabs are never moved, renamed, closed or pulled into a group;
+- Chrome removes the group automatically when its last tab closes;
+- the title/color are set once at creation, so manual renames/recolors stick;
+- headless browsers have no tab groups; grouping is skipped there and tab creation is unaffected.
+
+How it works: the package ships a tiny MV3 extension (only `tabs` and `tabGroups` permissions, no content scripts, no host permissions). On first use the harness installs it into the **dedicated browser profile** through the CDP `Extensions.loadUnpacked` command and drives its service worker to create the groups. It shows up in the dedicated browser's `chrome://extensions` as “DSH Browser Harness Tab Groups”; disable with `tabGroups: false` (it is then no longer loaded) or remove it from that page.
+
+`browser_status` reports `tabGroups: { enabled, available, extensionId, error }` for troubleshooting.
 
 ## Standalone library / CLI
 
@@ -126,12 +155,12 @@ CLI subcommands: `doctor`, `tabs`, `open <url>`, `info`, `snapshot`, `text [sele
 
 ## Test
 
-Run from a source checkout. The packed artifact (`npm pack`) contains the runtime only — no `tests/`, `scripts/`, or `fixtures/`; this plugin is not published to npm, so install it from source or a local directory.
+Run from a source checkout. The packed artifact (`npm pack`) contains the runtime only — no `tests/`, `scripts/`, or `fixtures/`. The plugin is published to GitHub Packages, and can also be installed from source or a local directory.
 
 ```sh
 npm test                    # unit: CDP protocol, endpoint, state, AX, tools (no browser)
-npm run test:integration    # 25 scenarios on a throwaway headless Chromium
-npm run test:all            # unit + integration (105 tests)
+npm run test:integration    # 27 scenarios on throwaway headless/headful Chromium browsers
+npm run test:all            # unit + integration (115 tests)
 node scripts/verify.mjs     # smoke against a live dedicated browser
 ```
 
@@ -147,6 +176,6 @@ Integration tests launch their own Chromium browser with a temporary profile and
 
 ## Status
 
-v0.2.0 — current release. Supported browsers now span **any Chromium-based browser** (Chrome, Chromium, Edge, Brave, Vivaldi, Opera, Arc, ...), with port conventions and `browser` selectors, 9222/9223 auto-probing, and registry `httpUrl` support; it also carries the earlier network-capture fix, strict snapshot-ref validation, reused/released Page CDP sessions, real `owned` flags, the truthful truncation flag and `bh close`. Pinned to DSH `0.2.1-rc.5` through `engines.dsh`. Downloads/uploads/cookies exist in the core library but are intentionally not exposed as tools yet. See the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog.
+v0.3.0 — current release. Adds **per-task Chrome tab groups**: tabs the harness creates are grouped by DSH session, work tabs are never touched (headless browsers skip grouping), and the bundled MV3 extension only asks for `tabs` / `tabGroups`. Also published to **GitHub Packages** as `@xumi0920/dsh-browser-harness`. Carries the earlier any-Chromium support, network capture, strict snapshot refs, reused Page CDP sessions, real `owned` flags, the truthful truncation flag and `bh close`. Pinned to DSH `0.2.1-rc.5` through `engines.dsh`. Downloads/uploads/cookies exist in the core library but are intentionally not exposed as tools yet. See the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog.
 
 MIT (c) 2026 Xumi0920

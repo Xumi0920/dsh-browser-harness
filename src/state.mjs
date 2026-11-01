@@ -46,6 +46,7 @@ function normalizeState(value) {
     version: STATE_VERSION,
     ownedTabs: Array.isArray(value.ownedTabs) ? value.ownedTabs.filter((tab) => tab && typeof tab.targetId === "string") : [],
     current: value.current && typeof value.current.targetId === "string" ? value.current : null,
+    group: value.group && Number.isFinite(value.group.id) ? value.group : null,
   };
 }
 
@@ -151,6 +152,11 @@ export async function rememberOwnedTab(lane, tab, dir = defaultStateDir()) {
 /** Set the current tab pointer. */
 export async function setCurrent(lane, current, dir = defaultStateDir()) {
   return updateState(lane, (state) => ({ ...state, current }), dir);
+}
+
+/** Remember the Chrome tab group created for a lane (task/session). */
+export async function setGroup(lane, group, dir = defaultStateDir()) {
+  return updateState(lane, (state) => ({ ...state, group: group ? { ...group, updatedAt: new Date().toISOString() } : null }), dir);
 }
 
 /** Forget a closed tab. */

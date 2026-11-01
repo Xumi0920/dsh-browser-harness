@@ -1,0 +1,31 @@
+name: publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  github-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: "@xumi0920"
+      - name: Verify package metadata
+        run: |
+          node -e "const pkg=require('./package.json'); if(!pkg.name.startsWith('@xumi0920/')) { console.error('package name must be scoped to @xumi0920'); process.exit(1); } console.log(pkg.name + '@' + pkg.version);"
+          node -e "const pkg=require('./package.json'); if(!pkg.dsh || !pkg.dsh.bundle) { console.error('package must stay a DSH bundle'); process.exit(1); }"
+      - name: Unit tests
+        run: node --test "tests/unit/**/*.test.mjs"
+      - name: Publish to GitHub Packages
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

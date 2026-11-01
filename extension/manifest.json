@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "DSH Browser Harness Tab Groups",
+  "version": "0.1.0",
+  "description": "Creates per-task Chrome tab groups for the DSH browser harness. No content scripts; only tabs/tabGroups permissions.",
+  "permissions": [
+    "tabs",
+    "tabGroups"
+  ],
+  "background": {
+    "service_worker": "sw.js"
+  }
+}

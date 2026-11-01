@@ -135,7 +135,7 @@ async function waitForCdpReady(httpUrl, timeoutMs = 10_000) {
 }
 
 /**
- * @param {{ headless?: boolean, extraArgs?: string[], executable?: string }} [options]
+ * @param {{ headless?: boolean, extraArgs?: string[], executable?: string, allowExtensions?: boolean }} [options]
  * @returns {Promise<null | { proc: any, port: number, httpUrl: string, userDataDir: string, executable: string, close: () => Promise<void> }>}
  */
 export async function launchChrome(options = {}) {
@@ -152,7 +152,7 @@ export async function launchChrome(options = {}) {
     "--disable-renderer-backgrounding",
     "--disable-backgrounding-occluded-windows",
     "--disable-sync",
-    "--disable-extensions",
+    ...(options.allowExtensions === true ? [] : ["--disable-extensions"]),
     "--window-size=1280,800",
     ...(options.headless === false ? [] : ["--headless=new"]),
     ...(process.platform === "linux" ? ["--no-sandbox", "--disable-dev-shm-usage"] : []),
