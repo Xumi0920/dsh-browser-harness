@@ -20,7 +20,7 @@ export const TAB_GROUP_COLORS = Object.freeze(["blue", "cyan", "green", "orange"
 export const TAB_GROUP_EXTENSION_NAME = "DSH Browser Harness Tab Groups";
 export const TAB_GROUP_TITLE_PREFIX = "DSH · ";
 
-function delay(ms) {
+function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -28,7 +28,7 @@ function delay(ms) {
 export const TAB_GROUP_TITLE_TEMPLATE = TAB_GROUP_TITLE_PREFIX + "{session}";
 
 /** Short tag used in group titles, e.g. "a1b2c3" for lane "dsh-a1b2c3". */
-export function tabGroupSessionTag(lane) {
+export function tabGroupSessionTag(lane: any) {
   const raw = String(lane || "default");
   if (raw === "default") return "default";
   const tag = raw.replace(/^dsh-/, "").replace(/[^a-zA-Z0-9]+/g, "").slice(-6);
@@ -39,7 +39,7 @@ export function tabGroupSessionTag(lane) {
  * Stable per-lane group title, e.g. "DSH · a1b2c3".
  * Supports a template with {session} and {lane} placeholders.
  */
-export function tabGroupTitleFor(lane, template = TAB_GROUP_TITLE_TEMPLATE) {
+export function tabGroupTitleFor(lane: any, template = TAB_GROUP_TITLE_TEMPLATE) {
   const raw = String(lane || "default");
   const title = String(template || TAB_GROUP_TITLE_TEMPLATE)
     .replaceAll("{session}", tabGroupSessionTag(raw))
@@ -48,9 +48,9 @@ export function tabGroupTitleFor(lane, template = TAB_GROUP_TITLE_TEMPLATE) {
 }
 
 /** Deterministic group color per lane. */
-export function tabGroupColorFor(lane) {
+export function tabGroupColorFor(lane: any) {
   let hash = 0;
-  for (const character of String(lane || "default")) hash = (hash * 31 + character.codePointAt(0)) >>> 0;
+  for (const character of String(lane || "default")) hash = (hash * 31 + character.codePointAt(0)!) >>> 0;
   return TAB_GROUP_COLORS[hash % TAB_GROUP_COLORS.length];
 }
 
@@ -69,7 +69,7 @@ export class TabGroupBridge {
    * @param {import("./browser.js").Browser} browser
    * @param {{ enabled?: boolean, extensionPath?: string, extensionId?: string }} [options]
    */
-  constructor(browser, options = {} as any) {
+  constructor(browser: any, options: any = {}) {
     this.browser = browser;
     this.extensionPath = options.extensionPath || fileURLToPath(new URL("../../extension", import.meta.url));
     this.enabled = options.enabled !== false;
@@ -101,7 +101,7 @@ export class TabGroupBridge {
   }
 
   /** Serialize operations: one worker session and one group state at a time. */
-  run(operation) {
+  run(operation: () => Promise<any>) {
     const next = this.queue.then(operation, operation);
     this.queue = next.then(() => undefined, () => undefined);
     return next;
@@ -118,7 +118,7 @@ export class TabGroupBridge {
       this.available = true;
       this.error = null;
       return true;
-    } catch (error) {
+    } catch (error: any) {
       this.available = false;
       this.sessionId = null;
       this.failedAt = Date.now();
@@ -131,12 +131,12 @@ export class TabGroupBridge {
     const listing = await this.transport.send("Extensions.getExtensions", {}, { timeoutMs: 5_000 });
     const extensions = Array.isArray(listing && listing.extensions) ? listing.extensions : [];
     const wantedPath = resolvePath(this.extensionPath);
-    const byPath = extensions.find((entry) => entry && typeof entry.path === "string" && resolvePath(entry.path) === wantedPath);
+    const byPath = extensions.find((entry: any) => entry && typeof entry.path === "string" && resolvePath(entry.path) === wantedPath);
     if (byPath) {
       this.extensionId = byPath.id;
       return;
     }
-    const stale = extensions.find((entry) => entry && entry.name === TAB_GROUP_EXTENSION_NAME);
+    const stale = extensions.find((entry: any) => entry && entry.name === TAB_GROUP_EXTENSION_NAME);
     if (stale && stale.id) {
       try { await this.transport.send("Extensions.uninstall", { id: stale.id }, { timeoutMs: 5_000 }); } catch { /* ignore */ }
     }
@@ -148,10 +148,10 @@ export class TabGroupBridge {
   async #findWorkerTarget() {
     const targets = await this.transport.send("Target.getTargets", {}, { timeoutMs: 5_000 });
     const infos = Array.isArray(targets && targets.targetInfos) ? targets.targetInfos : [];
-    return infos.find((info) => info && info.type === "service_worker" && String(info.url || "").startsWith("chrome-extension://" + this.extensionId + "/")) || null;
+    return infos.find((info: any) => info && info.type === "service_worker" && String(info.url || "").startsWith("chrome-extension://" + this.extensionId + "/")) || null;
   }
 
-  async #waitForWorkerTarget(timeoutMs) {
+  async #waitForWorkerTarget(timeoutMs: number) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const target = await this.#findWorkerTarget().catch(() => null);
@@ -181,7 +181,7 @@ export class TabGroupBridge {
     throw new Error("tab-group extension worker did not expose chrome APIs");
   }
 
-  async #evalRaw(expression) {
+  async #evalRaw(expression: string) {
     const result = await this.transport.send(
       "Runtime.evaluate",
       { expression, awaitPromise: true, returnByValue: true },
@@ -196,13 +196,17 @@ export class TabGroupBridge {
   }
 
   /** Evaluate an expression in the worker, re-attaching once if it went away. */
-  async evaluate(expression) {
+  async evaluate(expression: string) {
     if (!this.sessionId) {
       if (!(await this.ensure())) throw new Error(this.error || "tab-group extension is unavailable");
     }
     try {
       return await this.#evalRaw(expression);
-    } catch (error) {
+    } catch (error: any) {
+      // The MV3 service worker may have been shut down: drop the stale session
+      // so ensure() re-installs/re-attaches instead of short-circuiting.
+      this.available = false;
+      this.sessionId = null;
       if (!(await this.ensure())) throw error;
       return this.#evalRaw(expression);
     }
@@ -221,7 +225,7 @@ export class TabGroupBridge {
   }
 
   /** Whether the group still exists (empty groups are removed by Chrome). */
-  async groupExists(groupId) {
+  async groupExists(groupId: number) {
     if (!Number.isFinite(groupId)) return false;
     const ready = await this.ensure();
     if (!ready) return false;
@@ -244,7 +248,7 @@ export class TabGroupBridge {
    * @param {import("./page.js").Page} page
    * @param {{ title: string, color?: string, groupId?: number | null }} options
    */
-  async groupTab(page, { title, color = "blue", groupId = null } = {} as any) {
+  async groupTab(page: any, { title, color = "blue", groupId = null } = {} as any) {
     if (!this.enabled) return { ok: false, reason: "disabled" };
     return this.run(async () => {
       const ready = await this.ensure();
@@ -258,17 +262,17 @@ export class TabGroupBridge {
       const nonce = "DSH-TMP-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
       try {
         for (let attempt = 0; attempt < 3; attempt += 1) {
-          await page.evaluate((value) => { document.title = value; }, { args: [nonce] }).catch(() => {});
+          await page.evaluate((value: any) => { document.title = value; }, { args: [nonce] }).catch(() => {});
           const wantedGroupId = Number.isFinite(groupId) ? Number(groupId) : null;
           const result = await this.evaluate(groupExpression({ nonce, title, color, groupId: wantedGroupId }));
           if (result && result.ok) return { ...result, tabId: result.tabId, groupId: result.groupId };
           await delay(100);
         }
         return { ok: false, reason: "tab-not-found" };
-      } catch (error) {
+      } catch (error: any) {
         return { ok: false, reason: "group-failed", error: String((error && error.message) || error) };
       } finally {
-        await page.evaluate((value) => { document.title = value; }, { args: [originalTitle] }).catch(() => {});
+        await page.evaluate((value: any) => { document.title = value; }, { args: [originalTitle] }).catch(() => {});
       }
     });
   }
@@ -293,7 +297,7 @@ export class TabGroupBridge {
   }
 }
 
-function groupExpression({ nonce, title, color, groupId }) {
+function groupExpression({ nonce, title, color, groupId }: any) {
   return "(async () => {" +
     "const tabs = await chrome.tabs.query({ title: " + JSON.stringify(nonce) + " });" +
     "if (!tabs.length) return { ok: false, error: 'tab-not-found' };" +

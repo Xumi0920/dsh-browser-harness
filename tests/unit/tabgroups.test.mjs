@@ -159,3 +159,19 @@ test("an extension install failure is reported once and cooled down", async () =
   assert.equal(again.ok, false);
   assert.equal(transport.count("Extensions.getExtensions"), calls, "cooldown prevents retry storms");
 });
+
+test("a dead worker session is re-attached before retrying once", async () => {
+  const transport = bridgeTransport();
+  let evaluations = 0;
+  transport.on("Runtime.evaluate", (params) => {
+    const expression = String(params.expression);
+    if (expression === "typeof chrome") return { result: { value: "object" } };
+    evaluations += 1;
+    if (evaluations === 1) throw new Error("Session with given id not found");
+    return { result: { value: "recovered" } };
+  });
+  const bridge = bridgeFor(transport);
+  const value = await bridge.evaluate("chrome.tabs.query({})");
+  assert.equal(value, "recovered");
+  assert.ok(transport.count("Target.attachToTarget") >= 2, "the worker is re-attached before the retry");
+});

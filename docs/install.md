@@ -14,9 +14,9 @@ cd C:\path\to\dsh-browser-harness
 npm install                                   # 仅开发依赖：typescript + @types/node
 npm run build                                 # tsc 编译到 dist/（发布产物）
 
-npm test                                      # 构建 + 92 单测（fake CDP 替身，无需浏览器）
+npm test                                      # 构建 + 96 单测（fake CDP 替身，无需浏览器）
 npm run test:integration                      # 构建 + 27 场景（真实 headless/headful Chromium）
-npm run test:all                              # 构建 + 共 119 条
+npm run test:all                              # 构建 + 共 123 条
 node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟（需先 build）
 ```
 
@@ -128,7 +128,7 @@ $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\ds
 
 | 现象 | 处理 |
 |---|---|
-| `npm install` 报 **404 Not Found** | 没配 `@xumi0920:registry`：scoped 包在 npmjs.org 不存在，先执行 2b 的两条 npm config |
+| `npm install` 报 **404 Not Found** | 没配 `@xumi0920:registry`：scoped 包在 npmjs.org 不存在，先执行 2c 的两条 npm config |
 | 报 **401 Unauthorized** / token not provided | `GITHUB_TOKEN` 缺失、过期或没有 `read:packages`；重新配置后重试 |
 | `E_NO_BROWSER` | 专用浏览器没起/端口不对：确认 `/json/version`，或改配置 `cdpUrl`/`browser`（见 [configuration.md](configuration.md)） |
 | 安装后工具不出现 | 是否重启 DSH；确认 profile 的 dependencies / bundles 含 scoped 包名；DSH/Node 版本是否满足 `engines` |

@@ -22,7 +22,7 @@ async function main() {
   }
   if (command === "doctor") {
     const endpoints = await listEndpoints({});
-    for (const endpoint of endpoints) {
+    for (const endpoint of endpoints as any[]) {
       console.log(endpoint.id + "\tport=" + endpoint.port + "\t" + endpoint.status + (endpoint.browser ? "\t" + endpoint.browser : ""));
     }
     return;

@@ -20,7 +20,7 @@ browser_tabs        list / use / new / close
 - **真实登录态**：连自己起好的专用 Chromium 实例（Chrome / Chromium / Edge / Brave / Vivaldi / Opera / Arc 都可以），登录一次长期有效。
 - **文本优先**：无障碍树 + ref 比“截图喂视觉模型”更准更省；截图只是可选补充。
 - **按任务标签组**：插件自建的标签页自动按 DSH 会话分组，工作标签页不受影响；headless 自动跳过。
-- **可验证**：92 个单测（fake CDP 替身，无需浏览器）+ 27 个集成场景（真实 headless / headful Chromium）= 119 条。
+- **可验证**：96 个单测（fake CDP 替身，无需浏览器）+ 27 个集成场景（真实 headless / headful Chromium）= 123 条。
 
 ## 安装
 
@@ -83,9 +83,9 @@ browser_extract {mode:"text" | "html" | "js" | "network"}
 
 ```sh
 npm install                 # 开发依赖（TypeScript 构建），运行时零依赖
-npm test                    # 构建 + 92 单测（无浏览器）
+npm test                    # 构建 + 96 单测（无浏览器）
 npm run test:integration    # 构建 + 27 个集成场景
-npm run test:all            # 构建 + 单测 + 场景（共 119 条）
+npm run test:all            # 构建 + 单测 + 场景（共 123 条）
 ```
 
 CI：单测跑 ubuntu / windows；集成场景跑 ubuntu（xvfb，含 headful 标签组）。
@@ -99,6 +99,6 @@ CI：单测跑 ubuntu / windows；集成场景跑 ubuntu（xvfb，含 headful �
 
 ## 状态
 
-v0.4.0：**源码迁移到 TypeScript**——`src/`、`lib/`、`bin/` 改为 `.ts`，`tsc` 构建到 `dist/`（发布包只含构建产物），开发依赖仅 `typescript` + `@types/node`，运行时仍零依赖；同步更新 `package.json`（main/exports/bin/files）、CI（`npm ci` + build）、publish 打包冒烟与文档；行为与 v0.3.5 一致。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
+v0.4.1：类型与稳定性增强——`tsconfig` 开启 `strict`（`noImplicitAny` 分阶段）；修复 MV3 service worker 掉线后标签组不重挂的问题；`browser_navigate` 复用当前标签页时仅限 harness 自建页；插件入口拆出可测工厂 `createApply`（新增 4 个单测，96 + 27 = 123 条）；从 v0.4.0 起源码为 TypeScript、`tsc` 构建到 `dist/`，运行时仍零依赖。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
 
 MIT © 2026 Xumi0920

@@ -19,7 +19,7 @@ class Emitter {
   on(event, handler) {
     if (typeof handler !== "function") throw new TypeError("handler must be a function");
     if (!this.listeners.has(event)) this.listeners.set(event, new Set());
-    this.listeners.get(event).add(handler);
+    this.listeners.get(event)!.add(handler);
     return () => this.off(event, handler);
   }
   off(event, handler) {
@@ -120,7 +120,7 @@ export class CDPTransport extends Emitter {
       else if (data && typeof data.toString === "function") raw = data.toString("utf8");
       if (!raw) return;
       this.#dispatch(JSON.parse(raw));
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn?.("ignoring malformed CDP message", String(error).slice(0, 200));
     }
   }
@@ -171,7 +171,7 @@ export class CDPTransport extends Emitter {
     let json;
     try {
       json = JSON.stringify(payload);
-    } catch (error) {
+    } catch (error: any) {
       return Promise.reject(new HarnessError(codes.E_BAD_ARG, `cannot serialize params for ${method}: ${String(error)}`));
     }
     return new Promise((resolve, reject) => {
@@ -182,7 +182,7 @@ export class CDPTransport extends Emitter {
       this.pending.set(id, { resolve, reject, timer, method });
       try {
         this.ws.send(json);
-      } catch (error) {
+      } catch (error: any) {
         this.pending.delete(id);
         clearTimeout(timer);
         reject(notConnected(`cannot write to CDP socket: ${String(error)}`));

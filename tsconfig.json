@@ -7,7 +7,7 @@
     "types": ["node"],
     "outDir": "dist",
     "rootDir": ".",
-    "strict": false,
+    "strict": true,
     "noImplicitAny": false,
     "skipLibCheck": true,
     "declaration": true,

@@ -79,7 +79,7 @@ export function buildSnapshot(nodes, options = {} as any) {
   const roleSet = options.roles ? new Set(options.roles) : INTERACTIVE_ROLES;
   const boxes = options.boxes;
   const refStart = Number.isFinite(options.refStart) ? Number(options.refStart) : 0;
-  const out = [];
+  const out: any[] = [];
   let matched = 0;
   for (const node of nodes || []) {
     if (!node || node.ignored) continue;

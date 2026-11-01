@@ -91,7 +91,7 @@ async function acquireLock(lane, dir) {
     try {
       await writeFile(lock, String(process.pid) + "\n" + Date.now() + "\n", { encoding: "utf8", flag: "wx" });
       return lock;
-    } catch (error) {
+    } catch (error: any) {
       if (!error || error.code !== "EEXIST") throw error;
       try {
         const raw = await readFile(lock, "utf8");
@@ -141,29 +141,29 @@ export async function updateState(lane, mutate, dir = defaultStateDir()) {
 }
 
 /** Remember a tab this harness created. */
-export async function rememberOwnedTab(lane, tab, dir = defaultStateDir()) {
-  return updateState(lane, (state) => {
-    const owned = state.ownedTabs.filter((item) => item.targetId !== tab.targetId);
+export async function rememberOwnedTab(lane: any, tab: any, dir = defaultStateDir()) {
+  return updateState(lane, (state: any) => {
+    const owned = state.ownedTabs.filter((item: any) => item.targetId !== tab.targetId);
     owned.push({ ...tab, createdAt: tab.createdAt || new Date().toISOString() });
     return { ...state, ownedTabs: owned.slice(-50) };
   }, dir);
 }
 
 /** Set the current tab pointer. */
-export async function setCurrent(lane, current, dir = defaultStateDir()) {
-  return updateState(lane, (state) => ({ ...state, current }), dir);
+export async function setCurrent(lane: any, current: any, dir = defaultStateDir()) {
+  return updateState(lane, (state: any) => ({ ...state, current }), dir);
 }
 
 /** Remember the Chrome tab group created for a lane (task/session). */
-export async function setGroup(lane, group, dir = defaultStateDir()) {
-  return updateState(lane, (state) => ({ ...state, group: group ? { ...group, updatedAt: new Date().toISOString() } : null }), dir);
+export async function setGroup(lane: any, group: any, dir = defaultStateDir()) {
+  return updateState(lane, (state: any) => ({ ...state, group: group ? { ...group, updatedAt: new Date().toISOString() } : null }), dir);
 }
 
 /** Forget a closed tab. */
-export async function forgetTab(lane, targetId, dir = defaultStateDir()) {
-  return updateState(lane, (state) => ({
+export async function forgetTab(lane: any, targetId: any, dir = defaultStateDir()) {
+  return updateState(lane, (state: any) => ({
     ...state,
     current: state.current && state.current.targetId === targetId ? null : state.current,
-    ownedTabs: state.ownedTabs.filter((tab) => tab.targetId !== targetId),
+    ownedTabs: state.ownedTabs.filter((tab: any) => tab.targetId !== targetId),
   }), dir);
 }

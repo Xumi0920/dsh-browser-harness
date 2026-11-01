@@ -94,7 +94,7 @@ export class Page {
   executionContexts: any[];
   runtimeEnabled: boolean;
   ownedListeners: any[];
-  maxNetworkEvents: number;
+  maxNetworkEvents: number = 1000;
   /**
    * @param {import("./browser.js").Browser} browser
    * @param {{ sessionId: string, targetId: string }} ids
@@ -262,7 +262,7 @@ export class Page {
       try {
         const ready = await this.evaluate("document.readyState");
         if (ready === "complete" || ready === "interactive") return { ok: true, readyState: ready };
-      } catch (error) {
+      } catch (error: any) {
         if (error.code === "E_DIALOG_OPEN") throw error;
       }
       if (Date.now() > deadline) throw waitTimeout("document.readyState === 'complete'", timeoutMs);
@@ -332,7 +332,7 @@ export class Page {
       if (!found || !found.nodeId) throw elementNotFound(selector);
       const described = await this.send("DOM.describeNode", { nodeId: found.nodeId }, { timeoutMs: 5_000 });
       return described.node.backendNodeId;
-    } catch (error) {
+    } catch (error: any) {
       if (error.code === "E_ELEMENT_NOT_FOUND") throw error;
       throw elementNotFound(selector);
     }
@@ -356,7 +356,7 @@ export class Page {
    * @param {{ button?: string, clicks?: number, timeoutMs?: number }} [options]
    */
   async click(target, options = {} as any) {
-    let point = null;
+    let point: any = null;
     if (target && target.at) {
       point = { x: Number(target.at.x), y: Number(target.at.y) };
     } else if (target && target.ref) {
@@ -461,7 +461,7 @@ export class Page {
   /** Poll a selector until it exists (and is visible). */
   async waitForSelector(selector, { timeoutMs = DEFAULT_TIMEOUT_MS, visible = false } = {} as any) {
     const deadline = Date.now() + timeoutMs;
-    let lastError = null;
+    let lastError: any = null;
     while (Date.now() < deadline) {
       try {
         const found = await this.evaluate((args) => {
@@ -472,7 +472,7 @@ export class Page {
           return { tag: element.tagName.toLowerCase(), text: (element.innerText || "").slice(0, 200), width: rect.width, height: rect.height };
         }, { args: [{ selector, visible }] });
         if (found) return found;
-      } catch (error) {
+      } catch (error: any) {
         lastError = error;
         if (error.code === "E_DIALOG_OPEN") throw error;
       }
@@ -488,7 +488,7 @@ export class Page {
       try {
         const value = await this.evaluate(expression);
         if (value) return value;
-      } catch (error) {
+      } catch (error: any) {
         if (error.code === "E_DIALOG_OPEN") throw error;
       }
       await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
@@ -548,7 +548,7 @@ export class Page {
   /** Frame tree of the page. */
   async frames() {
     const tree = await this.send("Page.getFrameTree", {}, { timeoutMs: 5_000 });
-    const frames = [];
+    const frames: any[] = [];
     const collect = (node, parentId) => {
       if (!node || !node.frame) return;
       frames.push({ frameId: node.frame.id, url: node.frame.url, name: node.frame.name, parentFrameId: parentId });
@@ -561,7 +561,7 @@ export class Page {
   /** Evaluate inside a frame selected by id or URL substring. */
   async evaluateInFrame(frameMatch, expressionOrFn, options = {} as any) {
     const contexts = this.executionContexts;
-    let context = null;
+    let context: any = null;
     const frames = await this.frames();
     const wanted = frames.find((frame) => (frameMatch.frameId && frame.frameId === frameMatch.frameId) || (frameMatch.urlContains && frame.url.includes(frameMatch.urlContains)));
     if (wanted) {
@@ -623,7 +623,7 @@ export class Page {
    * @param {{ limit?: number, maxBytes?: number }} [options]
    */
   async networkBodies(events, { limit = 10, maxBytes = 200_000 } = {} as any) {
-    const out = [];
+    const out: any[] = [];
     for (const event of (events || []).slice(-limit)) {
       const entry = { ...event };
       if (entry.status !== undefined) {
@@ -634,7 +634,7 @@ export class Page {
             entry.bodyTruncated = text.length > maxBytes;
             entry.body = entry.bodyTruncated ? text.slice(0, maxBytes) : text;
           }
-        } catch (error) {
+        } catch (error: any) {
           entry.bodyError = String((error && error.message) || error);
         }
       }
@@ -660,7 +660,7 @@ export class Page {
           try {
             const body = await this.send("Network.getResponseBody", { requestId: entry.requestId }, { timeoutMs: 5_000 });
             result.body = body.base64Encoded ? Buffer.from(body.body, "base64").toString("utf8") : body.body;
-          } catch (error) {
+          } catch (error: any) {
             result.bodyError = String(error.message || error);
           }
         }

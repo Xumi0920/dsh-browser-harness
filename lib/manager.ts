@@ -54,7 +54,7 @@ export class BrowserManager {
         });
         this.connection = browser;
         return browser;
-      } catch (error) {
+      } catch (error: any) {
         throw new HarnessError(
           error.code || "E_NO_BROWSER",
           "cannot reach a dedicated automation browser: " + error.message +
@@ -149,7 +149,7 @@ export class BrowserManager {
       tabs = await browser.listTabs({ lane });
       current = await browser.current(lane);
       tabGroups = browser.tabGroups ? browser.tabGroups.info() : null;
-    } catch (error) {
+    } catch (error: any) {
       return { connected: false, error: error.message, endpoints, tabs: [], current: null, version: null };
     }
     return { connected: true, version, tabs, current, tabGroups, endpoints };
