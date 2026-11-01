@@ -6,9 +6,9 @@
 [![codeql](https://github.com/Xumi0920/dsh-browser-harness/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/Xumi0920/dsh-browser-harness/actions/workflows/codeql.yml)
 [![version](https://img.shields.io/github/package-json/v/Xumi0920/dsh-browser-harness?label=version)](https://github.com/Xumi0920/dsh-browser-harness/releases)
 [![license](https://img.shields.io/github/license/Xumi0920/dsh-browser-harness?label=license)](LICENSE)
-[![node](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](package.json)
-[![typescript](https://img.shields.io/badge/source-TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![chromium](https://img.shields.io/badge/browser-any%20Chromium-4285F4?logo=googlechrome&logoColor=white)](docs/configuration.md)
+[![Node](https://img.shields.io/badge/Node-%3E%3D22-339933?logo=nodedotjs&logoColor=white)](package.json)
+[![TypeScript](https://img.shields.io/badge/TypeScript-source-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Chromium](https://img.shields.io/badge/Chromium-any-4285F4?logo=googlechrome&logoColor=white)](docs/configuration.md)
 
 **DeepSeek Harness（DSH）原生浏览器工具。** 零依赖 CDP 内核 + 7 个 `browser_*` 工具，直连**专用、已登录**的 Chromium 内核浏览器，提供 e1/e2 引用快照，并按任务给自建标签页分组。
 
@@ -119,4 +119,4 @@ CI：单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场�
 
 ## 许可
 
-MIT © 2026 Xumi0920 · 当前版本 **v1.0.0** · 全量 TypeScript（源码/测试/脚本/扩展）· 更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)
+MIT © 2026 Xumi0920 · 当前版本 **v1.0.1** · 全量 TypeScript（源码/测试/脚本/扩展）· 更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)
