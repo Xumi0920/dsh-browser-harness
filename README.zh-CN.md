@@ -14,19 +14,19 @@ browser_tabs        list / use / new / close
 
 ## 为什么不用 Playwright
 
-- **零依赖**：只用 Node 22+ 内置能力（`fetch`、`WebSocket`、`node:test`），不下载浏览器、不需要构建。
+- **零依赖**：只用 Node 22+ 内置能力（`fetch`、`WebSocket`、`node:test`），不下载浏览器、不需要构建；插件入口仅使用宿主提供的 `@deepseek-ai/dsh-tools` peer。
 - **真实登录态**：连用户自己起好的专用 Chrome 实例（例如 9331），登录一次长期有效。
 - **文本优先**：无障碍树 + ref 比“截图喂视觉模型”更准更省；截图只是可选补充。
-- **场景测试**：30 个单测 + 14 个端到端场景（登录、异步渲染、多标签、iframe、Shadow DOM、下载、上传、对话框、表单校验、选择器超时、标签页被关恢复、截图、网络捕获、Cookie），全部跑在真实 headless Chrome + 本地 fixture 站上。
+- **场景测试**：37 个单测 + 14 个端到端场景（共 51 条；登录、异步渲染、多标签、iframe、Shadow DOM、下载、上传、对话框、表单校验、选择器超时、标签页被关恢复、截图、网络捕获、Cookie），全部跑在真实 headless Chrome + 本地 fixture 站上。
 
 ## 安装（DSH 0.2.1-rc.5）
 
 ```powershell
 # 本地目录（创造模式 / 插件管理器）：
-#   plugin_manager { action: "install_bundle", target: "G:\\path\\to\\dsh-browser-harness" }
+#   plugin_manager { action: "install_bundle", target: "C:\\path\\to\\dsh-browser-harness" }
 # 或 CLI（装完重启 DSH）：
 & "$env:LOCALAPPDATA\\Programs\\DeepSeek Harness\\resources\\runtime\\cli\\bin\\dsh.cmd" `
-  plugin --profile desktop add "G:\\path\\to\\dsh-browser-harness"
+  plugin --profile desktop add "C:\\path\\to\\dsh-browser-harness"
 ```
 
 插件是 DSH bundle（`dsh.bundle.patch` → `cordis.patch.yml`），安装后在 profile 级注册 `browser_*` 工具，并内嵌 `browser-harness` 技能。
@@ -59,6 +59,8 @@ import { connect } from "./src/index.mjs";
 const bh = await connect({ browser: "chrome" });
 const page = await bh.newTab("https://example.com");
 console.log(await page.info(), (await page.snapshot()).nodes.length);
+await page.click({ selector: "a" });
+await page.screenshot({ path: "shot.png" });
 bh.close();
 ```
 
@@ -70,9 +72,12 @@ node bin/bh.mjs snapshot
 
 ## 测试
 
+需从源码 checkout 运行（npm 打包安装只含运行时）：
+
 ```sh
 npm test                    # 单测（无浏览器）
 npm run test:integration    # 14 个场景（临时 headless Chrome）
+npm run test:all            # 单测 + 场景（共 51 条）
 node scripts/verify.mjs     # 对 live 专用 Chrome 冒烟
 ```
 
@@ -80,13 +85,14 @@ node scripts/verify.mjs     # 对 live 专用 Chrome 冒烟
 
 ## 安全边界
 
-- 只关闭本 harness 创建的标签页，绝不改用户标签页。
-- Cookie 默认脱敏，不打印任何密钥。
+- 只关闭本 harness 创建的标签页；`browser_tabs` 绝不关闭用户标签页。
+- Cookie API 默认脱敏；harness 不打印任何密钥。
+- `browser_extract` 的 `network` / `js` 模式只在你显式请求时返回页面本身暴露的内容（响应头可能含 `Set-Cookie`）；`browser_tabs {action:"use"}` 可把会话附着到既有标签页，之后 `browser_act` 会在其上操作。请显式使用，且不要把 `cdpUrl` 指向日常 Chrome。
 - 全部后台操作，不抢前台。
 - 遇到登录墙停手问人。
 
 ## 状态
 
-v0.1.0：首个原生插件版本。下载/上传/Cookie 能力已在内核库中，但一期不作为工具暴露。
+v0.1.0：首个原生插件版本，通过 `engines.dsh` 精确绑定 DSH `0.2.1-rc.5`。下载/上传/Cookie 能力已在内核库中，但一期不作为工具暴露。
 
 MIT © 2026 Xumi0920

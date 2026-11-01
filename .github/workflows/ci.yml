@@ -26,11 +26,26 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install Chrome
+      - name: Locate Chrome
         run: |
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable || true
+          if command -v google-chrome > /dev/null; then
+            echo "CHROME_PATH=$(command -v google-chrome)" >> "$GITHUB_ENV"
+          elif command -v google-chrome-stable > /dev/null; then
+            echo "CHROME_PATH=$(command -v google-chrome-stable)" >> "$GITHUB_ENV"
+          elif [ -x /usr/bin/chromium ]; then
+            echo "CHROME_PATH=/usr/bin/chromium" >> "$GITHUB_ENV"
+          else
+            echo "::error::No Chrome/Chromium found; integration scenarios would silently skip."
+            exit 1
+          fi
       - name: Run scenario suite
-        env:
-          CHROME_PATH: /usr/bin/google-chrome-stable
-        run: node --test "tests/integration/**/*.test.mjs"
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test --test-reporter=tap "tests/integration/**/*.test.mjs" | tee tap.txt
+      - name: Fail on skipped scenarios
+        run: |
+          if grep -Eq '(^# skipped [1-9]|# SKIP)' tap.txt; then
+            echo "::error::Integration scenarios were skipped (no Chrome?); refusing a false-green run."
+            exit 1
+          fi
