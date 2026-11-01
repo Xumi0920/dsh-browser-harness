@@ -1,0 +1,13 @@
+# Activates the browser-harness plugin inside the DSH profile.
+# Config keys are optional; all of them have safe defaults.
+- insert:
+    - id: browser-harness
+      name: dsh-browser-harness
+      config:
+        # Default: attach to the dedicated automation Chrome discovered through
+        # ~/.dsh/browser-cdp/registry.json (chrome=9331, chrome-beta=9333).
+        # Explicit alternatives:
+        #   browser: chrome-beta
+        #   cdpUrl: http://127.0.0.1:9333
+        #   ws: ws://127.0.0.1:9333/devtools/browser/<id>
+        maxSnapshotNodes: 250

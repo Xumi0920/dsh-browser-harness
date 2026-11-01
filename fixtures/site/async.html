@@ -1,0 +1,20 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Async list - Fixture</title></head>
+<body>
+  <h1>Async list</h1>
+  <ul id="list"><li class="skeleton">loading...</li></ul>
+  <script>
+    setTimeout(function () {
+      fetch('/api/items').then(function (response) { return response.json(); }).then(function (data) {
+        var list = document.getElementById('list');
+        list.innerHTML = '';
+        data.items.forEach(function (item) {
+          var row = document.createElement('li');
+          row.setAttribute('data-row', String(item.id));
+          row.textContent = item.name;
+          list.appendChild(row);
+        });
+      });
+    }, 300);
+  </script>
+</body></html>

@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Shadow - Fixture</title></head>
+<body>
+  <h1>Shadow DOM</h1>
+  <div id="host"></div>
+  <p id="out">waiting</p>
+  <script>
+    var host = document.getElementById('host');
+    var first = host.attachShadow({ mode: 'open' });
+    var wrapper = document.createElement('div');
+    first.appendChild(wrapper);
+    var second = wrapper.attachShadow({ mode: 'open' });
+    var button = document.createElement('button');
+    button.id = 'shadow-button';
+    button.textContent = 'Deep button';
+    button.addEventListener('click', function () {
+      document.getElementById('out').textContent = 'shadow clicked';
+    });
+    second.appendChild(button);
+  </script>
+</body></html>
