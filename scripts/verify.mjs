@@ -4,8 +4,8 @@
  * Verifies endpoint discovery, CDP attach, a throwaway tab, snapshot and close.
  */
 
-import { Browser } from "../src/browser.mjs";
-import { listEndpoints } from "../src/cdp/endpoint.mjs";
+import { Browser } from "../dist/src/browser.js";
+import { listEndpoints } from "../dist/src/cdp/endpoint.js";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

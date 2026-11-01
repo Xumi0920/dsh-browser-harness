@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MAX_SNAPSHOT_TEXT_LINES, boxCenter, buildSnapshot, findByRole, findRef, formatSnapshot, snapshotToText } from "../../src/ax.mjs";
+import { MAX_SNAPSHOT_TEXT_LINES, boxCenter, buildSnapshot, findByRole, findRef, formatSnapshot, snapshotToText } from "../../dist/src/ax.js";
 
 const nodes = [
   { role: { value: "RootWebArea" }, ignored: false, backendDOMNodeId: 1, name: { value: "Demo" } },

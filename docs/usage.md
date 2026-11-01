@@ -24,20 +24,20 @@ await page.screenshot({ path: "shot.png" });
 await bh.close();
 ```
 
-源码 checkout 内也可直接 `import { connect } from "./src/index.mjs"`（零依赖，Node 22+）。
+源码 checkout 内先 `npm install && npm run build`，再 `import { connect } from "./dist/src/index.js"`（运行时零第三方依赖，Node 22+）。
 
 ## CLI
 
 ```sh
-node bin/bh.mjs doctor              # 列出已知端点与状态
-node bin/bh.mjs tabs                # 列出标签页
-node bin/bh.mjs open <url>          # 打开 URL（记为自建标签页）
-node bin/bh.mjs info | snapshot | text [sel] | js <expr> | shot [path]
-node bin/bh.mjs close [targetId] [--force]
-node bin/bh.mjs groups [--retry]    # 标签组状态/列表；--retry 重试安装扩展
+node dist/bin/bh.js doctor              # 列出已知端点与状态
+node dist/bin/bh.js tabs                # 列出标签页
+node dist/bin/bh.js open <url>          # 打开 URL（记为自建标签页）
+node dist/bin/bh.js info | snapshot | text [sel] | js <expr> | shot [path]
+node dist/bin/bh.js close [targetId] [--force]
+node dist/bin/bh.js groups [--retry]    # 标签组状态/列表；--retry 重试安装扩展
 ```
 
-`node scripts/verify.mjs [--browser chrome|edge|brave|...]` 可对 live 专用浏览器做冒烟（需源码 checkout）。
+`npm run verify -- --browser chrome`（或 `npm run build && node scripts/verify.mjs --browser chrome`）可对 live 专用浏览器做冒烟（需源码 checkout）。
 
 ## 提示
 

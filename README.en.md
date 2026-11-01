@@ -16,7 +16,7 @@ browser_tabs        list / use / new / close
 
 ## Highlights
 
-- **Zero dependencies.** Node 22+ built-ins only (`fetch`, `WebSocket`, `node:test`); no browser download, no build step. The DSH plugin entry only uses the host-provided `@deepseek-ai/dsh-tools` peer.
+- **Zero runtime dependencies.** The built output uses only Node 22+ built-ins (`fetch`, `WebSocket`, `node:test`) and no browser download. The **source is TypeScript**, compiled to `dist/` with `tsc`; dev dependencies are just `typescript` + `@types/node`, and the DSH plugin entry only uses the host-provided `@deepseek-ai/dsh-tools` peer.
 - **Your logged-in browser.** Point it at a dedicated Chromium instance (Chrome / Chromium / Edge / Brave / Vivaldi / Opera / Arc); sign in once and it persists.
 - **Text-first.** Accessibility-tree snapshots and refs beat screenshot-VLM loops for actions; screenshots stay optional.
 - **Per-task tab groups.** Tabs the harness creates are grouped by DSH session; work tabs are never touched, and headless browsers skip grouping.
@@ -34,7 +34,7 @@ Open the **Plugins page** in the DSH Web UI (the "Plugins" entry in the left nav
 
 > Install `@xumi0920/dsh-browser-harness` into the current DSH profile.
 
-> The GitHub Packages source **requires the two npm config commands from option 3 first** (a read:packages token). To skip the token, use the absolute path of a local checkout instead: `Install <path-to-your-clone> into the current profile`.
+> The GitHub Packages source **requires the two npm config commands from option 3 first** (a read:packages token). To skip the token, use the absolute path of a local checkout instead: `Install <path-to-your-clone> into the current profile` (run `npm install && npm run build` in the checkout first — the source is TypeScript).
 
 **Option 3: manual install (GitHub Packages / CLI)**
 
@@ -82,9 +82,10 @@ Standalone library / CLI examples: [docs/usage.md](docs/usage.md). Starting the 
 ## Test
 
 ```sh
-npm test                    # unit (no browser)
-npm run test:integration    # 27 integration scenarios
-npm run test:all            # unit + integration (119 tests)
+npm install                 # dev deps (TypeScript build); runtime stays zero-dependency
+npm test                    # build + 92 unit tests (no browser)
+npm run test:integration    # build + 27 integration scenarios
+npm run test:all            # build + unit + integration (119 tests)
 ```
 
 CI: unit on ubuntu/windows; integration on ubuntu (xvfb, including the headful tab-group scenario).
@@ -98,6 +99,6 @@ CI: unit on ubuntu/windows; integration on ubuntu (xvfb, including the headful t
 
 ## Status
 
-v0.3.5: documentation update — added the official DSH Web **Plugins page** install path (Add plugin / Install a third-party plugin / Discover market), corrected the hot-plug story (`application: applied` is already live; only `restart-required` needs a restart), and added [docs/extending.md](docs/extending.md) covering extension languages (native JS/TS plus MCP for Python and others); behaviour is unchanged from v0.3.4. See the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog.
+v0.4.0: **source migrated to TypeScript** — `src/`, `lib/` and `bin/` are now `.ts` files compiled to `dist/` (the published package ships only the build), dev dependencies are just `typescript` + `@types/node`, and the runtime stays zero-dependency; `package.json` (main/exports/bin/files), CI (`npm ci` + build), the publish pack smoke test and docs were updated accordingly. Behaviour is unchanged from v0.3.5. See the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog.
 
 MIT (c) 2026 Xumi0920

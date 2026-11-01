@@ -5,12 +5,13 @@
  * matching, event routing, timeouts, and close handling without a browser.
  */
 
-import { cdpError, cdpTimeout, codes, connectTimeout, HarnessError, notConnected } from "../errors.mjs";
+import { cdpError, cdpTimeout, codes, connectTimeout, HarnessError, notConnected } from "../errors.js";
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 
 /** Tiny emitter with unsubscribe handles. */
 class Emitter {
+  listeners: Map<string, Set<Function>>;
   constructor() {
     /** @type {Map<string, Set<Function>>} */
     this.listeners = new Map();
@@ -38,11 +39,20 @@ class Emitter {
 }
 
 export class CDPTransport extends Emitter {
+  wsUrl: string;
+  WebSocketImpl: any;
+  defaultTimeoutMs: number;
+  logger: any;
+  ws: any;
+  nextId: number;
+  pending: Map<number, any>;
+  closed: boolean;
+  ready: boolean;
   /**
    * @param {string} wsUrl
    * @param {{ WebSocketImpl?: any, defaultTimeoutMs?: number, logger?: { debug?: Function, warn?: Function } }} [options]
    */
-  constructor(wsUrl, options = {}) {
+  constructor(wsUrl, options = {} as any) {
     super();
     if (typeof wsUrl !== "string" || wsUrl.length === 0) throw new HarnessError(codes.E_BAD_ARG, "CDPTransport needs a ws:// URL");
     this.wsUrl = wsUrl;
@@ -149,15 +159,14 @@ export class CDPTransport extends Emitter {
    * @param {Record<string, unknown>} [params]
    * @param {{ sessionId?: string, timeoutMs?: number }} [options]
    */
-  send(method, params = {}, options = {}) {
+  send(method, params = {} as any, options = {} as any) {
     if (typeof method !== "string" || method.length === 0) {
       return Promise.reject(new HarnessError(codes.E_BAD_ARG, "CDP method must be a non-empty string"));
     }
     if (this.closed || !this.ws) return Promise.reject(notConnected(`cannot send ${method}: CDP connection is not open`));
     const id = this.nextId++;
     const timeoutMs = options.timeoutMs ?? this.defaultTimeoutMs;
-    /** @type {Record<string, unknown>} */
-    const payload = { id, method, params };
+    const payload: any = { id, method, params };
     if (options.sessionId) payload.sessionId = options.sessionId;
     let json;
     try {

@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Browser, assertNavigableUrl } from "../../src/browser.mjs";
-import { readState, rememberOwnedTab, setCurrent } from "../../src/state.mjs";
+import { Browser, assertNavigableUrl } from "../../dist/src/browser.js";
+import { readState, rememberOwnedTab, setCurrent } from "../../dist/src/state.js";
 import { FakeTransport } from "./helpers/fake-transport.mjs";
 
 function pageTarget(targetId, url = "https://example.com/" + targetId) {

@@ -11,16 +11,22 @@
 ```powershell
 git clone https://github.com/Xumi0920/dsh-browser-harness.git C:\path\to\dsh-browser-harness
 cd C:\path\to\dsh-browser-harness
+npm install                                   # 仅开发依赖：typescript + @types/node
+npm run build                                 # tsc 编译到 dist/（发布产物）
 
-node --test "tests/unit/**/*.test.mjs"        # 92 单测（fake CDP 替身，无需浏览器）
-node --test "tests/integration/**/*.test.mjs" # 27 场景（真实 headless/headful Chromium）
-npm run test:all                              # 共 119 条
-node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟
+npm test                                      # 构建 + 92 单测（fake CDP 替身，无需浏览器）
+npm run test:integration                      # 构建 + 27 场景（真实 headless/headful Chromium）
+npm run test:all                              # 构建 + 共 119 条
+node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟（需先 build）
 ```
+
+> 源码是 TypeScript（`src/`、`lib/`、`bin/`），运行时零第三方依赖；`dist/` 是构建产物，不提交到 git。
 
 ## 2. 安装插件
 
 插件发布在 **GitHub Packages**：`@xumi0920/dsh-browser-harness`；npmjs.org 上的 `dsh-browser-harness` 是别的项目。GitHub Packages 来源需要先配置 registry + read:packages token（见 2c）；本地目录安装不需要 token。任选一种方式。热插拔/重启规则见 [extending.md](extending.md#热插拔与重启)。
+
+> **本地目录安装**（2b/2d/2e）前请先在仓库执行 `npm install && npm run build`：源码是 TypeScript，DSH 加载的是 `dist/` 构建产物。
 
 ### 2a. DSH Web 插件页（图形界面，推荐）
 
@@ -116,7 +122,7 @@ $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\ds
 ## 5. 升级
 
 - GitHub Packages：重新执行 `dsh plugin --profile desktop add "@xumi0920/dsh-browser-harness"` 后重启；
-- 本地目录：`git pull` 后重启 DSH（link 安装即时生效）。
+- 本地目录：`git pull` 后执行 `npm install && npm run build` 再重启 DSH（link 安装读取 `dist/` 构建产物）。
 
 ## 6. 常见问题
 

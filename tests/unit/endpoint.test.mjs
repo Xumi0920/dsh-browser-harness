@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_PORTS, listEndpoints, probeVersion, readRegistry, registryPath, resolveEndpoint } from "../../src/cdp/endpoint.mjs";
+import { DEFAULT_PORTS, listEndpoints, probeVersion, readRegistry, registryPath, resolveEndpoint } from "../../dist/src/cdp/endpoint.js";
 
 function jsonResponse(body, status = 200) {
   return {

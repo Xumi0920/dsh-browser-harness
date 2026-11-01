@@ -55,13 +55,23 @@ export function tabGroupColorFor(lane) {
 }
 
 export class TabGroupBridge {
+  browser: any;
+  extensionPath: string;
+  enabled: boolean;
+  extensionId: string | null;
+  sessionId: string | null;
+  available: boolean;
+  error: string | null;
+  failedAt: number;
+  retryDelayMs: number;
+  queue: Promise<void>;
   /**
-   * @param {import("./browser.mjs").Browser} browser
+   * @param {import("./browser.js").Browser} browser
    * @param {{ enabled?: boolean, extensionPath?: string, extensionId?: string }} [options]
    */
-  constructor(browser, options = {}) {
+  constructor(browser, options = {} as any) {
     this.browser = browser;
-    this.extensionPath = options.extensionPath || fileURLToPath(new URL("../extension", import.meta.url));
+    this.extensionPath = options.extensionPath || fileURLToPath(new URL("../../extension", import.meta.url));
     this.enabled = options.enabled !== false;
     this.extensionId = options.extensionId || null;
     /** @type {string | null} */
@@ -231,10 +241,10 @@ export class TabGroupBridge {
    * The page is briefly retitled with a nonce so the extension can find exactly
    * this tab; the original title is restored afterwards.
    *
-   * @param {import("./page.mjs").Page} page
+   * @param {import("./page.js").Page} page
    * @param {{ title: string, color?: string, groupId?: number | null }} options
    */
-  async groupTab(page, { title, color = "blue", groupId = null } = {}) {
+  async groupTab(page, { title, color = "blue", groupId = null } = {} as any) {
     if (!this.enabled) return { ok: false, reason: "disabled" };
     return this.run(async () => {
       const ready = await this.ensure();

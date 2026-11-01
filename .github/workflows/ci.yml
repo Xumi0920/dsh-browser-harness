@@ -18,7 +18,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --test "tests/unit/**/*.test.mjs"
+      - run: npm ci
+      - run: npm test
 
   integration:
     runs-on: ubuntu-latest
@@ -28,6 +29,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - run: npm ci
+      - run: npm run build
       - name: Locate Chrome
         run: |
           if command -v google-chrome > /dev/null; then

@@ -4,10 +4,10 @@
  *   bh doctor | tabs | open <url> | info | snapshot | text [sel] | js <expr> | shot [path] | close | groups [--retry]
  */
 
-import { Browser } from "../src/browser.mjs";
-import { listEndpoints } from "../src/cdp/endpoint.mjs";
-import { snapshotToText } from "../src/ax.mjs";
-import { defaultStateDir } from "../src/state.mjs";
+import { Browser } from "../src/browser.js";
+import { listEndpoints } from "../src/cdp/endpoint.js";
+import { snapshotToText } from "../src/ax.js";
+import { defaultStateDir } from "../src/state.js";
 
 const [command, ...args] = process.argv.slice(2);
 

@@ -9,7 +9,7 @@ import {
   tabGroupColorFor,
   tabGroupSessionTag,
   tabGroupTitleFor,
-} from "../../src/tabgroups.mjs";
+} from "../../dist/src/tabgroups.js";
 import { FakeTransport } from "./helpers/fake-transport.mjs";
 
 const EXTENSION_PATH = join(tmpdir(), "bh-package", "extension");

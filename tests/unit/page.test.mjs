@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Page } from "../../src/page.mjs";
+import { Page } from "../../dist/src/page.js";
 import { FakeTransport, quad } from "./helpers/fake-transport.mjs";
 
 const AX_NODES = [

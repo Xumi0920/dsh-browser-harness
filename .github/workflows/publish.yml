@@ -20,6 +20,7 @@ jobs:
           node-version: 22
           registry-url: https://npm.pkg.github.com
           scope: "@xumi0920"
+      - run: npm ci
       - name: Verify package metadata
         run: |
           node -e "const pkg=require('./package.json'); if(!pkg.name.startsWith('@xumi0920/')) { console.error('package name must be scoped to @xumi0920'); process.exit(1); } console.log(pkg.name + '@' + pkg.version);"
@@ -36,17 +37,17 @@ jobs:
           else
             echo "::warning::workflow_dispatch publish of ${version} from ${GITHUB_REF_NAME}; make sure a matching release/tag exists"
           fi
-      - name: Unit tests
-        run: node --test "tests/unit/**/*.test.mjs"
+      - name: Build and unit tests
+        run: npm test
       - name: Pack smoke test
         run: |
           mkdir -p /tmp/pack
           npm pack --pack-destination /tmp/pack
           tar -xzf /tmp/pack/*.tgz -C /tmp
-          for file in cordis.patch.yml icon.svg extension/sw.js extension/manifest.json skills/browser-harness/SKILL.md docs/install.md; do
+          for file in cordis.patch.yml icon.svg extension/sw.js extension/manifest.json skills/browser-harness/SKILL.md docs/install.md dist/lib/index.js dist/bin/bh.js; do
             test -f "/tmp/package/${file}" || { echo "::error::packed artifact is missing ${file}"; exit 1; }
           done
-          node --input-type=module -e "import { pathToFileURL } from 'node:url'; const m = await import(pathToFileURL('/tmp/package/lib/skill.js').href); if (m.SKILL_NAME !== 'browser-harness' || typeof m.SKILL_CONTENT !== 'string' || !m.SKILL_CONTENT.includes('browser_status')) { console.error('packed skill payload is invalid'); process.exit(1); } console.log('packed artifact ok:', m.SKILL_NAME);"
+          node --input-type=module -e "import { pathToFileURL } from 'node:url'; const m = await import(pathToFileURL('/tmp/package/dist/lib/skill.js').href); if (m.SKILL_NAME !== 'browser-harness' || typeof m.SKILL_CONTENT !== 'string' || !m.SKILL_CONTENT.includes('browser_status')) { console.error('packed skill payload is invalid'); process.exit(1); } console.log('packed artifact ok:', m.SKILL_NAME);"
       - name: Publish to GitHub Packages
         run: npm publish
         env:

@@ -10,14 +10,14 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const SKILL_FILE = fileURLToPath(new URL("../skills/browser-harness/SKILL.md", import.meta.url));
+const SKILL_FILE = fileURLToPath(new URL("../../skills/browser-harness/SKILL.md", import.meta.url));
 
 /** Minimal frontmatter reader: "key: value" pairs plus a quoted-scalar unwrap. */
 export function parseSkillFile(raw) {
   const text = String(raw ?? "");
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(text);
   if (!match) return { meta: {}, body: text.trim() };
-  const meta = {};
+  const meta = {} as any;
   for (const line of match[1].split(/\r?\n/)) {
     const entry = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line.trim());
     if (!entry) continue;

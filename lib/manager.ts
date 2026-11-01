@@ -8,12 +8,15 @@
  * network and DOM state survives across calls.
  */
 
-import { Browser } from "../src/browser.mjs";
-import { noTab, HarnessError } from "../src/errors.mjs";
-import { listEndpoints } from "../src/cdp/endpoint.mjs";
+import { Browser } from "../src/browser.js";
+import { noTab, HarnessError } from "../src/errors.js";
+import { listEndpoints } from "../src/cdp/endpoint.js";
 
 export class BrowserManager {
-  constructor(config = {}) {
+  config: any;
+  connection: any;
+  connecting: any;
+  constructor(config = {} as any) {
     this.config = {
       browser: undefined,
       cdpUrl: undefined,
@@ -96,7 +99,7 @@ export class BrowserManager {
     return this.#ensureNetworkCapture(await browser.attach(current.targetId));
   }
 
-  async navigate(sessionId, url, options = {}) {
+  async navigate(sessionId, url, options = {} as any) {
     const browser = await this.ensure();
     const page = await browser.open(String(url), {
       newTab: options.newTab,

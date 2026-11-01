@@ -4,12 +4,12 @@
  */
 
 import { join } from "node:path";
-import { CDPTransport } from "./cdp/transport.mjs";
-import { resolveEndpoint } from "./cdp/endpoint.mjs";
-import { Page } from "./page.mjs";
-import * as stateStore from "./state.mjs";
-import { TabGroupBridge, tabGroupColorFor, tabGroupTitleFor } from "./tabgroups.mjs";
-import { badArgument, elementNotFound, noTab, policyDenied, targetGone } from "./errors.mjs";
+import { CDPTransport } from "./cdp/transport.js";
+import { resolveEndpoint } from "./cdp/endpoint.js";
+import { Page } from "./page.js";
+import * as stateStore from "./state.js";
+import { TabGroupBridge, tabGroupColorFor, tabGroupTitleFor } from "./tabgroups.js";
+import { badArgument, elementNotFound, noTab, policyDenied, targetGone } from "./errors.js";
 
 const INTERNAL_URL = /^(chrome|devtools|edge|about:blank|chrome-extension):/;
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -40,6 +40,13 @@ function isRealPage(target) {
 
 /** One connection to one running Chromium-based browser instance. */
 export class Browser {
+  transport: any;
+  endpoint: any;
+  lane: string;
+  config: any;
+  version: any;
+  pages: Map<string, any>;
+  tabGroups: any;
   /**
    * @param {{
    *   transport: CDPTransport,
@@ -74,7 +81,7 @@ export class Browser {
    *   fetchImpl?: typeof fetch, WebSocketImpl?: any, timeoutMs?: number,
    * }} [options]
    */
-  static async connect(options = {}) {
+  static async connect(options = {} as any) {
     const endpoint = await resolveEndpoint(options);
     const transport = new CDPTransport(endpoint.wsUrl, {
       WebSocketImpl: options.WebSocketImpl,
@@ -103,7 +110,7 @@ export class Browser {
   }
 
   /** All real page targets, with `owned` reflecting harness-created tabs. */
-  async listTabs({ lane = this.lane, includeChrome = false } = {}) {
+  async listTabs({ lane = this.lane, includeChrome = false } = {} as any) {
     const result = await this.transport.send("Target.getTargets", {}, { timeoutMs: 5_000 });
     const targets = (result.targetInfos || []).filter((target) => target.type === "page");
     await this.#prunePages(new Set(targets.map((target) => target.targetId)));
@@ -166,7 +173,7 @@ export class Browser {
   }
 
   /** Reuse the remembered tab when it matches, otherwise open a new one. */
-  async open(url, { newTab = false, waitUntil = "load", timeoutMs = 30_000, lane = this.lane } = {}) {
+  async open(url, { newTab = false, waitUntil = "load", timeoutMs = 30_000, lane = this.lane } = {} as any) {
     if (typeof url !== "string" || url.length === 0) throw badArgument("open(url) needs a URL");
     assertNavigableUrl(url);
     if (!newTab) {
@@ -182,7 +189,7 @@ export class Browser {
   }
 
   /** Create a background tab (never foregrounded) and optionally navigate it. */
-  async newTab(url = "about:blank", { waitUntil = "load", timeoutMs = 30_000, lane = this.lane } = {}) {
+  async newTab(url = "about:blank", { waitUntil = "load", timeoutMs = 30_000, lane = this.lane } = {} as any) {
     assertNavigableUrl(url);
     const created = await this.transport.send("Target.createTarget", { url: "about:blank", background: true }, { timeoutMs: 10_000 });
     const page = await this.attach(created.targetId);
@@ -215,7 +222,7 @@ export class Browser {
   }
 
   /** Switch to a tab by targetId or URL substring (attach only, no activation). */
-  async use(targetIdOrUrlSubstring, { lane = this.lane } = {}) {
+  async use(targetIdOrUrlSubstring, { lane = this.lane } = {} as any) {
     const targets = await this.transport.send("Target.getTargets", {}, { timeoutMs: 5_000 });
     const match = (targets.targetInfos || []).find((target) => target.targetId === targetIdOrUrlSubstring)
       || (targets.targetInfos || []).find((target) => String(target.url || "").includes(String(targetIdOrUrlSubstring)));
@@ -227,7 +234,7 @@ export class Browser {
   }
 
   /** Close a tab; only tabs created by this harness unless `force` is set. */
-  async closeTab(targetId, { force = false, lane = this.lane } = {}) {
+  async closeTab(targetId, { force = false, lane = this.lane } = {} as any) {
     const state = await this.#currentState(lane);
     const id = targetId || (state.current && state.current.targetId);
     if (!id) throw noTab("no tab to close; pass a targetId");
@@ -240,7 +247,7 @@ export class Browser {
   }
 
   /** Explicitly bring a tab to the foreground (user-requested only). */
-  async activate(targetId, { lane = this.lane } = {}) {
+  async activate(targetId, { lane = this.lane } = {} as any) {
     const id = targetId || ((await this.#currentState(lane)).current || {}).targetId;
     if (!id) throw noTab("activate needs a targetId");
     await this.transport.send("Target.activateTarget", { targetId: id }, { timeoutMs: 5_000 });
@@ -248,8 +255,8 @@ export class Browser {
   }
 
   /** Browser-scoped download behavior. */
-  async setDownloadBehavior({ behavior = "default", downloadPath, eventsEnabled = false } = {}) {
-    const params = { behavior };
+  async setDownloadBehavior({ behavior = "default", downloadPath, eventsEnabled = false } = {} as any) {
+    const params: any = { behavior };
     if (downloadPath) params.downloadPath = downloadPath;
     if (eventsEnabled) params.eventsEnabled = true;
     return this.transport.send("Browser.setDownloadBehavior", params, { timeoutMs: 5_000 });

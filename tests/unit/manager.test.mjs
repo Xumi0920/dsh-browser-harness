@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BrowserManager } from "../../lib/manager.js";
+import { BrowserManager } from "../../dist/lib/manager.js";
 
 function fakeConnection() {
   const calls = [];

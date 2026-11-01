@@ -14,8 +14,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startFixtureServer } from "../fixtures/server.mjs";
 import { launchChrome } from "./helpers/launch-chrome.mjs";
-import { Browser } from "../../src/browser.mjs";
-import { tabGroupTitleFor } from "../../src/tabgroups.mjs";
+import { Browser } from "../../dist/src/browser.js";
+import { tabGroupTitleFor } from "../../dist/src/tabgroups.js";
 
 let server;
 
@@ -97,7 +97,7 @@ test("S16 harness tabs are grouped per task and work tabs are left alone", async
     assert.equal(stillGrouped, 2, "work tab was not added to the harness group");
     try { await browser.transport.send("Target.closeTarget", { targetId: work.targetId }, { timeoutMs: 5_000 }); } catch { /* ignore */ }
 
-    const stored = await import("../../src/state.mjs").then((state) => state.readState(lane, stateDir));
+    const stored = await import("../../dist/src/state.js").then((state) => state.readState(lane, stateDir));
     assert.equal(stored.group.id, group.id, "group id is persisted for later tasks");
 
     await browser.closeTab(first.targetId, { force: true });
