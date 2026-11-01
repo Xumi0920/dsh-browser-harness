@@ -19,7 +19,7 @@ browser_tabs        list / use / new / close
 - **零依赖**：只用 Node 22+ 内置能力（`fetch`、`WebSocket`、`node:test`），不下载浏览器、不需要构建；插件入口仅使用宿主提供的 `@deepseek-ai/dsh-tools` peer。
 - **真实登录态**：连用户自己起好的专用 Chromium 浏览器实例（默认 `chrome`=9331，也支持 Edge/Brave/Chromium 等，见下方「适用浏览器」），登录一次长期有效。
 - **文本优先**：无障碍树 + ref 比“截图喂视觉模型”更准更省；截图只是可选补充。
-- **场景测试**：80 个单测 + 25 个端到端场景（14 条浏览器场景 + 11 条工具层/CLI/兼容性场景，共 105 条；登录、异步渲染、多标签、iframe、Shadow DOM、下载、上传、对话框、表单校验、选择器超时、标签页被关恢复、截图、网络捕获、Cookie），全部跑在真实 headless Chromium + 本地 fixture 站上。
+- **场景测试**：88 个单测 + 27 个端到端场景（14 条浏览器场景 + 11 条工具层/CLI/兼容性场景 + 2 条标签组场景，共 115 条；登录、异步渲染、多标签、iframe、Shadow DOM、下载、上传、对话框、表单校验、选择器超时、标签页被关恢复、截图、网络捕获、Cookie），全部跑在真实 headless Chromium + 本地 fixture 站上。
 
 ## 环境要求
 
@@ -49,7 +49,20 @@ browser_tabs        list / use / new / close
 
 ## 安装（DSH 0.2.1-rc.5）
 
-本插件**未发布到 npm**；npm 上的同名包属于其他项目，与本插件无关。请从本地 clone 目录安装，或直接从 GitHub 仓库安装。
+本插件发布在 **GitHub Packages**：`@xumi0920/dsh-browser-harness`。npmjs.org 上的 `dsh-browser-harness` 属于其他项目，与本插件无关。三种安装方式任选：
+
+**A. 从 GitHub Packages 安装**（需要带 `read:packages` 的 GitHub token）：
+
+```powershell
+npm config set @xumi0920:registry https://npm.pkg.github.com
+npm config set //npm.pkg.github.com/:_authToken "<YOUR_GITHUB_TOKEN>"
+# 创造模式 / 插件管理器里：plugin_manager { action: "install_bundle", target: "@xumi0920/dsh-browser-harness" }
+# 或 CLI（装完重启 DSH）：
+& "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" `
+  plugin --profile desktop add "@xumi0920/dsh-browser-harness"
+```
+
+**B. 从本地 clone 目录安装**（推荐给开发/自用）：
 
 示例路径 `C:\path\to\dsh-browser-harness` 只是占位符，必须换成你本机 clone 的绝对路径（早期文档曾误写成作者本机的绝对路径，已废弃）。
 
@@ -77,7 +90,7 @@ git clone https://github.com/Xumi0920/dsh-browser-harness.git C:\path\to\dsh-bro
 
 ```yaml
 - id: browser-harness
-  name: dsh-browser-harness
+  name: "@xumi0920/dsh-browser-harness"
   config:
     browser: chrome-beta      # 或 chrome
     # cdpUrl: http://127.0.0.1:9333
@@ -86,6 +99,9 @@ git clone https://github.com/Xumi0920/dsh-browser-harness.git C:\path\to\dsh-bro
     # stateDir: ~/.dsh/browser-harness
     # downloadDir: ~/.dsh/browser-harness/downloads
     # dialogPolicy: auto-dismiss
+    tabGroups: true                 # 按任务给自建标签页分组（默认开）
+    # tabGroupTitle: "DSH · my-task"  # 固定组名，默认按会话生成
+    # tabGroupColor: blue             # 默认按会话稳定分配
 ```
 
 > 注意：**不要**在 profile patch 里再写 `- insert:` 插一行，否则会重复注册；`insert` 是插件包自身 `cordis.patch.yml` 的注册方式。配置项：`browser` 选目标实例；`cdpUrl` / `ws` 直连端点（二选一）；`maxSnapshotNodes` 默认 250（`browser_snapshot` 上限 400）；`stateDir` / `downloadDir` 控制运行状态与下载目录；`dialogPolicy` 默认 `auto-dismiss`。
@@ -102,6 +118,19 @@ brave.exe  --remote-debugging-port=9335 "--user-data-dir=$env:USERPROFILE\.dsh\b
 ```
 
 用任意端口（如 9222）也可以：`browser: "auto"` 会自动回退探测，或直接配 `cdpUrl: "http://127.0.0.1:9222"`。`registry.json` 条目除 `port` 外还支持 `httpUrl`，例如 `"brave": { "label": "Brave", "httpUrl": "http://127.0.0.1:9222", "enabled": true }`。
+
+## 按任务标签页分组（Chrome tab groups）
+
+插件默认把**自己创建的标签页**收进一个按任务（DSH 会话）命名的 Chrome 标签组，标题形如 `DSH · a1b2c3`、颜色按会话稳定分配，避免和工作标签页混在一起。边界很明确：
+
+- **只操作自己新建的标签页**：不移动、不改名、不关闭用户已有标签页，也不会把工作标签页拉进组；
+- 最后一个标签页关闭后，空组由 Chrome 自动移除；
+- 组名/颜色只在创建时设置，之后你手动改名/换色不会被覆盖；
+- headless 浏览器不支持标签组，会自动跳过且不影响开标签页。
+
+实现方式：随包内置一个极小的 MV3 扩展（仅 `tabs`、`tabGroups` 权限，无 content script、无 host 权限），首次使用时通过 CDP `Extensions.loadUnpacked` 安装到**专用浏览器 profile**，由 harness 驱动它的 service worker 建组。扩展会出现在专用浏览器的 `chrome://extensions`（名称 “DSH Browser Harness Tab Groups”）；不想要时可用 `tabGroups: false` 关闭（不再加载），或在该页面手动移除。
+
+`browser_status` 会返回 `tabGroups: { enabled, available, extensionId, error }`，便于排查。
 
 ## 独立库 / CLI（不装 DSH 也能用）
 
@@ -126,12 +155,12 @@ CLI 子命令：`doctor`、`tabs`、`open <url>`、`info`、`snapshot`、`text [
 
 ## 测试
 
-需从源码 checkout 运行。打包（`npm pack`）产物只含运行时，不含 `tests/`、`scripts/`、`fixtures/`；本插件未发布到 npm，请从源码或本地目录安装。
+需从源码 checkout 运行。打包（`npm pack`）产物只含运行时，不含 `tests/`、`scripts/`、`fixtures/`。插件已发布到 GitHub Packages，也支持从源码或本地目录安装。
 
 ```sh
 npm test                    # 单测（无浏览器）
-npm run test:integration    # 25 个场景（临时 headless Chromium）
-npm run test:all            # 单测 + 场景（共 105 条）
+npm run test:integration    # 27 个场景（临时 headless / headful Chromium）
+npm run test:all            # 单测 + 场景（共 115 条）
 node scripts/verify.mjs     # 对 live 专用浏览器冒烟
 ```
 
@@ -147,6 +176,6 @@ node scripts/verify.mjs     # 对 live 专用浏览器冒烟
 
 ## 状态
 
-v0.2.0：适用浏览器扩展到**任意 Chromium 内核浏览器**（Chrome / Chromium / Edge / Brave / Vivaldi / Opera / Arc…），新增已知端口约定与 `browser` 选择器、9222/9223 自动回退探测、registry 条目 `httpUrl` 支持；同时包含此前版本的 network 捕获修复、ref 严格校验、Page/CDP session 复用与释放、`owned` 标记、快照截断标志与 `bh close`。通过 `engines.dsh` 精确绑定 DSH `0.2.1-rc.5`。下载/上传/Cookie 能力在内核库中但未作为工具暴露。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
+v0.3.0：新增**按任务标签页分组**——插件自建的标签页会自动收进以 DSH 会话命名的 Chrome 标签组，只动自建标签页、工作标签页不受影响（headless 下自动跳过）；随包 MV3 扩展仅需 `tabs` / `tabGroups` 权限。同时发布到 **GitHub Packages**（`@xumi0920/dsh-browser-harness`）。包含此前：任意 Chromium 内核浏览器、network 捕获、ref 严格校验、Page/CDP session 复用、`owned` 标记、快照截断标志与 `bh close`。通过 `engines.dsh` 精确绑定 DSH `0.2.1-rc.5`。下载/上传/Cookie 能力在内核库中但未作为工具暴露。更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)。
 
 MIT © 2026 Xumi0920

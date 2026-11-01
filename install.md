@@ -15,6 +15,7 @@
   brave.exe  --remote-debugging-port=9335 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\brave"
   ```
 - 平台：优先在 Windows 上验证；macOS / Linux 未实测。
+- 标签组：默认给插件自建的标签页按任务分组（需要带界面的浏览器；headless 下自动跳过）。首次使用会把随包 MV3 扩展装进专用浏览器 profile；可在配置里用 `tabGroups: false` 关闭。
 
 ## 1. 本地自测（不需要 DSH）
 
@@ -25,14 +26,27 @@ git clone https://github.com/Xumi0920/dsh-browser-harness.git C:\path\to\dsh-bro
 cd C:\path\to\dsh-browser-harness
 
 node --test "tests/unit/**/*.test.mjs"        # 单测
-node --test "tests/integration/**/*.test.mjs" # 25 场景（临时 headless Chromium）
-npm run test:all                              # 单测 + 场景（共 105 条）
+node --test "tests/integration/**/*.test.mjs" # 27 场景（含标签组 headful 场景）
+npm run test:all                              # 单测 + 场景（共 115 条）
 node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟（需源码 checkout；也可用 edge/brave 等）
 ```
 
 ## 2. 安装插件
 
-### 2a. 创造模式 / 插件管理器（推荐）
+> 插件已发布到 **GitHub Packages**（`@xumi0920/dsh-browser-harness`），也可从本地 clone 目录安装；npmjs.org 上的 `dsh-browser-harness` 是别的项目。
+
+### 2c. 从 GitHub Packages 安装（需要带 read:packages 的 GitHub token）
+
+```powershell
+npm config set @xumi0920:registry https://npm.pkg.github.com
+npm config set //npm.pkg.github.com/:_authToken "<YOUR_GITHUB_TOKEN>"
+# 然后与 2a/2b 二选一，target 换成包名：
+#   plugin_manager { action: "install_bundle", target: "@xumi0920/dsh-browser-harness" }
+$DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd"
+& $DSH plugin --profile desktop add "@xumi0920/dsh-browser-harness"
+```
+
+### 2a. 创造模式 / 插件管理器（推荐，本地目录）
 
 在 Creator（创造模式）空会话里让模型执行（把 target 换成本机 clone 的绝对路径）：
 
@@ -54,8 +68,8 @@ $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\ds
 
 ## 3. 验证（由弱到强）
 
-1. `plugin_manager { action: "list_plugins" }` → `dsh-browser-harness` 存在且 enabled。
-2. 确认 `~/.dsh/profiles/desktop/package.json` 的 `dependencies` 有 `dsh-browser-harness`、`dsh.profile.bundles` 含 `dsh-browser-harness`；注册行在**插件包自身**的 `cordis.patch.yml`，profile 的 patch 不必出现该行。
+1. `plugin_manager { action: "list_plugins" }` → `@xumi0920/dsh-browser-harness` 存在且 enabled。
+2. 确认 `~/.dsh/profiles/desktop/package.json` 的 `dependencies` 有 `@xumi0920/dsh-browser-harness`、`dsh.profile.bundles` 含 `@xumi0920/dsh-browser-harness`；注册行在**插件包自身**的 `cordis.patch.yml`，profile 的 patch 不必出现该行。
 3. 创造模式里 `cordis_inspect_query` → Tool provider 能看到 7 个 browser_* 工具与 schema。
 4. 实际调用：`browser_status` → `browser_navigate` 打开 `https://example.com` → `browser_snapshot` → `browser_tabs {action:"close"}`。
 5. 确认没有碰用户日常浏览器的标签页（`browser_status.tabs` 里只有专用实例的页）。
@@ -64,7 +78,7 @@ $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\ds
 
 ```powershell
 $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd"
-& $DSH plugin --profile desktop remove dsh-browser-harness
+& $DSH plugin --profile desktop remove "@xumi0920/dsh-browser-harness"
 # 或 plugin_manager 的 remove_bundle
 ```
 
@@ -75,7 +89,7 @@ $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\ds
 | 现象 | 处理 |
 |---|---|
 | `E_NO_BROWSER` | 专用浏览器没起/端口不对：确认 `/json/version`，或改 config 的 `cdpUrl`/`browser` |
-| 安装后工具不出现 | 重启 DSH；确认 `~/.dsh/profiles/desktop/package.json` 的 `dependencies` / `dsh.profile.bundles` 含 `dsh-browser-harness`（注册行在插件包自身的 `cordis.patch.yml`） |
+| 安装后工具不出现 | 重启 DSH；确认 `~/.dsh/profiles/desktop/package.json` 的 `dependencies` / `dsh.profile.bundles` 含 `@xumi0920/dsh-browser-harness`（注册行在插件包自身的 `cordis.patch.yml`） |
 | 浏览器弹 "Allow remote debugging?" | 用的是日常浏览器；改用专用 profile 实例 |
 | 工具报 `E_SELECTOR_TIMEOUT` | 先 `browser_snapshot` 重取 ref，再操作 |
 | 工具报 `E_POLICY_DENIED` | 试图关闭非本 harness 创建的标签页；需要 `force` 时先取得用户明确同意 |

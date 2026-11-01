@@ -10,6 +10,7 @@ import {
   readState,
   rememberOwnedTab,
   setCurrent,
+  setGroup,
   statePath,
   updateState,
   writeState,
@@ -79,4 +80,17 @@ test("lanes are isolated and lane names are sanitized", async () => {
   assert.equal((await readState("a", dir)).count, 1);
   assert.equal((await readState("b", dir)).count, 2);
   assert.match(statePath("../../evil lane", dir), /state-evil-lane\.json$/);
+});
+
+test("tab groups are remembered per lane and invalid groups are dropped", async () => {
+  const dir = await tempDir();
+  const written = await setGroup("default", { id: 42, title: "DSH · task", color: "blue" }, dir);
+  assert.equal(written.group.id, 42);
+  const state = await readState("default", dir);
+  assert.deepEqual({ id: state.group.id, title: state.group.title, color: state.group.color }, { id: 42, title: "DSH · task", color: "blue" });
+  assert.ok(state.group.updatedAt);
+  await writeState({ ...emptyState(), group: { id: "not-a-number" } }, "default", dir);
+  assert.equal((await readState("default", dir)).group, null);
+  await setGroup("default", null, dir);
+  assert.equal((await readState("default", dir)).group, null);
 });

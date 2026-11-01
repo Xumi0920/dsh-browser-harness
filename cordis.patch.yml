@@ -2,7 +2,7 @@
 # Config keys are optional; all of them have safe defaults.
 - insert:
     - id: browser-harness
-      name: dsh-browser-harness
+      name: "@xumi0920/dsh-browser-harness"
       config:
         # Default: attach to the dedicated Chromium-based automation browser
         # discovered through ~/.dsh/browser-cdp/registry.json
@@ -12,3 +12,8 @@
         #   cdpUrl: http://127.0.0.1:9333
         #   ws: ws://127.0.0.1:9333/devtools/browser/<id>
         maxSnapshotNodes: 250
+        # Per-task Chrome tab groups for harness-created tabs (default true).
+        # A small bundled extension is installed through CDP into this profile.
+        tabGroups: true
+        # tabGroupTitle: "DSH · my-task"
+        # tabGroupColor: blue
