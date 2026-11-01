@@ -18,7 +18,7 @@ export * as errors from "./errors.js";
 export { HarnessError, codes } from "./errors.js";
 
 /** Connect to a running browser; shorthand for `Browser.connect`. */
-export async function connect(options = {} as any) {
+export async function connect(options: any = {} as any) {
   return (await import("./browser.js")).Browser.connect(options);
 }
 
@@ -29,7 +29,7 @@ export async function connect(options = {} as any) {
  * @param {(browser: import("./browser.js").Browser) => Promise<T>} fn
  * @returns {Promise<T>}
  */
-export async function withBrowser(options, fn) {
+export async function withBrowser(options: any, fn: any) {
   const browser = await connect(options);
   try {
     return await fn(browser);

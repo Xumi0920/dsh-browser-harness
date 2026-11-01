@@ -131,3 +131,14 @@ test("ensure forwards tab-group and extension settings to the browser factory", 
     lane: "dsh",
   });
 });
+
+test("ensure maps a connect failure to E_NO_BROWSER", async () => {
+  const manager = new BrowserManager({
+    browserFactory: async () => { throw new Error("ECONNREFUSED 127.0.0.1:9331"); },
+  });
+  await assert.rejects(manager.ensure(), (error) => {
+    assert.equal(error.code, "E_NO_BROWSER");
+    assert.match(error.message, /cannot reach a dedicated automation browser/);
+    return true;
+  });
+});

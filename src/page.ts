@@ -42,7 +42,7 @@ const KEY_CODES = {
   Space: { code: "Space", key: " ", vk: 32, text: " " },
 };
 
-function modifierMask(modifiers) {
+function modifierMask(modifiers: any) {
   if (!modifiers) return 0;
   if (Array.isArray(modifiers)) {
     let mask = 0;
@@ -57,14 +57,14 @@ function modifierMask(modifiers) {
   return Number(modifiers) || 0;
 }
 
-function pngSize(buffer) {
+function pngSize(buffer: any) {
   if (!buffer || buffer.length < 24) return null;
   const signature = buffer.subarray(0, 8).toString("hex");
   if (signature !== "89504e470d0a1a0a") return null;
   return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
 }
 
-function jsonSafe(value) {
+function jsonSafe(value: any) {
   if (value === undefined) return null;
   try {
     const text = JSON.stringify(value);
@@ -99,7 +99,7 @@ export class Page {
    * @param {import("./browser.js").Browser} browser
    * @param {{ sessionId: string, targetId: string }} ids
    */
-  constructor(browser, ids) {
+  constructor(browser: any, ids: any) {
     this.browser = browser;
     this.transport = browser.transport;
     this.sessionId = ids.sessionId;
@@ -130,13 +130,13 @@ export class Page {
   }
 
   /** Send a CDP command on this page session. */
-  send(method, params = {} as any, options = {} as any) {
+  send(method: any, params: any = {} as any, options: any = {} as any) {
     return this.transport.send(method, params, { sessionId: this.sessionId, ...options });
   }
 
   /** Subscribe to page-scoped CDP events. */
-  on(method, handler) {
-    const off = this.transport.onEvent(method, (params, sessionId) => {
+  on(method: any, handler: any) {
+    const off = this.transport.onEvent(method, (params: any, sessionId: any) => {
       if (sessionId === undefined || sessionId === this.sessionId) handler(params);
     });
     this.ownedListeners.push(off);
@@ -144,21 +144,21 @@ export class Page {
   }
 
   /** Enable the CDP domains this harness depends on. */
-  async enableDomains({ runtime = true } = {} as any) {
+  async enableDomains({ runtime = true }: any = {} as any) {
     const domains = [this.send("Page.enable", {}, { timeoutMs: 5_000 }).catch(() => null), this.send("DOM.enable", {}, { timeoutMs: 5_000 }).catch(() => null)];
     if (runtime && !this.runtimeEnabled) {
       this.runtimeEnabled = true;
       domains.push(
         this.send("Runtime.enable", {}, { timeoutMs: 5_000 }).catch(() => null),
       );
-      this.on("Runtime.executionContextCreated", (params) => {
+      this.on("Runtime.executionContextCreated", (params: any) => {
         if (params && params.context) this.executionContexts.push(params.context);
       });
-      this.on("Runtime.executionContextDestroyed", (params) => {
-        this.executionContexts = this.executionContexts.filter((context) => context.id !== (params && params.executionContextId));
+      this.on("Runtime.executionContextDestroyed", (params: any) => {
+        this.executionContexts = this.executionContexts.filter((context: any) => context.id !== (params && params.executionContextId));
       });
     }
-    this.on("Page.javascriptDialogOpening", (params) => this.#onDialogOpening(params));
+    this.on("Page.javascriptDialogOpening", (params: any) => this.#onDialogOpening(params));
     this.on("Page.javascriptDialogClosed", () => {
       this.pendingDialog = null;
     });
@@ -171,13 +171,13 @@ export class Page {
    * Pretend the page has focus so CDP input is dispatched while the tab stays
    * in the background (headless and hidden tabs otherwise hang on Input.*).
    */
-  async setFocusEmulation(enabled) {
+  async setFocusEmulation(enabled: any) {
     await this.send("Emulation.setFocusEmulationEnabled", { enabled: Boolean(enabled) }, { timeoutMs: 5_000 });
     this.focusEmulation = Boolean(enabled);
     return { ok: true, focusEmulation: this.focusEmulation };
   }
 
-  #onDialogOpening(params) {
+  #onDialogOpening(params: any) {
     const dialog = { type: params.type, message: params.message, defaultPrompt: params.defaultPrompt, openedAt: new Date().toISOString() };
     this.dialogHistory.push(dialog);
     if (this.dialogPolicy === "auto-dismiss") {
@@ -194,7 +194,7 @@ export class Page {
   }
 
   /** Handle the currently open dialog. */
-  async handleDialog({ accept = true, promptText } = {} as any) {
+  async handleDialog({ accept = true, promptText }: any = {} as any) {
     const params: any = { accept };
     if (typeof promptText === "string") params.promptText = promptText;
     await this.send("Page.handleJavaScriptDialog", params, { timeoutMs: 5_000 });
@@ -220,7 +220,7 @@ export class Page {
    * @param {string | Function} expressionOrFn
    * @param {{ awaitPromise?: boolean, timeoutMs?: number, returnByValue?: boolean, contextId?: number }} [options]
    */
-  async evaluate(expressionOrFn, options = {} as any) {
+  async evaluate(expressionOrFn: any, options: any = {} as any) {
     if (this.pendingDialog) throw dialogOpen(this.pendingDialog);
     const callArgs = options.args === undefined ? null : JSON.stringify(options.args);
     const expression = typeof expressionOrFn === "function"
@@ -244,7 +244,7 @@ export class Page {
   }
 
   /** Navigate and optionally wait for the load state. */
-  async navigate(url, { waitUntil = "load", timeoutMs = DEFAULT_LOAD_TIMEOUT_MS } = {} as any) {
+  async navigate(url: any, { waitUntil = "load", timeoutMs = DEFAULT_LOAD_TIMEOUT_MS }: any = {} as any) {
     if (typeof url !== "string" || url.length === 0) throw badArgument("navigate(url) needs a URL");
     const result = await this.send("Page.navigate", { url }, { timeoutMs });
     if (result.errorText && !/^net::ERR_ABORTED/.test(result.errorText)) {
@@ -256,7 +256,7 @@ export class Page {
   }
 
   /** Poll document.readyState until it reaches `complete`. */
-  async waitForLoad({ timeoutMs = DEFAULT_LOAD_TIMEOUT_MS } = {} as any) {
+  async waitForLoad({ timeoutMs = DEFAULT_LOAD_TIMEOUT_MS }: any = {} as any) {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
       try {
@@ -266,7 +266,7 @@ export class Page {
         if (error.code === "E_DIALOG_OPEN") throw error;
       }
       if (Date.now() > deadline) throw waitTimeout("document.readyState === 'complete'", timeoutMs);
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
+      await new Promise((resolvePromise: any) => setTimeout(resolvePromise, 50));
     }
   }
 
@@ -274,7 +274,7 @@ export class Page {
    * Accessibility snapshot with stable refs and optional box centers.
    * @param {{ maxNodes?: number, includeBoxes?: boolean, roles?: string[] }} [options]
    */
-  async snapshot(options = {} as any) {
+  async snapshot(options: any = {} as any) {
     const raw = await this.send("Accessibility.getFullAXTree", {}, { timeoutMs: 15_000 });
     const refStart = this.nextRef;
     const first = buildSnapshot(raw.nodes || [], { maxNodes: options.maxNodes ?? 400, roles: options.roles, refStart });
@@ -284,7 +284,7 @@ export class Page {
       const concurrency = 8;
       for (let index = 0; index < first.nodes.length; index += concurrency) {
         const chunk = first.nodes.slice(index, index + concurrency);
-        await Promise.all(chunk.map(async (node) => {
+        await Promise.all(chunk.map(async (node: any) => {
           try {
             const model = await this.send("DOM.getBoxModel", { backendNodeId: node.backendDOMNodeId }, { timeoutMs: 2_000 });
             boxes.set(node.backendDOMNodeId, model.model);
@@ -309,7 +309,7 @@ export class Page {
    * A ref belongs to the snapshot that produced it. Re-snapshotting here would
    * silently renumber refs, so a missing ref is an error instead of a remap.
    */
-  async #resolveRef(ref) {
+  async #resolveRef(ref: any) {
     if (!this.lastSnapshot) {
       throw elementNotFound(ref, { kind: "ref", hint: "no snapshot yet; call browser_snapshot or browser_navigate first" });
     }
@@ -318,14 +318,14 @@ export class Page {
       throw elementNotFound(ref, {
         kind: "ref",
         hint: "ref is not in the latest snapshot; take a new snapshot and use its refs",
-        refs: this.lastSnapshot.slice(0, 20).map((item) => item.ref),
+        refs: this.lastSnapshot.slice(0, 20).map((item: any) => item.ref),
       });
     }
     return node;
   }
 
   /** Resolve a CSS selector to a backend node id. */
-  async #resolveSelector(selector) {
+  async #resolveSelector(selector: any) {
     const document = await this.send("DOM.getDocument", { depth: 0 }, { timeoutMs: 5_000 });
     try {
       const found = await this.send("DOM.querySelector", { nodeId: document.root.nodeId, selector }, { timeoutMs: 5_000 });
@@ -338,7 +338,7 @@ export class Page {
     }
   }
 
-  async #centerForBackendNode(backendNodeId) {
+  async #centerForBackendNode(backendNodeId: any) {
     try {
       await this.send("DOM.scrollIntoViewIfNeeded", { backendNodeId }, { timeoutMs: 3_000 });
     } catch {
@@ -355,7 +355,7 @@ export class Page {
    * @param {{ ref?: string, selector?: string, at?: {x:number,y:number} }} target
    * @param {{ button?: string, clicks?: number, timeoutMs?: number }} [options]
    */
-  async click(target, options = {} as any) {
+  async click(target: any, options: any = {} as any) {
     let point: any = null;
     if (target && target.at) {
       point = { x: Number(target.at.x), y: Number(target.at.y) };
@@ -372,7 +372,7 @@ export class Page {
   }
 
   /** Dispatch a real mouse click at viewport CSS coordinates. */
-  async clickAt(x, y, { button = "left", clicks = 1 } = {} as any) {
+  async clickAt(x: any, y: any, { button = "left", clicks = 1 }: any = {} as any) {
     const mouseButton = String(button).toLowerCase();
     await this.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y }, { timeoutMs: 5_000 });
     for (let index = 1; index <= clicks; index += 1) {
@@ -383,7 +383,7 @@ export class Page {
   }
 
   /** Focus an element by ref or selector. */
-  async focus(target) {
+  async focus(target: any) {
     let backendNodeId;
     if (target && target.ref) backendNodeId = (await this.#resolveRef(target.ref)).backendDOMNodeId;
     else if (target && target.selector) backendNodeId = await this.#resolveSelector(target.selector);
@@ -393,14 +393,14 @@ export class Page {
   }
 
   /** Insert text into the focused element (fast path, IME friendly). */
-  async type(text) {
+  async type(text: any) {
     await this.send("Input.insertText", { text: String(text) }, { timeoutMs: 10_000 });
     return { ok: true, typed: String(text).length };
   }
 
   /** Press a key with optional modifiers. */
-  async press(key, { modifiers = 0 } = {} as any) {
-    const spec = KEY_CODES[key] || (key.length === 1 ? { code: /[a-z]/i.test(key) ? "Key" + key.toUpperCase() : key, key, vk: key.toUpperCase().charCodeAt(0), text: key } : null);
+  async press(key: any, { modifiers = 0 }: any = {} as any) {
+    const spec = (KEY_CODES as Record<string, any>)[key] || (key.length === 1 ? { code: /[a-z]/i.test(key) ? "Key" + key.toUpperCase() : key, key, vk: key.toUpperCase().charCodeAt(0), text: key } : null);
     if (!spec) throw badArgument("unsupported key: " + key);
     const mask = modifierMask(modifiers);
     const base = { modifiers: mask, key: spec.key, code: spec.code, windowsVirtualKeyCode: spec.vk, nativeVirtualKeyCode: spec.vk };
@@ -416,7 +416,7 @@ export class Page {
    * React/Vue controlled components stay in sync. This is not per-character
    * typing (use type() for that).
    */
-  async fill({ ref, selector, text, clearFirst = true }, options = {} as any) {
+  async fill({ ref, selector, text, clearFirst = true }: any, options: any = {} as any) {
     const value = String(text ?? "");
     const target = await this.#resolveTargetHandle({ ref, selector });
     await this.send("DOM.focus", { backendNodeId: target.backendNodeId }, { timeoutMs: 5_000 });
@@ -435,7 +435,7 @@ export class Page {
     return { ok: true, length: value.length, ...(options.verify ? { value: await this.evaluate("document.activeElement ? document.activeElement.value : null") } : {}) };
   }
 
-  async #resolveTargetHandle(target) {
+  async #resolveTargetHandle(target: any) {
     if (target && target.ref) {
       const node = await this.#resolveRef(target.ref);
       const resolved = await this.send("DOM.resolveNode", { backendNodeId: node.backendDOMNodeId }, { timeoutMs: 5_000 });
@@ -450,7 +450,7 @@ export class Page {
   }
 
   /** Wheel scroll at a point (defaults to the current viewport center). */
-  async scroll({ dx = 0, dy = 0, x, y } = {} as any) {
+  async scroll({ dx = 0, dy = 0, x, y }: any = {} as any) {
     const info = await this.evaluate(() => ({ cx: Math.floor(window.innerWidth / 2), cy: Math.floor(window.innerHeight / 2) }));
     const pointX = typeof x === "number" ? x : info.cx;
     const pointY = typeof y === "number" ? y : info.cy;
@@ -459,12 +459,12 @@ export class Page {
   }
 
   /** Poll a selector until it exists (and is visible). */
-  async waitForSelector(selector, { timeoutMs = DEFAULT_TIMEOUT_MS, visible = false } = {} as any) {
+  async waitForSelector(selector: any, { timeoutMs = DEFAULT_TIMEOUT_MS, visible = false }: any = {} as any) {
     const deadline = Date.now() + timeoutMs;
     let lastError: any = null;
     while (Date.now() < deadline) {
       try {
-        const found = await this.evaluate((args) => {
+        const found = await this.evaluate((args: any) => {
           const element = document.querySelector(args.selector);
           if (!element) return null;
           if (args.visible && typeof element.checkVisibility === "function" && !element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) return null;
@@ -476,13 +476,13 @@ export class Page {
         lastError = error;
         if (error.code === "E_DIALOG_OPEN") throw error;
       }
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
+      await new Promise((resolvePromise: any) => setTimeout(resolvePromise, 50));
     }
     throw selectorTimeout(selector, timeoutMs, { lastError: lastError ? String(lastError.message || lastError) : undefined });
   }
 
   /** Poll an expression until it is truthy. */
-  async waitForFunction(expression, { timeoutMs = DEFAULT_TIMEOUT_MS } = {} as any) {
+  async waitForFunction(expression: any, { timeoutMs = DEFAULT_TIMEOUT_MS }: any = {} as any) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       try {
@@ -491,13 +491,13 @@ export class Page {
       } catch (error: any) {
         if (error.code === "E_DIALOG_OPEN") throw error;
       }
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
+      await new Promise((resolvePromise: any) => setTimeout(resolvePromise, 50));
     }
     throw waitTimeout(String(expression).slice(0, 200), timeoutMs);
   }
 
   /** Wait until network activity has been quiet for `idleMs`. */
-  async waitForNetworkIdle({ timeoutMs = 10_000, idleMs = 500 } = {} as any) {
+  async waitForNetworkIdle({ timeoutMs = 10_000, idleMs = 500 }: any = {} as any) {
     const deadline = Date.now() + timeoutMs;
     let lastCount = this.networkLog.length;
     let lastChange = Date.now();
@@ -507,22 +507,22 @@ export class Page {
         lastChange = Date.now();
       }
       if (Date.now() - lastChange >= idleMs) return { ok: true, events: this.networkLog.length };
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
+      await new Promise((resolvePromise: any) => setTimeout(resolvePromise, 50));
     }
     throw waitTimeout("network idle", timeoutMs);
   }
 
   /** Read visible text of the page or of one element. */
-  async text(selector) {
+  async text(selector: any) {
     if (!selector) return this.evaluate("document.body ? document.body.innerText : ''");
-    return this.evaluate((selectorArg) => {
+    return this.evaluate((selectorArg: any) => {
       const element = document.querySelector(selectorArg);
       return element ? element.innerText : null;
     }, { args: [String(selector)] });
   }
 
   /** Capture a PNG screenshot and return its path and pixel size. */
-  async screenshot({ path: filePath, fullPage = false } = {} as any) {
+  async screenshot({ path: filePath, fullPage = false }: any = {} as any) {
     const result = await this.send("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: Boolean(fullPage) }, { timeoutMs: 60_000 });
     const buffer = Buffer.from(result.data, "base64");
     const target = filePath ? resolve(filePath) : join(tmpdir(), "bh-shot-" + Date.now() + ".png");
@@ -533,7 +533,7 @@ export class Page {
   }
 
   /** Override the viewport metrics (rendering and screenshot size). */
-  async setViewport({ width, height, deviceScaleFactor = 1, mobile = false } = {} as any) {
+  async setViewport({ width, height, deviceScaleFactor = 1, mobile = false }: any = {} as any) {
     if (!Number.isFinite(width) || !Number.isFinite(height)) throw badArgument("setViewport needs numeric width and height");
     await this.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor, mobile }, { timeoutMs: 5_000 });
     return { ok: true, width, height, deviceScaleFactor };
@@ -549,7 +549,7 @@ export class Page {
   async frames() {
     const tree = await this.send("Page.getFrameTree", {}, { timeoutMs: 5_000 });
     const frames: any[] = [];
-    const collect = (node, parentId) => {
+    const collect = (node: any, parentId: any) => {
       if (!node || !node.frame) return;
       frames.push({ frameId: node.frame.id, url: node.frame.url, name: node.frame.name, parentFrameId: parentId });
       for (const child of node.childFrames || []) collect(child, node.frame.id);
@@ -559,11 +559,11 @@ export class Page {
   }
 
   /** Evaluate inside a frame selected by id or URL substring. */
-  async evaluateInFrame(frameMatch, expressionOrFn, options = {} as any) {
+  async evaluateInFrame(frameMatch: any, expressionOrFn: any, options: any = {} as any) {
     const contexts = this.executionContexts;
     let context: any = null;
     const frames = await this.frames();
-    const wanted = frames.find((frame) => (frameMatch.frameId && frame.frameId === frameMatch.frameId) || (frameMatch.urlContains && frame.url.includes(frameMatch.urlContains)));
+    const wanted = frames.find((frame: any) => (frameMatch.frameId && frame.frameId === frameMatch.frameId) || (frameMatch.urlContains && frame.url.includes(frameMatch.urlContains)));
     if (wanted) {
       for (let index = contexts.length - 1; index >= 0; index -= 1) {
         const candidate = contexts[index];
@@ -583,19 +583,19 @@ export class Page {
    * Idempotent: the log lives on the (cached) Page, so events survive across
    * tool calls while the tab stays attached.
    */
-  async startNetworkCapture({ maxEvents = 2000 } = {} as any) {
+  async startNetworkCapture({ maxEvents = 2000 }: any = {} as any) {
     this.maxNetworkEvents = maxEvents;
     if (this.networkEnabled) return { ok: true, capturing: true };
     if (this.networkStarting) return this.networkStarting;
     const start = (async () => {
       await this.send("Network.enable", {}, { timeoutMs: 5_000 });
       this.networkEnabled = true;
-      this.on("Network.requestWillBeSent", (params) => {
+      this.on("Network.requestWillBeSent", (params: any) => {
         this.networkLog.push({ requestId: params.requestId, url: params.request && params.request.url, method: params.request && params.request.method, resourceType: params.type, ts: Date.now() });
         if (this.networkLog.length > this.maxNetworkEvents) this.networkLog.shift();
       });
-      this.on("Network.responseReceived", (params) => {
-        const entry = this.networkLog.find((item) => item.requestId === params.requestId);
+      this.on("Network.responseReceived", (params: any) => {
+        const entry = this.networkLog.find((item: any) => item.requestId === params.requestId);
         if (entry) {
           entry.status = params.response && params.response.status;
           entry.mimeType = params.response && params.response.mimeType;
@@ -603,8 +603,8 @@ export class Page {
           entry.resourceType = params.type || entry.resourceType;
         }
       });
-      this.on("Network.loadingFailed", (params) => {
-        const entry = this.networkLog.find((item) => item.requestId === params.requestId);
+      this.on("Network.loadingFailed", (params: any) => {
+        const entry = this.networkLog.find((item: any) => item.requestId === params.requestId);
         if (entry) entry.error = params.errorText;
       });
       return { ok: true, capturing: true };
@@ -622,7 +622,7 @@ export class Page {
    * @param {any[]} events events from networkEvents()
    * @param {{ limit?: number, maxBytes?: number }} [options]
    */
-  async networkBodies(events, { limit = 10, maxBytes = 200_000 } = {} as any) {
+  async networkBodies(events: any, { limit = 10, maxBytes = 200_000 }: any = {} as any) {
     const out: any[] = [];
     for (const event of (events || []).slice(-limit)) {
       const entry = { ...event };
@@ -645,15 +645,15 @@ export class Page {
 
   /** Snapshot of captured network requests/responses. */
   networkEvents() {
-    return this.networkLog.map((entry) => ({ ...entry }));
+    return this.networkLog.map((entry: any) => ({ ...entry }));
   }
 
   /** Wait for a response whose URL matches a string or RegExp. */
-  async waitForResponse(pattern, { timeoutMs = 15_000, includeBody = false } = {} as any) {
-    const matcher = typeof pattern === "string" ? (url) => String(url || "").includes(pattern) : (url) => pattern.test(String(url || ""));
+  async waitForResponse(pattern: any, { timeoutMs = 15_000, includeBody = false }: any = {} as any) {
+    const matcher = typeof pattern === "string" ? (url: any) => String(url || "").includes(pattern) : (url: any) => pattern.test(String(url || ""));
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const entry = this.networkLog.find((item) => item.status !== undefined && matcher(item.url));
+      const entry = this.networkLog.find((item: any) => item.status !== undefined && matcher(item.url));
       if (entry) {
         const result = { ...entry };
         if (includeBody) {
@@ -666,7 +666,7 @@ export class Page {
         }
         return result;
       }
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
+      await new Promise((resolvePromise: any) => setTimeout(resolvePromise, 50));
     }
     throw waitTimeout("response matching " + String(pattern), timeoutMs);
   }
@@ -681,10 +681,10 @@ export class Page {
   }
 
   /** Cookies for a URL. Values are redacted unless includeValues is true. */
-  async cookies({ url, includeValues = false } = {} as any) {
+  async cookies({ url, includeValues = false }: any = {} as any) {
     const params = url ? { urls: [url] } : {};
     const result = await this.send("Network.getCookies", params, { timeoutMs: 5_000 });
-    return (result.cookies || []).map((cookie) => ({
+    return (result.cookies || []).map((cookie: any) => ({
       name: cookie.name,
       domain: cookie.domain,
       path: cookie.path,
@@ -698,14 +698,14 @@ export class Page {
   }
 
   /** Set a cookie (values never logged by the harness itself). */
-  async setCookie(cookie) {
+  async setCookie(cookie: any) {
     if (!cookie || typeof cookie.name !== "string" || typeof cookie.value !== "string") throw badArgument("setCookie needs {name, value, url|domain}");
     await this.send("Network.setCookie", { ...cookie }, { timeoutMs: 5_000 });
     return { ok: true, name: cookie.name };
   }
 
   /** Clear cookies (all with `all`, or matching a URL). */
-  async clearCookies({ url, all = false } = {} as any) {
+  async clearCookies({ url, all = false }: any = {} as any) {
     if (all) {
       const result = await this.send("Network.getAllCookies", {}, { timeoutMs: 5_000 });
       for (const cookie of result.cookies || []) {
@@ -726,8 +726,8 @@ export class Page {
    * @param {{ ref?: string, selector?: string }} target
    * @param {string | string[]} paths
    */
-  async upload(target, paths) {
-    const files = (Array.isArray(paths) ? paths : [paths]).map((file) => resolve(String(file)));
+  async upload(target: any, paths: any) {
+    const files = (Array.isArray(paths) ? paths : [paths]).map((file: any) => resolve(String(file)));
     if (files.length === 0) throw badArgument("upload needs at least one absolute file path");
     for (const file of files) {
       try {
@@ -745,7 +745,7 @@ export class Page {
    * Click something and wait for the resulting download.
    * @param {{ dir?: string, trigger: () => Promise<any>, timeoutMs?: number }} options
    */
-  async download({ dir, trigger, timeoutMs = 30_000 } = {} as any) {
+  async download({ dir, trigger, timeoutMs = 30_000 }: any = {} as any) {
     if (typeof trigger !== "function") throw badArgument("download needs a trigger() function");
     const directory = resolve(dir || this.downloadDir || join(this.browser.config.stateDir || tmpdir(), "downloads"));
     await mkdir(directory, { recursive: true });
@@ -756,15 +756,15 @@ export class Page {
       const deadline = Date.now() + timeoutMs;
       while (Date.now() < deadline) {
         const names = await readdir(directory).catch(() => []);
-        const fresh = names.filter((name) => !before.has(name));
-        const partial = fresh.filter((name) => name.endsWith(".crdownload"));
-        const complete = fresh.filter((name) => !name.endsWith(".crdownload"));
+        const fresh = names.filter((name: any) => !before.has(name));
+        const partial = fresh.filter((name: any) => name.endsWith(".crdownload"));
+        const complete = fresh.filter((name: any) => !name.endsWith(".crdownload"));
         if (complete.length > 0 && partial.length === 0) {
           const file = join(directory, complete[0]);
           const info = await stat(file);
           return { ok: true, path: file, bytes: info.size, filename: complete[0] };
         }
-        await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+        await new Promise((resolvePromise: any) => setTimeout(resolvePromise, 100));
       }
       throw downloadFailed("download did not finish within " + timeoutMs + "ms", { directory });
     } finally {

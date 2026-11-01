@@ -21,7 +21,7 @@ export const TAB_GROUP_EXTENSION_NAME = "DSH Browser Harness Tab Groups";
 export const TAB_GROUP_TITLE_PREFIX = "DSH · ";
 
 function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve: any) => setTimeout(resolve, ms));
 }
 
 /** Default title template; {session} is the short session/lane tag. */
@@ -39,7 +39,7 @@ export function tabGroupSessionTag(lane: any) {
  * Stable per-lane group title, e.g. "DSH · a1b2c3".
  * Supports a template with {session} and {lane} placeholders.
  */
-export function tabGroupTitleFor(lane: any, template = TAB_GROUP_TITLE_TEMPLATE) {
+export function tabGroupTitleFor(lane: any, template: any = TAB_GROUP_TITLE_TEMPLATE) {
   const raw = String(lane || "default");
   const title = String(template || TAB_GROUP_TITLE_TEMPLATE)
     .replaceAll("{session}", tabGroupSessionTag(raw))
@@ -248,7 +248,7 @@ export class TabGroupBridge {
    * @param {import("./page.js").Page} page
    * @param {{ title: string, color?: string, groupId?: number | null }} options
    */
-  async groupTab(page: any, { title, color = "blue", groupId = null } = {} as any) {
+  async groupTab(page: any, { title, color = "blue", groupId = null }: any = {} as any) {
     if (!this.enabled) return { ok: false, reason: "disabled" };
     return this.run(async () => {
       const ready = await this.ensure();

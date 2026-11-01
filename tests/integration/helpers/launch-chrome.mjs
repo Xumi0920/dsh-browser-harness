@@ -199,7 +199,14 @@ export async function launchChrome(options = {}) {
       // using this throwaway profile so no headless browser leaks.
       await killByUserDataDir(userDataDir);
       await sleep(300);
-      await rm(userDataDir, { recursive: true, force: true }).catch(() => {});
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          await rm(userDataDir, { recursive: true, force: true });
+          break;
+        } catch {
+          await sleep(150 * (attempt + 1));
+        }
+      }
     },
   };
 }

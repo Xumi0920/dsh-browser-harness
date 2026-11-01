@@ -16,16 +16,16 @@ class Emitter {
     /** @type {Map<string, Set<Function>>} */
     this.listeners = new Map();
   }
-  on(event, handler) {
+  on(event: any, handler: any) {
     if (typeof handler !== "function") throw new TypeError("handler must be a function");
     if (!this.listeners.has(event)) this.listeners.set(event, new Set());
     this.listeners.get(event)!.add(handler);
     return () => this.off(event, handler);
   }
-  off(event, handler) {
+  off(event: any, handler: any) {
     this.listeners.get(event)?.delete(handler);
   }
-  emit(event, ...args) {
+  emit(event: any, ...args: any) {
     const set = this.listeners.get(event);
     if (!set) return;
     for (const handler of [...set]) {
@@ -52,7 +52,7 @@ export class CDPTransport extends Emitter {
    * @param {string} wsUrl
    * @param {{ WebSocketImpl?: any, defaultTimeoutMs?: number, logger?: { debug?: Function, warn?: Function } }} [options]
    */
-  constructor(wsUrl, options = {} as any) {
+  constructor(wsUrl: any, options: any = {} as any) {
     super();
     if (typeof wsUrl !== "string" || wsUrl.length === 0) throw new HarnessError(codes.E_BAD_ARG, "CDPTransport needs a ws:// URL");
     this.wsUrl = wsUrl;
@@ -74,7 +74,7 @@ export class CDPTransport extends Emitter {
     if (typeof Impl !== "function") {
       return Promise.reject(notConnected("no WebSocket implementation available (Node 22+ or pass WebSocketImpl)"));
     }
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve: any, reject: any) => {
       let settled = false;
       const ws = new Impl(this.wsUrl);
       this.ws = ws;
@@ -86,7 +86,7 @@ export class CDPTransport extends Emitter {
         reject(connectTimeout(this.wsUrl, this.defaultTimeoutMs));
       }, this.defaultTimeoutMs);
 
-      const finish = (error) => {
+      const finish = (error: any) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
@@ -99,20 +99,20 @@ export class CDPTransport extends Emitter {
         this.logger.debug?.("cdp transport open", this.wsUrl);
         finish(null);
       });
-      ws.addEventListener("message", (event) => this.#onMessage(event));
-      ws.addEventListener("error", (event) => {
+      ws.addEventListener("message", (event: any) => this.#onMessage(event));
+      ws.addEventListener("error", (event: any) => {
         const message = (event && (event.message || (event.error && event.error.message))) || "websocket error";
         if (!this.ready) finish(notConnected(`CDP websocket error: ${message}`));
         this.emit("error", event);
       });
-      ws.addEventListener("close", (event) => {
+      ws.addEventListener("close", (event: any) => {
         this.#onClose(event);
         if (!this.ready) finish(notConnected("CDP websocket closed before it opened"));
       });
     });
   }
 
-  #onMessage(event) {
+  #onMessage(event: any) {
     let raw = "";
     try {
       const data = event && event.data;
@@ -125,7 +125,7 @@ export class CDPTransport extends Emitter {
     }
   }
 
-  #dispatch(message) {
+  #dispatch(message: any) {
     if (typeof message.id === "number") {
       const entry = this.pending.get(message.id);
       if (!entry) return;
@@ -141,7 +141,7 @@ export class CDPTransport extends Emitter {
     }
   }
 
-  #onClose(event) {
+  #onClose(event: any) {
     this.closed = true;
     this.ready = false;
     const reason = event && (event.reason || event.code) ? ` (code ${event.code}${event.reason ? ": " + event.reason : ""})` : "";
@@ -159,7 +159,7 @@ export class CDPTransport extends Emitter {
    * @param {Record<string, unknown>} [params]
    * @param {{ sessionId?: string, timeoutMs?: number }} [options]
    */
-  send(method, params = {} as any, options = {} as any) {
+  send(method: any, params: any = {} as any, options: any = {} as any) {
     if (typeof method !== "string" || method.length === 0) {
       return Promise.reject(new HarnessError(codes.E_BAD_ARG, "CDP method must be a non-empty string"));
     }
@@ -174,7 +174,7 @@ export class CDPTransport extends Emitter {
     } catch (error: any) {
       return Promise.reject(new HarnessError(codes.E_BAD_ARG, `cannot serialize params for ${method}: ${String(error)}`));
     }
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve: any, reject: any) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(cdpTimeout(method, timeoutMs));
@@ -190,7 +190,7 @@ export class CDPTransport extends Emitter {
     });
   }
 
-  onEvent(method, handler) {
+  onEvent(method: any, handler: any) {
     return this.on(method, handler);
   }
 
@@ -200,13 +200,13 @@ export class CDPTransport extends Emitter {
    * @param {((params: any, sessionId?: string) => boolean) | undefined} predicate
    * @param {number} [timeoutMs]
    */
-  waitForEvent(method, predicate, timeoutMs = this.defaultTimeoutMs) {
-    return new Promise((resolve, reject) => {
+  waitForEvent(method: any, predicate: any, timeoutMs: any = this.defaultTimeoutMs) {
+    return new Promise((resolve: any, reject: any) => {
       const timer = setTimeout(() => {
         off();
         reject(cdpTimeout(method + " (event)", timeoutMs));
       }, timeoutMs);
-      const off = this.onEvent(method, (params, sessionId) => {
+      const off = this.onEvent(method, (params: any, sessionId: any) => {
         let matched = true;
         if (typeof predicate === "function") {
           try { matched = Boolean(predicate(params, sessionId)); } catch { matched = false; }
@@ -232,7 +232,7 @@ export class CDPTransport extends Emitter {
 }
 
 /** Connect and resolve a ready transport. */
-export function connectTransport(wsUrl, options) {
+export function connectTransport(wsUrl: any, options: any) {
   const transport = new CDPTransport(wsUrl, options);
   return transport.connect();
 }

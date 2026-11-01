@@ -26,6 +26,21 @@ before(async () => {
 after(async () => {
   await server?.close();
 });
+import { cleanupTempDirs, tempDir } from "../helpers/temp.mjs";
+
+
+after(cleanupTempDirs);
+
+async function waitUntil(check, predicate, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs;
+  let last;
+  while (Date.now() < deadline) {
+    last = await check();
+    if (predicate(last)) return last;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return last;
+}
 
 function canRunHeadful() {
   // Windows/macOS have a window server; Linux needs an X/Wayland display
@@ -40,7 +55,7 @@ test("S15 headless browsers still create tabs when tab groups are unavailable", 
     t.skip("no Chromium browser available");
     return;
   }
-  const stateDir = await mkdtemp(join(tmpdir(), "bh-groups-headless-"));
+  const stateDir = await tempDir("bh-groups-headless-");
   const browser = await Browser.connect({ cdpUrl: chrome.httpUrl, stateDir, lane: "dsh-headless-groups" });
   try {
     const started = Date.now();
@@ -72,7 +87,7 @@ test("S16 harness tabs are grouped per task and work tabs are left alone", async
     t.skip("no Chromium browser available");
     return;
   }
-  const stateDir = await mkdtemp(join(tmpdir(), "bh-groups-headful-"));
+  const stateDir = await tempDir("bh-groups-headful-");
   const lane = "dsh-grouptask";
   const browser = await Browser.connect({ cdpUrl: chrome.httpUrl, stateDir, lane });
   try {
@@ -89,12 +104,16 @@ test("S16 harness tabs are grouped per task and work tabs are left alone", async
     assert.equal(grouped.length, 2, "both harness tabs are in the group");
 
     // A tab the harness did not create must stay out of the group.
-    const work = await browser.transport.send("Target.createTarget", { url: server.url + "/b.html", background: true }, { timeoutMs: 5_000 });
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const stillGrouped = await browser.tabGroups.evaluate(
+    const groupCount = () => browser.tabGroups.evaluate(
       "chrome.tabs.query({ groupId: " + Number(group.id) + " }).then((tabs) => tabs.length)",
     );
-    assert.equal(stillGrouped, 2, "work tab was not added to the harness group");
+    const work = await browser.transport.send("Target.createTarget", { url: server.url + "/b.html", background: true }, { timeoutMs: 5_000 });
+    assert.equal(await groupCount(), 2, "both harness tabs are grouped");
+    const stableUntil = Date.now() + 1_000;
+    while (Date.now() < stableUntil) {
+      assert.equal(await groupCount(), 2, "work tab was not added to the harness group");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
     try { await browser.transport.send("Target.closeTarget", { targetId: work.targetId }, { timeoutMs: 5_000 }); } catch { /* ignore */ }
 
     const stored = await import("../../dist/src/state.js").then((state) => state.readState(lane, stateDir));
@@ -102,8 +121,10 @@ test("S16 harness tabs are grouped per task and work tabs are left alone", async
 
     await browser.closeTab(first.targetId, { force: true });
     await browser.closeTab(second.targetId, { force: true });
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const remaining = await browser.tabGroups.listGroups();
+    const remaining = await waitUntil(
+      () => browser.tabGroups.listGroups(),
+      (groups) => Array.isArray(groups) && !groups.some((entry) => entry.id === group.id),
+    );
     assert.ok(!remaining.some((entry) => entry.id === group.id), "empty task group disappears");
   } finally {
     await browser.close();

@@ -41,7 +41,7 @@ async function main() {
     }
     if (command === "close") {
       const force = args.includes("--force");
-      const targetId = args.find((arg) => !arg.startsWith("--"));
+      const targetId = args.find((arg: any) => !arg.startsWith("--"));
       const result = await browser.closeTab(targetId, { force });
       console.log(JSON.stringify(result));
       return;
@@ -67,7 +67,7 @@ async function main() {
   }
 }
 
-main().catch((error) => {
+main().catch((error: any) => {
   console.error((error && error.code ? error.code + ": " : "") + (error && error.message ? error.message : error));
   process.exit(1);
 });

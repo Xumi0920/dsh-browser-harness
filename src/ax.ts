@@ -34,14 +34,14 @@ export const INTERACTIVE_ROLES = new Set([
 
 const TEXT_ROLES = new Set(["StaticText", "staticText", "paragraph", "LabelText"]);
 
-function axValue(node, key) {
+function axValue(node: any, key: any) {
   const value = node && node[key];
   if (!value) return undefined;
   if (typeof value === "object" && "value" in value) return value.value;
   return undefined;
 }
 
-function round2(value) {
+function round2(value: any) {
   return Math.round(value * 100) / 100;
 }
 
@@ -50,13 +50,13 @@ function round2(value) {
  * @param {{ content?: number[] }} model
  * @returns {{ x: number, y: number, width: number, height: number } | null}
  */
-export function boxCenter(model) {
+export function boxCenter(model: any) {
   const quad = model && Array.isArray(model.content) ? model.content : null;
   if (!quad || quad.length !== 8) return null;
   const xs = [quad[0], quad[2], quad[4], quad[6]];
   const ys = [quad[1], quad[3], quad[5], quad[7]];
-  const x = xs.reduce((sum, value) => sum + value, 0) / 4;
-  const y = ys.reduce((sum, value) => sum + value, 0) / 4;
+  const x = xs.reduce((sum: any, value: any) => sum + value, 0) / 4;
+  const y = ys.reduce((sum: any, value: any) => sum + value, 0) / 4;
   const width = Math.max(...xs) - Math.min(...xs);
   const height = Math.max(...ys) - Math.min(...ys);
   return { x: round2(x), y: round2(y), width: round2(width), height: round2(height) };
@@ -74,7 +74,7 @@ export function boxCenter(model) {
  * }} [options]
  * @returns {{ nodes: Array<{ref: string, role: string, name: string, value?: unknown, disabled?: boolean, backendDOMNodeId: number, center?: {x:number,y:number}, size?: {width:number,height:number}}>, truncated: boolean, total: number }}
  */
-export function buildSnapshot(nodes, options = {} as any) {
+export function buildSnapshot(nodes: any, options: any = {} as any) {
   const maxNodes = options.maxNodes ?? 400;
   const roleSet = options.roles ? new Set(options.roles) : INTERACTIVE_ROLES;
   const boxes = options.boxes;
@@ -120,7 +120,7 @@ export function buildSnapshot(nodes, options = {} as any) {
   return { nodes: out, truncated: matched > out.length, total: matched };
 }
 
-function safeJson(value) {
+function safeJson(value: any) {
   try {
     return JSON.parse(JSON.stringify(value));
   } catch {
@@ -133,8 +133,8 @@ function safeJson(value) {
  * @param {any[]} snapshotNodes
  * @param {string} ref
  */
-export function findRef(snapshotNodes, ref) {
-  return (snapshotNodes || []).find((node) => node.ref === ref) ?? null;
+export function findRef(snapshotNodes: any, ref: any) {
+  return (snapshotNodes || []).find((node: any) => node.ref === ref) ?? null;
 }
 
 /**
@@ -142,9 +142,9 @@ export function findRef(snapshotNodes, ref) {
  * @param {any[]} snapshotNodes
  * @param {{ role?: string, name?: string, exact?: boolean }} query
  */
-export function findByRole(snapshotNodes, query = {} as any) {
+export function findByRole(snapshotNodes: any, query: any = {} as any) {
   const wanted = query.name ? String(query.name).toLowerCase() : null;
-  return (snapshotNodes || []).filter((node) => {
+  return (snapshotNodes || []).filter((node: any) => {
     if (query.role && node.role !== query.role) return false;
     if (wanted === null) return true;
     const name = String(node.name ?? "").toLowerCase();
@@ -156,7 +156,7 @@ export function findByRole(snapshotNodes, query = {} as any) {
 export const MAX_SNAPSHOT_TEXT_LINES = 200;
 
 /** Render one snapshot node as a compact model-readable line. */
-export function snapshotLine(node) {
+export function snapshotLine(node: any) {
   const parts = [node.ref, node.role];
   if (node.name) parts.push(JSON.stringify(node.name));
   if (node.value !== undefined && node.value !== null && node.value !== "") parts.push("value=" + JSON.stringify(node.value));
@@ -176,7 +176,7 @@ export function snapshotLine(node) {
  * @param {{ maxLines?: number }} [options]
  * @returns {{ text: string, truncated: boolean, shown: number }}
  */
-export function formatSnapshot(snapshot, options = {} as any) {
+export function formatSnapshot(snapshot: any, options: any = {} as any) {
   const maxLines = options.maxLines ?? MAX_SNAPSHOT_TEXT_LINES;
   const nodes = (snapshot && snapshot.nodes) || [];
   const shown = nodes.slice(0, maxLines);
@@ -194,6 +194,6 @@ export function formatSnapshot(snapshot, options = {} as any) {
  * @param {{ nodes: any[], truncated?: boolean, total?: number }} snapshot
  * @param {{ maxLines?: number }} [options]
  */
-export function snapshotToText(snapshot, options = {} as any) {
+export function snapshotToText(snapshot: any, options: any = {} as any) {
   return formatSnapshot(snapshot, options).text;
 }

@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -16,12 +16,16 @@ import {
   writeState,
 } from "../../dist/src/state.js";
 
-async function tempDir() {
-  return mkdtemp(join(tmpdir(), "bh-state-"));
+async function freshDir() {
+  return tempDir("bh-state-");
 }
+import { cleanupTempDirs, tempDir } from "../helpers/temp.mjs";
+
+
+after(cleanupTempDirs);
 
 test("missing state reads as empty", async () => {
-  const dir = await tempDir();
+  const dir = await freshDir();
   const state = await readState("default", dir);
   assert.equal(state.version, 1);
   assert.equal(state.current, null);
@@ -30,7 +34,7 @@ test("missing state reads as empty", async () => {
 });
 
 test("writeState is atomic and round-trips, adding updatedAt", async () => {
-  const dir = await tempDir();
+  const dir = await freshDir();
   const written = await writeState({ ...emptyState(), current: { targetId: "T1", url: "https://example.com" } }, "default", dir);
   assert.ok(written.updatedAt);
   const state = await readState("default", dir);
@@ -40,14 +44,14 @@ test("writeState is atomic and round-trips, adding updatedAt", async () => {
 });
 
 test("corrupt state file falls back to empty state", async () => {
-  const dir = await tempDir();
+  const dir = await freshDir();
   await writeFile(statePath("default", dir), "{not json", "utf8");
   const state = await readState("default", dir);
   assert.equal(state.current, null);
 });
 
 test("updateState serializes read-modify-write with the lane lock", async () => {
-  const dir = await tempDir();
+  const dir = await freshDir();
   await Promise.all(
     Array.from({ length: 5 }, (_, index) =>
       updateState("default", (state) => {
@@ -60,7 +64,7 @@ test("updateState serializes read-modify-write with the lane lock", async () => 
 });
 
 test("owned tabs are remembered once and forgotten", async () => {
-  const dir = await tempDir();
+  const dir = await freshDir();
   await rememberOwnedTab("default", { targetId: "T1", url: "https://a.example" }, dir);
   await rememberOwnedTab("default", { targetId: "T1", url: "https://a.example" }, dir);
   await rememberOwnedTab("default", { targetId: "T2", url: "https://b.example" }, dir);
@@ -74,7 +78,7 @@ test("owned tabs are remembered once and forgotten", async () => {
 });
 
 test("lanes are isolated and lane names are sanitized", async () => {
-  const dir = await tempDir();
+  const dir = await freshDir();
   await writeState({ ...emptyState(), count: 1 }, "a", dir);
   await writeState({ ...emptyState(), count: 2 }, "b", dir);
   assert.equal((await readState("a", dir)).count, 1);
@@ -83,7 +87,7 @@ test("lanes are isolated and lane names are sanitized", async () => {
 });
 
 test("tab groups are remembered per lane and invalid groups are dropped", async () => {
-  const dir = await tempDir();
+  const dir = await freshDir();
   const written = await setGroup("default", { id: 42, title: "DSH · task", color: "blue" }, dir);
   assert.equal(written.group.id, 42);
   const state = await readState("default", dir);

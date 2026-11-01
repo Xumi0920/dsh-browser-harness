@@ -14,9 +14,9 @@ cd C:\path\to\dsh-browser-harness
 npm install                                   # 仅开发依赖：typescript + @types/node
 npm run build                                 # tsc 编译到 dist/（发布产物）
 
-npm test                                      # 构建 + 96 单测（fake CDP 替身，无需浏览器）
+npm test                                      # 构建 + 100 单测（fake CDP 替身，无需浏览器）
 npm run test:integration                      # 构建 + 27 场景（真实 headless/headful Chromium）
-npm run test:all                              # 构建 + 共 123 条
+npm run test:all                              # 构建 + 共 127 条
 node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟（需先 build）
 ```
 

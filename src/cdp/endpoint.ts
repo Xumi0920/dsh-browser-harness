@@ -34,7 +34,7 @@ export const KNOWN_BROWSERS = Object.freeze({
 
 /** Convention ports keyed by browser id (kept for compatibility). */
 export const DEFAULT_PORTS = Object.freeze(
-  Object.fromEntries(Object.entries(KNOWN_BROWSERS).map(([id, entry]) => [id, entry.port])),
+  Object.fromEntries(Object.entries(KNOWN_BROWSERS).map(([id, entry]: any) => [id, entry.port])),
 );
 
 /** Standard `--remote-debugging-port` values probed as a last-resort fallback. */
@@ -44,7 +44,7 @@ export function defaultDshHome() {
   return process.env.DSH_HOME || join(homedir(), ".dsh");
 }
 
-export function registryPath(dshHome = defaultDshHome()) {
+export function registryPath(dshHome: any = defaultDshHome()) {
   return join(dshHome, "browser-cdp", "registry.json");
 }
 
@@ -52,7 +52,7 @@ export function registryPath(dshHome = defaultDshHome()) {
  * Read the local browser-cdp registry. Missing/invalid file returns `null`.
  * @param {{ dshHome?: string }} [options]
  */
-export async function readRegistry(options = {} as any) {
+export async function readRegistry(options: any = {} as any) {
   const file = registryPath(options.dshHome);
   try {
     const raw = await readFile(file, "utf8");
@@ -64,13 +64,13 @@ export async function readRegistry(options = {} as any) {
   }
 }
 
-function normalizeBaseUrl(value) {
+function normalizeBaseUrl(value: any) {
   return String(value).replace(/\/$/, "");
 }
 
 /** HTTP DevTools base URL for a registry entry or a known browser. */
-function candidateFor(id, entry = {} as any) {
-  const known = KNOWN_BROWSERS[id] || {};
+function candidateFor(id: any, entry: any = {} as any) {
+  const known = (KNOWN_BROWSERS as Record<string, any>)[id] || {};
   const httpUrl = typeof entry.httpUrl === "string" && entry.httpUrl.length > 0
     ? normalizeBaseUrl(entry.httpUrl)
     : null;
@@ -85,7 +85,7 @@ function candidateFor(id, entry = {} as any) {
 }
 
 /** Candidates from a registry file; disabled entries are skipped. */
-function registryCandidates(registry) {
+function registryCandidates(registry: any) {
   const out: any[] = [];
   for (const [id, entry] of Object.entries(((registry && registry.browsers) || {}) as Record<string, any>)) {
     if (!entry || entry.enabled === false) continue;
@@ -98,13 +98,13 @@ function registryCandidates(registry) {
 /** Candidates when no registry file exists: every known Chromium browser. */
 function defaultCandidates() {
   return Object.entries(KNOWN_BROWSERS)
-    .map(([id]) => candidateFor(id))
+    .map(([id]: any) => candidateFor(id))
     .filter(Boolean);
 }
 
 /** Extra endpoints to try when every configured candidate is down. */
-function fallbackCandidates(configured, disabledIds) {
-  const tried = new Set(configured.map((candidate) => candidate.httpUrl));
+function fallbackCandidates(configured: any, disabledIds: any) {
+  const tried = new Set(configured.map((candidate: any) => candidate.httpUrl));
   const out: any[] = [];
   for (const [id, entry] of Object.entries(KNOWN_BROWSERS)) {
     if (disabledIds.has(id)) continue;
@@ -120,7 +120,7 @@ function fallbackCandidates(configured, disabledIds) {
   return out;
 }
 
-function disabledBrowserIds(registry) {
+function disabledBrowserIds(registry: any) {
   const ids = new Set();
   for (const [id, entry] of Object.entries(((registry && registry.browsers) || {}) as Record<string, any>)) {
     if (entry && entry.enabled === false) ids.add(id);
@@ -134,7 +134,7 @@ function disabledBrowserIds(registry) {
  * @param {{ fetchImpl?: typeof fetch, timeoutMs?: number }} [options]
  * @returns {Promise<{ webSocketDebuggerUrl: string, browser?: string, userAgent?: string }>}
  */
-export async function probeVersion(httpUrl, options = {} as any) {
+export async function probeVersion(httpUrl: any, options: any = {} as any) {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const timeoutMs = options.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS;
   if (typeof fetchImpl !== "function") throw noBrowser("no fetch implementation available to probe the CDP endpoint");
@@ -175,7 +175,7 @@ export async function probeVersion(httpUrl, options = {} as any) {
  * }} [options]
  * @returns {Promise<{ wsUrl: string, httpUrl?: string, browser?: string, source: string }>}
  */
-export async function resolveEndpoint(options = {} as any) {
+export async function resolveEndpoint(options: any = {} as any) {
   const env = options.env ?? process.env;
   const fetchImpl = options.fetchImpl;
   const probeOptions = { fetchImpl, timeoutMs: options.probeTimeoutMs };
@@ -195,7 +195,7 @@ export async function resolveEndpoint(options = {} as any) {
 
   if (selector && selector !== "auto") {
     const fromRegistry = registry && registry.browsers ? registry.browsers[selector] : undefined;
-    const known = KNOWN_BROWSERS[selector] || KNOWN_BROWSERS[String(selector).toLowerCase()];
+    const known = (KNOWN_BROWSERS as Record<string, any>)[selector] || (KNOWN_BROWSERS as Record<string, any>)[String(selector).toLowerCase()];
     const candidate = fromRegistry ? candidateFor(selector, fromRegistry) : known ? candidateFor(selector) : null;
     if (!candidate) {
       const knownIds = new Set([
@@ -210,7 +210,7 @@ export async function resolveEndpoint(options = {} as any) {
 
   const preferred = registry && typeof registry.default === "string" ? registry.default : null;
   const ordered = preferred
-    ? [...configured].sort((a, b) => (a.id === preferred ? -1 : b.id === preferred ? 1 : 0))
+    ? [...configured].sort((a: any, b: any) => (a.id === preferred ? -1 : b.id === preferred ? 1 : 0))
     : configured;
   const failures: any[] = [];
   for (const candidate of ordered) {
@@ -225,7 +225,7 @@ export async function resolveEndpoint(options = {} as any) {
   // Nothing configured answered: try the other known Chromium ports and the
   // standard --remote-debugging-port values in parallel.
   const fallbacks = fallbackCandidates(configured, disabledBrowserIds(registry));
-  const settled = await Promise.allSettled(fallbacks.map((candidate) => probeVersion(candidate.httpUrl, probeOptions)));
+  const settled = await Promise.allSettled(fallbacks.map((candidate: any) => probeVersion(candidate.httpUrl, probeOptions)));
   for (let index = 0; index < settled.length; index += 1) {
     const result = settled[index];
     if (result.status === "fulfilled") {
@@ -241,18 +241,18 @@ export async function resolveEndpoint(options = {} as any) {
  * Probe every registry (or default) browser for `doctor`/`browser_status`.
  * @param {{ dshHome?: string, fetchImpl?: typeof fetch, probeTimeoutMs?: number }} [options]
  */
-export async function listEndpoints(options = {} as any) {
+export async function listEndpoints(options: any = {} as any) {
   const registry = await readRegistry({ dshHome: options.dshHome });
   const entries = (registry && registry.browsers
     ? Object.entries(registry.browsers)
-    : Object.entries(KNOWN_BROWSERS).map(([id, entry]) => [id, { label: entry.label, port: entry.port, enabled: true, mode: "cdp" }])) as [string, any][];
+    : Object.entries(KNOWN_BROWSERS).map(([id, entry]: any) => [id, { label: entry.label, port: entry.port, enabled: true, mode: "cdp" }])) as [string, any][];
   const probeOptions = { fetchImpl: options.fetchImpl, timeoutMs: options.probeTimeoutMs };
-  const rows = await Promise.all(entries.map(async ([id, entry]) => {
+  const rows = await Promise.all(entries.map(async ([id, entry]: any) => {
     const candidate = candidateFor(id, entry || {});
     const enabled = !(entry && entry.enabled === false);
     const row: any = {
       id,
-      label: (entry && entry.label) || (KNOWN_BROWSERS[id] && KNOWN_BROWSERS[id].label) || id,
+      label: (entry && entry.label) || ((KNOWN_BROWSERS as Record<string, any>)[id] && (KNOWN_BROWSERS as Record<string, any>)[id].label) || id,
       port: candidate ? candidate.port : null,
       enabled,
       httpUrl: candidate ? candidate.httpUrl : null,
