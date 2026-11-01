@@ -29,7 +29,8 @@ browser_tabs        list / use / new / close
 - **真实登录态**：接自己起好的专用 Chromium 实例，登录一次长期有效；不碰日常浏览器。
 - **文本优先**：无障碍树 + ref 比“截图喂视觉模型”更准更省，截图只是补充。
 - **按任务标签组**：插件自建的标签页自动按 DSH 会话分组，工作标签页不受影响；headless 自动跳过。
-- **可验证**：102 单测（fake CDP）+ 27 集成场景（真实 headless/headful Chromium）= 129 条，CI 覆盖三平台。
+- **可验证**：108 单测（fake CDP）+ 27 集成场景（真实 headless/headful Chromium）= 135 条，CI 覆盖三平台。
+- **收紧的边界**：`browser_tabs use` 只接受 page + http(s)/about:blank（非自建页需精确 targetId）；截图限定 `screenshotDir` 且不覆盖；fill 不回显输入值；JS 模式标非并发；工具输出对 token 类 URL/headers 尽力脱敏；宽泛端口回退改为显式 `auto`。
 
 ## 环境要求
 
@@ -46,7 +47,7 @@ browser_tabs        list / use / new / close
 
 1. **插件页（推荐）**：DSH Web → 插件页 → 添加插件 → 安装第三方插件，支持 npm 包名 / Git 仓库 / 本地目录；或在「发现」标签页安装市场条目。
 2. **一句话交给 DSH**（创造模式会话）：`把 @xumi0920/dsh-browser-harness 安装到当前 profile`。
-3. **手动安装（GitHub Packages）**：
+3. **手动安装（GitHub Packages，classic PAT）**：
 
 ```powershell
 npm config set "@xumi0920:registry" "https://npm.pkg.github.com"
@@ -55,7 +56,7 @@ npm config set "//npm.pkg.github.com/:_authToken" "<YOUR_GITHUB_TOKEN>"
   plugin --profile desktop add "@xumi0920/dsh-browser-harness"
 ```
 
-> GitHub Packages 需要 read:packages token；本地目录安装前先 `npm install && npm run build`；CLI 改 profile 前先退出 DSH。**热插拔**：`application: applied` 已生效，`restart-required` 才需重启（替换已安装包通常需要重启加载新的 JS 模块，原因见返回的 `restartReason`）。
+> GitHub Packages npm registry **只支持 classic PAT**（scope `read:packages`），不支持 fine-grained token。手动 `npm config set` 会把 token 持久化到 `~/.npmrc`：建议优先用一键脚本（临时配置，装完即删）；手动安装后请执行 `npm config delete "//npm.pkg.github.com/:_authToken"` 并撤销该 token。本地目录安装前先 `npm install && npm run build`；CLI 改 profile 前先退出 DSH。**热插拔**：`application: applied` 已生效，`restart-required` 才需重启（替换已安装包通常需要重启加载新的 JS 模块，原因见返回的 `restartReason`）。
 
 ## 快速开始
 
@@ -88,6 +89,7 @@ browser_extract {mode:"text" | "html" | "js" | "network"}
 | [架构](docs/architecture.md) | 分层、关键流程、错误模型、安全边界 |
 | [扩展与语言](docs/extending.md) | 原生 JS/TS 插件、热插拔/HMR、MCP 接 Python 等 |
 | [仓库结构](docs/README.md) | 目录约定、维护与发布流程 |
+| [安全策略](SECURITY.md) | 漏洞私密报告、支持版本、数据处理说明 |
 
 ## 扩展与语言
 
@@ -99,7 +101,7 @@ browser_extract {mode:"text" | "html" | "js" | "network"}
 
 ```sh
 npm install                 # 开发依赖（TypeScript），运行时零依赖
-npm run test:all            # 构建 + 102 单测 + 27 集成场景 = 129 条
+npm run test:all            # 构建 + 108 单测 + 27 集成场景 = 135 条
 ```
 
 CI：单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场景跑 ubuntu + xvfb（门禁 27 条，S15/S16 必须实跑）。测试与脚本同样由 `tsc` 编译（`dist-tests/` / `dist-scripts/`），与运行时源码共用 NodeNext 配置。
@@ -107,10 +109,13 @@ CI：单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场�
 ## 安全边界
 
 - 只关闭本 harness 创建的标签页；`force` 关闭需要用户明确同意。
-- Cookie 默认脱敏，不主动读取或打印 token；`browser_status` / `browser_tabs` 会原样返回含 token 的 URL，不要外发。
-- 只在显式请求时返回页面内容；不要把 `cdpUrl` 指向日常浏览器。
-- 全部后台操作，不抢前台；遇到登录墙停手问人。
+- `browser_tabs use` 只接受 **page** target + `http(s)`/`about:blank`；非自建页必须精确 `targetId`，URL 子串只匹配自建页；`file:`/`chrome:`/扩展 worker 会被拒绝。
+- 截图只写 `screenshotDir`（默认 `<stateDir>/screenshots`），拒绝目录外路径、symlink 逃逸和覆盖已有文件。
+- `browser_act fill` 只返回 `{ok, length, verified}`，不回显输入；JS 模式可修改页面状态，已标非并发。
+- Cookie 默认脱敏；network URL/headers、status/tabs URL 对 token 类字段尽力脱敏。页面正文、HTML、截图仍可能含敏感数据，不要把工具输出当完整 DLP。
+- 状态文件只保存去掉 query/fragment 的 URL；宽泛 CDP 端口回退需显式 `browser: "auto"` / `BH_ALLOW_FALLBACK=1`。
+- 不要把 `cdpUrl` 指向日常浏览器；全部后台操作，不抢前台；遇到登录墙停手问人。
 
 ## 许可
 
-MIT © 2026 Xumi0920 · 当前版本 **v0.5.1** · 全量 TypeScript（源码/测试/脚本/扩展）· 更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)
+MIT © 2026 Xumi0920 · 当前版本 **v0.6.0** · 全量 TypeScript（源码/测试/脚本/扩展）· 更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)

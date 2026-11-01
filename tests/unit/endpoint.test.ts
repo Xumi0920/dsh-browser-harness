@@ -112,7 +112,7 @@ test("auto mode prefers the registry default, then falls through enabled browser
 test("auto mode reports every tried endpoint when nothing is reachable", async () => {
   const home = await dshHomeWithRegistry(registry);
   await assert.rejects(
-    resolveEndpoint({ dshHome: home, fetchImpl: fakeFetch(() => { throw new Error("down"); }) }),
+    resolveEndpoint({ browser: "auto", dshHome: home, fetchImpl: fakeFetch(() => { throw new Error("down"); }) }),
     (error: any) => {
       assert.equal(error.code, "E_NO_BROWSER");
       // 2 configured candidates + the other known Chromium ports + 9222/9223
@@ -208,6 +208,7 @@ test("auto mode falls back to standard Chromium debugging ports", async () => {
     browsers: { chrome: { port: 9331, enabled: true } },
   });
   const endpoint = await resolveEndpoint({
+    browser: "auto",
     dshHome: home,
     fetchImpl: fakeFetch((url) => {
       if (url.includes(":9222")) return jsonResponse({ webSocketDebuggerUrl: "ws://127.0.0.1:9222/devtools/browser/any", Browser: "Chromium/140" });
@@ -281,4 +282,28 @@ test("probeVersion maps an aborted probe to E_NO_BROWSER", async () => {
     assert.match(error.message, /probe timed out/);
     return true;
   });
+});
+
+test("broad fallback probing is opt-in and does not touch 9222 by default", async () => {
+  const home = await dshHomeWithRegistry({
+    version: 1,
+    default: "chrome",
+    browsers: { chrome: { port: 9331, enabled: true } },
+  });
+  const seen = [];
+  await assert.rejects(
+    resolveEndpoint({
+      dshHome: home,
+      fetchImpl: fakeFetch((url) => {
+        seen.push(url);
+        throw new Error("refused");
+      }),
+    }),
+    (error: any) => {
+      assert.equal(error.code, "E_NO_BROWSER");
+      assert.match(error.message, /browser: "auto"/);
+      assert.ok(!seen.some((url) => url.includes(":9222")), "9222/9223 are only probed in explicit auto mode");
+      return true;
+    },
+  );
 });

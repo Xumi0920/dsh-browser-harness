@@ -5,8 +5,8 @@
  * background listeners beyond the lifetime of this Page object.
  */
 
-import { writeFile, readFile, readdir, stat, mkdir } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { writeFile, readFile, readdir, stat, mkdir, realpath } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import {
   badArgument,
@@ -15,6 +15,7 @@ import {
   elementNotFound,
   evalFailure,
   frameNotFound,
+  policyDenied,
   selectorTimeout,
   uploadFailed,
   waitTimeout,
@@ -91,6 +92,7 @@ export class Page {
   dialogPolicy: string;
   focusEmulation: boolean;
   downloadDir: string;
+  screenshotDir: string;
   executionContexts: any[];
   runtimeEnabled: boolean;
   ownedListeners: any[];
@@ -122,6 +124,7 @@ export class Page {
     this.dialogPolicy = browser.config.dialogPolicy ?? "auto-dismiss";
     this.focusEmulation = browser.config.focusEmulation !== false;
     this.downloadDir = browser.config.downloadDir;
+    this.screenshotDir = browser.config.screenshotDir || join(browser.config.stateDir || "", "screenshots");
     /** @type {any[]} */
     this.executionContexts = [];
     this.runtimeEnabled = false;
@@ -432,7 +435,12 @@ export class Page {
     if (target.objectId) {
       await this.send("Runtime.callFunctionOn", { objectId: target.objectId, functionDeclaration: "function () { this.dispatchEvent(new Event('input', { bubbles: true })); this.dispatchEvent(new Event('change', { bubbles: true })); return this.value; }", returnByValue: true }, { timeoutMs: 5_000 });
     }
-    return { ok: true, length: value.length, ...(options.verify ? { value: await this.evaluate("document.activeElement ? document.activeElement.value : null") } : {}) };
+    let verified: boolean | undefined;
+    if (options.verify) {
+      const current = await this.evaluate("document.activeElement ? document.activeElement.value : null");
+      verified = String(current ?? "") === value;
+    }
+    return { ok: true, length: value.length, ...(verified === undefined ? {} : { verified }) };
   }
 
   async #resolveTargetHandle(target: any) {
@@ -521,13 +529,37 @@ export class Page {
     }, { args: [String(selector)] });
   }
 
-  /** Capture a PNG screenshot and return its path and pixel size. */
+  /**
+   * Capture a PNG screenshot and return its path and pixel size.
+   *
+   * Files are confined to the configured screenshotDir (default
+   * <stateDir>/screenshots). Relative paths resolve inside that directory, and
+   * existing files are never overwritten.
+   */
   async screenshot({ path: filePath, fullPage = false }: any = {} as any) {
     const result = await this.send("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: Boolean(fullPage) }, { timeoutMs: 60_000 });
     const buffer = Buffer.from(result.data, "base64");
-    const target = filePath ? resolve(filePath) : join(tmpdir(), "bh-shot-" + Date.now() + ".png");
-    await mkdir(join(target, ".."), { recursive: true });
-    await writeFile(target, buffer);
+    const base = resolve(this.screenshotDir);
+    await mkdir(base, { recursive: true, mode: 0o700 });
+    const realBase = await realpath(base).catch(() => base);
+    const target = filePath ? resolve(base, String(filePath)) : join(base, "bh-shot-" + Date.now() + ".png");
+    const relativeTarget = relative(resolve(this.screenshotDir), target);
+    if (relativeTarget === ".." || relativeTarget.startsWith(".." + sep) || isAbsolute(relativeTarget)) {
+      throw policyDenied("screenshot path must stay inside screenshotDir", { path: target, screenshotDir: base });
+    }
+    const parent = dirname(target);
+    await mkdir(parent, { recursive: true, mode: 0o700 });
+    const realParent = await realpath(parent).catch(() => parent);
+    const relativeParent = relative(realBase, realParent);
+    if (relativeParent === ".." || relativeParent.startsWith(".." + sep) || isAbsolute(relativeParent)) {
+      throw policyDenied("screenshot path must stay inside screenshotDir", { path: target, screenshotDir: realBase });
+    }
+    try {
+      await writeFile(target, buffer, { flag: "wx", mode: 0o600 });
+    } catch (error: any) {
+      if (error && error.code === "EEXIST") throw policyDenied("refusing to overwrite an existing screenshot", { path: target });
+      throw error;
+    }
     const size = pngSize(buffer);
     return { path: target, bytes: buffer.length, width: size ? size.width : null, height: size ? size.height : null };
   }

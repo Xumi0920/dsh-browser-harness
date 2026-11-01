@@ -192,6 +192,9 @@ export async function resolveEndpoint(options: any = {} as any) {
   const registry = await readRegistry({ dshHome: options.dshHome });
   const configured = registry && registry.browsers ? registryCandidates(registry) : defaultCandidates();
   const selector = options.browser ?? env.BH_BROWSER;
+  // Broad fallback probing of other known Chromium/9222/9223 ports is opt-in:
+  // it can attach to a browser the user did not intend to expose.
+  const allowFallback = selector === "auto" || options.allowFallback === true || env.BH_ALLOW_FALLBACK === "1";
 
   if (selector && selector !== "auto") {
     const fromRegistry = registry && registry.browsers ? registry.browsers[selector] : undefined;
@@ -222,8 +225,15 @@ export async function resolveEndpoint(options: any = {} as any) {
     }
   }
 
-  // Nothing configured answered: try the other known Chromium ports and the
-  // standard --remote-debugging-port values in parallel.
+  if (!allowFallback) {
+    throw noBrowser(
+      'no configured CDP endpoint answered; pass browser: "auto" (or BH_ALLOW_FALLBACK=1) to also probe other known Chromium/9222/9223 ports',
+      { tried: failures },
+    );
+  }
+
+  // Explicit auto mode: try the other known Chromium ports and the standard
+  // --remote-debugging-port values in parallel.
   const fallbacks = fallbackCandidates(configured, disabledBrowserIds(registry));
   const settled = await Promise.allSettled(fallbacks.map((candidate: any) => probeVersion(candidate.httpUrl, probeOptions)));
   for (let index = 0; index < settled.length; index += 1) {

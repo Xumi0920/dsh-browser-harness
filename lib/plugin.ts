@@ -20,6 +20,7 @@ export function resolveConfig(config: any = {}) {
     ws: config.ws,
     stateDir: config.stateDir,
     downloadDir: config.downloadDir,
+    screenshotDir: config.screenshotDir,
     dialogPolicy: config.dialogPolicy || "auto-dismiss",
     maxSnapshotNodes: Number(config.maxSnapshotNodes) || 250,
     tabGroups: config.tabGroups !== false,

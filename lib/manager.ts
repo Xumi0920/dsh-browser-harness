@@ -44,6 +44,7 @@ export class BrowserManager {
           ws: this.config.ws,
           stateDir: this.config.stateDir,
           downloadDir: this.config.downloadDir,
+          screenshotDir: this.config.screenshotDir,
           dialogPolicy: this.config.dialogPolicy,
           tabGroups: this.config.tabGroups,
           tabGroupTitle: this.config.tabGroupTitle,

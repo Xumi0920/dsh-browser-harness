@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Page } from "../../dist/src/page.js";
+import { join } from "node:path";
 import { FakeTransport, quad } from "./helpers/fake-transport.js";
+import { tempDir } from "../helpers/temp.js";
 
 const AX_NODES = [
   { role: { value: "button" }, backendDOMNodeId: 10, name: { value: "Go" } },
@@ -116,4 +118,38 @@ test("networkBodies records per-response body errors", async () => {
   const withBodies = await page.networkBodies([{ requestId: "r1", url: "https://api.test/x", status: 200 }]);
   assert.match(withBodies[0].bodyError, /No resource/);
   assert.equal(withBodies[0].body, undefined);
+});
+
+test("fill returns only length/verified, never the entered value", async () => {
+  const { page } = setupPage();
+  const result = await page.fill({ selector: "#name", text: "secret-value" });
+  assert.deepEqual(Object.keys(result).sort(), ["length", "ok"]);
+  const verified = await page.fill({ selector: "#name", text: "secret-value" }, { verify: true });
+  assert.equal(typeof verified.verified, "boolean");
+  assert.equal("value" in verified, false);
+});
+
+test("screenshots stay inside screenshotDir and never overwrite", async () => {
+  const transport = new FakeTransport();
+  const png = Buffer.alloc(32);
+  Buffer.from("89504e470d0a1a0a", "hex").copy(png, 0);
+  png.writeUInt32BE(1, 16);
+  png.writeUInt32BE(1, 20);
+  transport.on("Page.captureScreenshot", () => ({ data: png.toString("base64") }));
+  const dir = await tempDir("bh-page-shot-");
+  const browser = {
+    transport,
+    config: { dialogPolicy: "auto-dismiss", focusEmulation: false, stateDir: dir, screenshotDir: dir },
+  };
+  const page = new Page(browser, { sessionId: "s1", targetId: "t1" });
+  const shot = await page.screenshot({ path: "shot.png" });
+  assert.equal(shot.path, join(dir, "shot.png"));
+  await assert.rejects(page.screenshot({ path: "../escape.png" }), (error: any) => {
+    assert.equal(error.code, "E_POLICY_DENIED");
+    return true;
+  });
+  await assert.rejects(page.screenshot({ path: "shot.png" }), (error: any) => {
+    assert.equal(error.code, "E_POLICY_DENIED");
+    return true;
+  });
 });

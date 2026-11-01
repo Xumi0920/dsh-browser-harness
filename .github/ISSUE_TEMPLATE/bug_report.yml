@@ -1,0 +1,63 @@
+name: Bug report
+description: Something in the browser harness does not work as documented
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do **not** paste tokens, cookies, customer data, browser profiles or personal paths.
+        Security issues must go through the private Security Advisories entry.
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      placeholder: v0.6.0
+    validations:
+      required: true
+  - type: input
+    id: dsh-version
+    attributes:
+      label: DSH version
+      placeholder: 0.2.1-rc.5
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser / CDP endpoint
+      placeholder: Chrome 156 on port 9331
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: Windows 11 / Ubuntu 24.04 / macOS 15
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: 1. browser_status ... 2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour and sanitized logs
+      description: Remove URLs with tokens, cookies, customer data and local absolute paths.
+    validations:
+      required: true
+  - type: checkboxes
+    id: sanitized
+    attributes:
+      label: Sanitization
+      options:
+        - label: I removed secrets, cookies, customer data and personal paths from this report.
+          required: true

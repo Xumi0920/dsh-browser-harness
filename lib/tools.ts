@@ -16,10 +16,61 @@ const jsonOutput = {
   render: (_args: any, value: any) => [{ type: "text", text: textOutput(value) }],
 };
 
+const SENSITIVE_QUERY = /^(token|access_token|refresh_token|id_token|session|sessionid|sid|auth|authorization|password|passwd|secret|api[-_]?key|key|code)$/i;
+const SENSITIVE_HEADER = /^(authorization|proxy-authorization|cookie|set-cookie|x[-_].*(token|secret|session|auth|key).*)$/i;
+
+/** Strip credentials and sensitive query values before a URL enters tool output. */
+export function redactUrlForOutput(raw: any) {
+  const text = String(raw || "");
+  if (!text) return raw;
+  try {
+    const url = new URL(text);
+    let changed = false;
+    if (url.username) { url.username = "redacted"; changed = true; }
+    if (url.password) { url.password = "redacted"; changed = true; }
+    for (const [key, value] of [...url.searchParams.entries()]) {
+      if (SENSITIVE_QUERY.test(key) || /(token|secret|session|password|authorization)/i.test(value)) {
+        url.searchParams.set(key, "[redacted]");
+        changed = true;
+      }
+    }
+    if (url.hash) { url.hash = "#redacted"; changed = true; }
+    return changed ? url.toString() : text;
+  } catch {
+    return text;
+  }
+}
+
+/** Redact credential-carrying response/request headers. */
+export function redactHeadersForOutput(headers: any) {
+  if (!headers || typeof headers !== "object") return headers;
+  const out: any = {};
+  for (const [key, value] of Object.entries(headers)) out[key] = SENSITIVE_HEADER.test(key) ? "[redacted]" : value;
+  return out;
+}
+
+function redactEvent(event: any) {
+  return {
+    ...event,
+    ...(event && event.url !== undefined ? { url: redactUrlForOutput(event.url) } : {}),
+    ...(event && event.headers !== undefined ? { headers: redactHeadersForOutput(event.headers) } : {}),
+  };
+}
+
+function redactStatus(status: any) {
+  if (!status || typeof status !== "object") return status;
+  return {
+    ...status,
+    ...(status.current ? { current: redactEvent(status.current) } : {}),
+    ...(Array.isArray(status.tabs) ? { tabs: status.tabs.map(redactEvent) } : {}),
+  };
+}
+
+
 function summarizePage(page: any, info: any) {
   return {
     targetId: page.targetId,
-    url: info && info.url,
+    url: redactUrlForOutput(info && info.url),
     title: info && info.title,
     readyState: info && info.readyState,
     viewport: info && info.viewport,
@@ -59,7 +110,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       output: jsonOutput,
       timeoutMs: 20_000,
       isConcurrencySafe: () => true,
-      execute: wrap(async (args: any, sessionId: any) => manager.status(sessionId)),
+      execute: wrap(async (args: any, sessionId: any) => redactStatus(await manager.status(sessionId))),
     }),
 
     tool({
@@ -101,14 +152,14 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         let nodes = snapshot.nodes;
         if (args.role || args.name) nodes = findByRole(nodes, { role: args.role, name: args.name });
         const rendered = formatSnapshot({ ...snapshot, nodes });
-        return { targetId: page.targetId, url: (await page.info()).url, text: rendered.text, nodes: nodes.length, truncated: rendered.truncated };
+        return { targetId: page.targetId, url: redactUrlForOutput((await page.info()).url), text: rendered.text, nodes: nodes.length, truncated: rendered.truncated };
       }),
     }),
 
     tool({
       name: "browser_act",
       description:
-        "Perform one browser action: click a ref/selector/coordinate, type into the focused element, fill an input like a user, press a key, or scroll. Use refs from browser_navigate/browser_snapshot; verify the result afterwards (snapshot or browser_extract).",
+        "Perform one browser action: click a ref/selector/coordinate, type into the focused element, fill an input like a user, press a key, or scroll. Use refs from browser_navigate/browser_snapshot; verify the result afterwards (snapshot or browser_extract). fill returns only length/verified, never the entered value.",
       parameters: {
         action: { type: "string", required: true, enum: ["click", "type", "fill", "press", "scroll"], description: "action to perform" },
         ref: { type: "string", description: "snapshot ref such as e3" },
@@ -151,7 +202,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
     tool({
       name: "browser_extract",
       description:
-        "Read from the current page: visible text (text), raw HTML (html), a JavaScript expression result (js), or captured network responses (network). Prefer browser_snapshot for interaction targets and this tool for content/data.",
+        "Read from the current page: visible text (text), raw HTML (html), a JavaScript expression result (js), or captured network responses (network). Prefer browser_snapshot for interaction targets and this tool for content/data. js mode executes arbitrary page JavaScript with user-gesture semantics: it can change page state and is treated as non-concurrent; URLs/headers with token-like values are redacted in output, page content itself is not.",
       parameters: {
         mode: { type: "string", required: true, enum: ["text", "html", "js", "network"], description: "what to read" },
         selector: { type: "string", description: "CSS selector for text/html modes (defaults to body)" },
@@ -161,7 +212,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       },
       output: jsonOutput,
       timeoutMs: 30_000,
-      isConcurrencySafe: () => true,
+      isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
         const page = await manager.pageFor(sessionId);
         const mode = String(args.mode);
@@ -193,10 +244,10 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         }
         if (mode === "network") {
           const matched = page.networkEvents().filter((event: any) => !args.urlContains || String(event.url || "").includes(String(args.urlContains)));
-          const events = matched.slice(-100);
+          const events = matched.slice(-100).map(redactEvent);
           const capturing = Boolean(page.networkEnabled);
           if (args.includeBody) {
-            const withBodies = await page.networkBodies(events);
+            const withBodies = (await page.networkBodies(events)).map(redactEvent);
             return { mode, events: withBodies, count: withBodies.length, capturing };
           }
           return { mode, events, count: events.length, capturing };
@@ -207,10 +258,10 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
 
     tool({
       name: "browser_screenshot",
-      description: "Capture a PNG screenshot of the current page and return its file path (open it with an image reader). Use when layout or visual state matters.",
+      description: "Capture a PNG screenshot of the current page and return its file path (open it with an image reader). Use when layout or visual state matters. The file is written inside the configured screenshotDir (default <stateDir>/screenshots); existing files are never overwritten.",
       parameters: {
         fullPage: { type: "boolean", description: "capture beyond the viewport (default false)" },
-        path: { type: "string", description: "optional absolute file path for the PNG" },
+        path: { type: "string", description: "optional relative file name under screenshotDir (default: bh-shot-<timestamp>.png)" },
       },
       output: jsonOutput,
       timeoutMs: 60_000,
@@ -227,7 +278,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         "Manage background tabs: list them, switch the session to one (use), open a new blank tab, or close a tab this harness created. Never closes user tabs.",
       parameters: {
         action: { type: "string", required: true, enum: ["list", "use", "new", "close"], description: "tab operation" },
-        targetId: { type: "string", description: "target id for use/close" },
+        targetId: { type: "string", description: "exact target id for use/close; use also accepts a URL substring of a harness-owned tab" },
         url: { type: "string", description: "optional URL for new" },
       },
       output: jsonOutput,
@@ -235,7 +286,14 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
         const action = String(args.action);
-        if (action === "list") return manager.listTabs(sessionId);
+        if (action === "list") {
+          const result = await manager.listTabs(sessionId);
+          return {
+            ...result,
+            ...(Array.isArray(result && result.tabs) ? { tabs: result.tabs.map(redactEvent) } : {}),
+            ...(result && result.current ? { current: redactEvent(result.current) } : {}),
+          };
+        }
         if (action === "use") {
           if (!args.targetId) throw new HarnessError("E_BAD_ARG", "use needs targetId");
           const page = await manager.useTab(sessionId, args.targetId);

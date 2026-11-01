@@ -7,9 +7,10 @@
 解析顺序：显式 `ws` → 显式 `cdpUrl` → 环境变量（`BH_WS` / `BH_CDP_URL` / `BH_BROWSER`）→ `browser` 选择器 → registry 默认 / auto。
 
 - registry 文件：`~/.dsh/browser-cdp/registry.json`
-- `browser: "auto"`（或不指定）：先按配置实例顺序探测；都不通时并行回退其它已知 Chromium 端口与标准 `9222` / `9223`
+- 不指定 `browser`：只探测已配置的 registry 实例（或项目约定的 9331–9338 端口）；全部失败即报 `E_NO_BROWSER`
+- 显式 `browser: "auto"`（或 `BH_ALLOW_FALLBACK=1`）：配置实例都不通时，才并行回退其它已知 Chromium 端口与标准 `9222` / `9223`
 
-> auto 回退会探测任意本地 CDP 端口：如果日常浏览器也开了 remote debugging，可能附着到它。普通日常浏览器默认不开启 remote debugging；请确认 9222/9223 不属于你要保护的工作浏览器。
+> 宽泛回退是**显式 opt-in**：它会探测任意本地 CDP 端口，如果日常浏览器也开了 remote debugging，可能附着到它。普通日常浏览器默认不开启 remote debugging；请确认 9222/9223 不属于你要保护的工作浏览器。
 
 ## 2. 支持的浏览器与默认端口
 
@@ -54,7 +55,7 @@ macOS（未实测）：
 open -na "Google Chrome" --args --remote-debugging-port=9331 "--user-data-dir=$HOME/.dsh/browser-cdp/profiles/chrome"
 ```
 
-用任意端口（如 9222）也可以：`browser: "auto"` 会自动回退探测，或直接配 `cdpUrl: "http://127.0.0.1:9222"`。
+用任意端口（如 9222）也可以：直接配 `cdpUrl: "http://127.0.0.1:9222"`；`browser: "auto"` 会**显式**回退探测标准端口。
 
 ## 4. profile patch 配置示例
 
@@ -70,6 +71,7 @@ open -na "Google Chrome" --args --remote-debugging-port=9331 "--user-data-dir=$H
     maxSnapshotNodes: 250
     # stateDir: ~/.dsh/browser-harness
     # downloadDir: ~/.dsh/browser-harness/downloads
+    # screenshotDir: ~/.dsh/browser-harness/screenshots
     # dialogPolicy: auto-dismiss
     tabGroups: true                 # 按任务给自建标签页分组（默认开）
     # tabGroupTitle: "DSH · {session}"  # 支持 {session} / {lane} 占位符
@@ -87,6 +89,7 @@ open -na "Google Chrome" --args --remote-debugging-port=9331 "--user-data-dir=$H
 | `maxSnapshotNodes` | 250 | 快照节点上限（`browser_snapshot` 可单独指定，最多 400） |
 | `stateDir` | `~/.dsh/browser-harness` | 状态文件目录（per-lane JSON） |
 | `downloadDir` | `<stateDir>/downloads` | 下载目录 |
+| `screenshotDir` | `<stateDir>/screenshots` | 截图输出目录：只允许写这里，拒绝覆盖已有文件 |
 | `dialogPolicy` | `auto-dismiss` | 对话框策略 |
 | `tabGroups` | `true` | 按任务标签页分组，见 [tab-groups.md](tab-groups.md) |
 | `tabGroupTitle` | `DSH · {session}` | 组名模板，支持 `{session}` / `{lane}` |
@@ -114,11 +117,14 @@ open -na "Google Chrome" --args --remote-debugging-port=9331 "--user-data-dir=$H
 | `BH_CDP_URL` | 直接指定 CDP HTTP 地址 |
 | `BH_WS` | 直接指定 WebSocket 地址 |
 | `BH_BROWSER` | 浏览器选择器（如 `edge` / `auto`） |
+| `BH_ALLOW_FALLBACK` | `1` = 允许 `browser` 未指定时也探测其它端口（等同显式 auto） |
 | `DSH_HOME` / `BH_STATE_DIR` | 覆盖 `~/.dsh` 与状态目录位置 |
 
 ## 7. 安全提醒
 
 - 不要把 `cdpUrl` 指向日常浏览器；专用实例的 profile 与工作 profile 分离。
-- `browser_tabs {action:"use"}` 可把会话指向已有标签页（含非自建页），之后 `browser_navigate` 会复用该页——请只对自己可操作的页面显式使用。
+- `browser_tabs {action:"use"}` 只接受 **page** target 和 `http(s)` / `about:blank` URL：非自建标签页必须用精确 `targetId`，URL 子串只匹配 harness 自建标签页；`file:`、`chrome:`、扩展 worker 等会被拒绝。
 - 只允许打开 `http(s)` 页面（`about:blank` 除外）；`file://`、`data:`、`javascript:`、`chrome://` 等会被 `E_POLICY_DENIED` 拒绝。
-- harness 探测失败会报 `E_NO_BROWSER`，不会自行启动浏览器。
+- 截图默认写入 `screenshotDir`，拒绝目录外路径、symlink 逃逸和覆盖已有文件。
+- 工具输出会对 token 类 URL query / 响应 headers 做**尽力脱敏**；页面正文、HTML、截图和用户输入仍可能包含敏感数据，不要把浏览器工具当作完整 DLP。
+- 状态文件里只保留去掉 query/fragment 的 URL；harness 探测失败会报 `E_NO_BROWSER`，不会自行启动浏览器。

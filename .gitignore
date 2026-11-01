@@ -10,3 +10,13 @@ reports/
 work-debug*.mjs
 .DS_Store
 Thumbs.db
+.env
+.env.*
+.npmrc
+*.pem
+*.key
+*.p12
+*.crt
+bh-shot-*.png
+screenshots/
+browser-data/

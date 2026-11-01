@@ -271,3 +271,43 @@ test("browser_status passes tab group status through", async () => {
   assert.equal(value.tabGroups.enabled, true);
   assert.equal(value.tabGroups.error, "headless");
 });
+
+test("browser_extract is not marked concurrency-safe", () => {
+  const extract = build().find((definition: any) => definition.name === "browser_extract");
+  assert.equal(extract.isConcurrencySafe(), false);
+});
+
+test("status and network outputs redact token-like URLs and headers", async () => {
+  const manager = fakeManager({
+    status: async () => ({
+      connected: true,
+      version: { product: "Chrome/156" },
+      tabs: [{ targetId: "T1", url: "https://example.com/app?access_token=abc123&x=1", title: "App" }],
+      current: { targetId: "T1", url: "https://example.com/app?session=xyz789", title: "App" },
+      endpoints: [],
+    }),
+  });
+  const status = build(manager).find((definition: any) => definition.name === "browser_status");
+  const statusValue: any = await status.execute({}, {});
+  assert.ok(!String(statusValue.tabs[0].url).includes("abc123"));
+  assert.match(statusValue.tabs[0].url, /redacted/i);
+  assert.ok(!String(statusValue.current.url).includes("xyz789"));
+
+  const page = {
+    targetId: "T1",
+    info: async () => ({ url: "https://example.com", title: "Example" }),
+    networkEvents: () => [{
+      url: "https://example.com/api?token=secret42&page=1",
+      status: 200,
+      headers: { authorization: "Bearer secret", "content-type": "application/json" },
+    }],
+    networkEnabled: true,
+  };
+  const networkManager = fakeManager({ pageFor: async () => page });
+  const extract = build(networkManager).find((definition: any) => definition.name === "browser_extract");
+  const network: any = await extract.execute({ mode: "network" }, {});
+  assert.ok(!network.events[0].url.includes("secret42"));
+  assert.match(network.events[0].url, /redacted/i);
+  assert.equal(network.events[0].headers.authorization, "[redacted]");
+  assert.equal(network.events[0].headers["content-type"], "application/json");
+});

@@ -11,8 +11,34 @@ import * as stateStore from "./state.js";
 import { TabGroupBridge, tabGroupColorFor, tabGroupTitleFor } from "./tabgroups.js";
 import { badArgument, elementNotFound, noTab, policyDenied, targetGone } from "./errors.js";
 
-const INTERNAL_URL = /^(chrome|devtools|edge|about:blank|chrome-extension):/;
+const INTERNAL_URL = /^(chrome|devtools|edge|about:blank|chrome-extension|file):/;
 const DEFAULT_TIMEOUT_MS = 15_000;
+
+/** A target the browser tools may attach to: a real page with a safe web URL. */
+export function isSafePageTarget(target: any) {
+  if (!target || target.type !== "page") return false;
+  const raw = String(target.url || "");
+  if (raw === "about:blank") return true;
+  try {
+    const protocol = new URL(raw).protocol;
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/** Strip query/fragment before persisting a page URL in the local state file. */
+export function sanitizeUrlForState(url: any) {
+  const raw = String(url || "");
+  try {
+    const parsed = new URL(raw);
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return raw;
+  }
+}
 
 /**
  * Only real web pages may be opened through the high-level API. Local file://,
@@ -62,6 +88,7 @@ export class Browser {
     this.config = { marker: stateStore.DEFAULT_MARKER, dialogPolicy: "auto-dismiss", focusEmulation: true, ...(options.config || {}) };
     this.config.stateDir = this.config.stateDir || stateStore.defaultStateDir();
     this.config.downloadDir = this.config.downloadDir || join(this.config.stateDir, "downloads");
+    this.config.screenshotDir = this.config.screenshotDir || join(this.config.stateDir, "screenshots");
     this.version = null;
     /** @type {Map<string, Page>} one reused Page per target (CDP session) */
     this.pages = new Map();
@@ -95,6 +122,7 @@ export class Browser {
       config: {
         stateDir: options.stateDir,
         downloadDir: options.downloadDir,
+        screenshotDir: options.screenshotDir,
         dialogPolicy: options.dialogPolicy,
         focusEmulation: options.focusEmulation,
         marker: options.marker,
@@ -132,7 +160,7 @@ export class Browser {
     const infos = targets.targetInfos || [];
     await this.#prunePages(new Set(infos.map((target: any) => target.targetId)));
     const live = infos.find((target: any) => target.targetId === state.current.targetId);
-    if (!live) return null;
+    if (!live || !isSafePageTarget(live)) return null;
     return { targetId: live.targetId, url: live.url, title: live.title };
   }
 
@@ -225,12 +253,30 @@ export class Browser {
     }
   }
 
-  /** Switch to a tab by targetId or URL substring (attach only, no activation). */
+  /**
+   * Switch this lane to an existing page.
+   *
+   * Only real page targets with http(s)/about:blank URLs are accepted. A non-owned
+   * tab must be addressed by its exact targetId; URL substrings are only matched
+   * against harness-owned tabs (they can never select a work/file/internal target).
+   */
   async use(targetIdOrUrlSubstring: any, { lane = this.lane }: any = {} as any) {
+    const key = String(targetIdOrUrlSubstring ?? "");
+    if (!key) throw badArgument("use needs a targetId or a URL substring");
     const targets = await this.transport.send("Target.getTargets", {}, { timeoutMs: 5_000 });
-    const match = (targets.targetInfos || []).find((target: any) => target.targetId === targetIdOrUrlSubstring)
-      || (targets.targetInfos || []).find((target: any) => String(target.url || "").includes(String(targetIdOrUrlSubstring)));
-    if (!match) throw elementNotFound(String(targetIdOrUrlSubstring), { kind: "tab" });
+    const state = await this.#currentState(lane);
+    const ownedIds = new Set(state.ownedTabs.map((tab: any) => tab.targetId));
+    const pages = (targets.targetInfos || []).filter((target: any) => target.type === "page");
+    const exact = pages.find((target: any) => target.targetId === key);
+    const byOwnedUrl = exact ? null : pages.find((target: any) => ownedIds.has(target.targetId) && String(target.url || "").includes(key));
+    const match = exact || byOwnedUrl;
+    if (!match) throw elementNotFound(key, { kind: "tab" });
+    if (!isSafePageTarget(match)) {
+      throw policyDenied("refusing to attach to a non-http(s) page; only http(s) pages and about:blank are allowed", {
+        targetId: match.targetId,
+        url: String(match.url || "").slice(0, 200),
+      });
+    }
     const page = await this.attach(match.targetId);
     await this.#rememberCurrent(page, lane);
     await this.#ensureMarker(page, lane);
@@ -276,7 +322,7 @@ export class Browser {
     }
     await stateStore.setCurrent(lane, {
       targetId: page.targetId,
-      url: info ? info.url : undefined,
+      url: info ? sanitizeUrlForState(info.url) : undefined,
       title: info ? info.title : undefined,
       attachedAt: new Date().toISOString(),
     }, this.config.stateDir);

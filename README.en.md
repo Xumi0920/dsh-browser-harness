@@ -29,7 +29,8 @@ browser_tabs        list / use / new / close
 - **Your real login state.** Point it at a dedicated Chromium instance; sign in once and it persists. Your daily browser is never touched.
 - **Text-first.** Accessibility-tree snapshots and refs beat screenshot-VLM loops; screenshots stay optional.
 - **Per-task tab groups.** Tabs the harness creates are grouped per DSH session; work tabs are never grouped, and headless browsers skip grouping.
-- **Tested.** 102 unit tests (fake CDP) + 27 integration scenarios (real headless/headful Chromium) = 129, with CI on three platforms.
+- **Tested.** 108 unit tests (fake CDP) + 27 integration scenarios (real headless/headful Chromium) = 135, with CI on three platforms.
+- **Hardened boundaries.** `browser_tabs use` accepts only page targets with http(s)/about:blank URLs (non-owned tabs need an exact targetId); screenshots stay inside `screenshotDir` and never overwrite; `fill` never echoes the entered value; JS mode is marked non-concurrent; token-like URLs/headers are redacted in tool output; broad port fallback is explicit `auto` only.
 
 ## Requirements
 
@@ -46,7 +47,7 @@ Published to **GitHub Packages** as `@xumi0920/dsh-browser-harness` (the same-na
 
 1. **Plugins page (recommended)**: DSH Web → Plugins → Add plugin → Install a third-party plugin. Accepts npm package names, Git repositories and local directories; marketplace entries live under the **Discover** tab.
 2. **Ask DSH in one sentence** (Creator-mode session): `Install @xumi0920/dsh-browser-harness into the current profile`.
-3. **Manual install (GitHub Packages)**:
+3. **Manual install (GitHub Packages, classic PAT)**:
 
 ```powershell
 npm config set "@xumi0920:registry" "https://npm.pkg.github.com"
@@ -55,7 +56,7 @@ npm config set "//npm.pkg.github.com/:_authToken" "<YOUR_GITHUB_TOKEN>"
   plugin --profile desktop add "@xumi0920/dsh-browser-harness"
 ```
 
-> GitHub Packages needs a read:packages token; build a local checkout with `npm install && npm run build` before installing it; exit DSH before changing the profile from the CLI. **Hot-plugging:** `application: applied` means it is already live; only `restart-required` needs a restart (replacing an installed package usually requires a restart to load the new JS module generation; see `restartReason`).
+> The GitHub Packages npm registry **only supports classic PATs** (`read:packages`); fine-grained tokens do not work. A manual `npm config set` persists the token in `~/.npmrc`: prefer the one-click scripts (temporary config, deleted after install), or delete it with `npm config delete "//npm.pkg.github.com/:_authToken"` and revoke the token after installing. Build a local checkout with `npm install && npm run build` before installing it; exit DSH before changing the profile from the CLI. **Hot-plugging:** `application: applied` means it is already live; only `restart-required` needs a restart (replacing an installed package usually requires a restart to load the new JS module generation; see `restartReason`).
 
 ## Quick start
 
@@ -88,6 +89,7 @@ browser_extract {mode:"text" | "html" | "js" | "network"}
 | [Architecture](docs/architecture.md) | Layers, flows, error model, safety boundaries |
 | [Extending & languages](docs/extending.md) | Native JS/TS plugins, hot-plug/HMR, MCP for Python etc. |
 | [Repository layout](docs/README.md) | Directory conventions, maintenance and release flow |
+| [Security policy](SECURITY.md) | Private vulnerability reporting, supported versions, data handling |
 
 ## Extending & languages
 
@@ -99,7 +101,7 @@ browser_extract {mode:"text" | "html" | "js" | "network"}
 
 ```sh
 npm install                 # dev deps (TypeScript); runtime stays zero-dependency
-npm run test:all            # build + 102 unit + 27 integration = 129 tests
+npm run test:all            # build + 108 unit + 27 integration = 135 tests
 ```
 
 CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu + xvfb (27-scenario gate, S15/S16 must actually run). Tests and scripts are compiled by `tsc` too (`dist-tests/` / `dist-scripts/`), sharing the runtime NodeNext config.
@@ -107,10 +109,13 @@ CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu
 ## Safety
 
 - Only tabs this harness created are closed; `force` needs the user's explicit agreement.
-- Cookie values are redacted by default and no tokens are logged; note that `browser_status` / `browser_tabs` echo tab URLs that may embed tokens.
-- Page data is only returned when explicitly requested; never point `cdpUrl` at a daily-driver browser.
-- Background operations only; login walls stop the workflow and ask the user.
+- `browser_tabs use` accepts only **page** targets with `http(s)`/`about:blank` URLs; non-owned tabs need an exact `targetId`, and URL substrings only match harness-owned tabs. `file:`/`chrome:`/extension workers are rejected.
+- Screenshots are confined to `screenshotDir` (default `<stateDir>/screenshots`); directory escapes, symlinks and overwriting existing files are rejected.
+- `browser_act fill` returns only `{ok, length, verified}` and never echoes the input; JS mode can mutate page state and is marked non-concurrent.
+- Cookies are redacted by default; network URLs/headers and status/tab URLs get best-effort token redaction. Page content, HTML and screenshots may still contain sensitive data: not a full DLP.
+- State stores URLs without query/fragment; broad CDP port fallback requires explicit `browser: "auto"` / `BH_ALLOW_FALLBACK=1`.
+- Never point `cdpUrl` at a daily-driver browser; background operations only; login walls stop the workflow and ask the user.
 
 ## License
 
-MIT (c) 2026 Xumi0920 · current version **v0.5.1** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog
+MIT (c) 2026 Xumi0920 · current version **v0.6.0** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog

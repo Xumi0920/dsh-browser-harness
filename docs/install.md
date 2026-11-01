@@ -14,9 +14,9 @@ cd C:\path\to\dsh-browser-harness
 npm install                                   # 开发依赖：typescript / @types/node / @types/chrome / semver
 npm run build                                 # tsc → dist/ + extension/sw.js（发布产物）
 
-npm test                                      # 构建源码与测试，跑 102 单测（fake CDP 替身）
+npm test                                      # 构建源码与测试，跑 108 单测（fake CDP 替身）
 npm run test:integration                      # 构建 + 27 场景（真实 headless/headful Chromium）
-npm run test:all                              # 构建 + 共 129 条
+npm run test:all                              # 构建 + 共 135 条
 npm run verify -- --browser chrome            # 对 live 实例冒烟（需先 build）
 ```
 
@@ -50,7 +50,7 @@ npm run verify -- --browser chrome            # 对 live 实例冒烟（需先 b
 
 DSH 会调用 `plugin_manager` 的 `install_bundle` 完成安装；`plugin_manager` 是**创造模式专用工具**，每次操作需要 danger-full-access 沙箱或当次批准。安装结果为 `applied` 时已热生效；`restart-required` 时按提示重启。之后即可在**任意会话/预设**里使用 `browser_*` 工具（不限于创造模式）。
 
-### 2c. GitHub Packages（需要带 read:packages 的 GitHub token）
+### 2c. GitHub Packages（需要带 read:packages 的 classic PAT）
 
 ```powershell
 npm config set "@xumi0920:registry" "https://npm.pkg.github.com"
@@ -61,12 +61,14 @@ npm config set "//npm.pkg.github.com/:_authToken" "<YOUR_GITHUB_TOKEN>"
   plugin --profile desktop add "@xumi0920/dsh-browser-harness"
 ```
 
+> GitHub Packages npm registry **只支持 classic PAT**（`read:packages`），fine-grained token 不可用。上面手动 `npm config set` 会把 token 持久化到 `~/.npmrc`；更推荐下面的一键脚本（临时配置），或安装后立即执行 `npm config delete "//npm.pkg.github.com/:_authToken"` 并撤销 token。
+
 一键脚本（从仓库获取；只会把 token 写进**临时 npm 配置**，安装结束即删除，不写你的 `~/.npmrc`）：
 
 - Windows：[install-github-packages.ps1](https://github.com/Xumi0920/dsh-browser-harness/blob/main/scripts/install-github-packages.ps1)
 - Linux / macOS：[install-github-packages.sh](https://github.com/Xumi0920/dsh-browser-harness/blob/main/scripts/install-github-packages.sh)
 
-> 如果你运行过**旧版**脚本，它可能把 token 明文留在了 `~/.npmrc`：执行 `npm config delete "//npm.pkg.github.com/:_authToken"`，并到 GitHub 撤销那个 token，换用 fine-grained、只带 `read:packages` 的新 token。
+> 如果你运行过**旧版**脚本，它可能把 token 明文留在了 `~/.npmrc`：执行 `npm config delete "//npm.pkg.github.com/:_authToken"`，并到 GitHub 撤销那个 token，换用**只带 `read:packages` 的 classic PAT**。
 
 ### 2d. 本地 clone 目录（推荐开发/自用）
 
@@ -91,7 +93,8 @@ $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\ds
 
 ```bash
 npm config set "@xumi0920:registry" "https://npm.pkg.github.com"
-npm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+npm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"   # classic PAT, read:packages
+# 安装后清理: npm config delete "//npm.pkg.github.com/:_authToken"
 # 先退出 DSH；dsh 不在 PATH 时传 CLI 绝对路径
 dsh plugin --profile desktop add "@xumi0920/dsh-browser-harness"
 # 或一键脚本：GITHUB_TOKEN="$GITHUB_TOKEN" ./scripts/install-github-packages.sh desktop

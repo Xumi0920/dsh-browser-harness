@@ -2,6 +2,7 @@
 /**
  * Standalone CLI over the core (no DSH required):
  *   bh doctor | tabs | open <url> | info | snapshot | text [sel] | js <expr> | shot [path] | close | groups [--retry]
+ *   (shot path is relative to screenshotDir; default <stateDir>/screenshots)
  */
 
 import { Browser } from "../src/browser.js";

@@ -138,3 +138,37 @@ test("open() creates a new tab instead of navigating a non-owned current tab", a
   assert.ok(browser.pages.has("t-new"));
   assert.ok(!browser.pages.has("t-work"), "the work tab is never attached or navigated");
 });
+
+test("use rejects file/non-page targets and only URL-matches owned tabs", async () => {
+  const { browser, stateDir } = await setup({
+    targets: [
+      pageTarget("t-work", "https://work.example/app"),
+      { targetId: "t-file", type: "page", url: "file:///C:/Windows/win.ini", title: "win.ini" },
+      { targetId: "sw-1", type: "service_worker", url: "chrome-extension://x/sw.js" },
+      pageTarget("t-owned", "https://owned.example/page"),
+    ],
+    owned: [{ targetId: "t-owned", url: "https://owned.example/page" }],
+  });
+
+  await assert.rejects(browser.use("t-file"), (error: any) => {
+    assert.equal(error.code, "E_POLICY_DENIED");
+    return true;
+  });
+  await assert.rejects(browser.use("sw-1"), (error: any) => {
+    assert.equal(error.code, "E_ELEMENT_NOT_FOUND");
+    return true;
+  });
+  await assert.rejects(browser.use("work.example"), (error: any) => {
+    assert.equal(error.code, "E_ELEMENT_NOT_FOUND");
+    return true;
+  });
+
+  assert.equal((await browser.use("t-work")).targetId, "t-work", "exact non-owned http tab is allowed");
+  assert.equal((await browser.use("owned.example")).targetId, "t-owned", "owned URL substring is allowed");
+
+  const tabs = await browser.listTabs();
+  assert.deepEqual(tabs.map((tab) => tab.targetId).sort(), ["t-owned", "t-work"]);
+
+  await setCurrent("unit", { targetId: "t-file", url: "file:///C:/Windows/win.ini" }, stateDir);
+  assert.equal(await browser.current(), null, "file pages are never the current tab");
+});

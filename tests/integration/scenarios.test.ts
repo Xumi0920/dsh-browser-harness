@@ -238,7 +238,7 @@ test("S12 screenshots: PNG signature and dimensions follow the viewport", async 
   const page = await openTab(t, "/colors.html");
   if (!page) return;
   await page.setViewport({ width: 400, height: 300, deviceScaleFactor: 1 });
-  const shot = await page.screenshot({ path: join(stateDir, "shot.png") });
+  const shot = await page.screenshot({ path: "shot.png" });
   assert.equal(shot.width, 400);
   assert.equal(shot.height, 300);
   assert.ok(shot.bytes > 1_000);
