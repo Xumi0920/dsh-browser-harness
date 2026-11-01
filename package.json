@@ -1,6 +1,6 @@
 {
   "name": "@xumi0920/dsh-browser-harness",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "DSH native browser tools (browser_*) backed by a zero-dependency CDP core driving a dedicated, logged-in Chromium-based browser (Chrome, Edge, Brave, Chromium, Vivaldi, Opera, Arc), with per-task Chrome tab groups for harness-created tabs.",
   "type": "module",
   "license": "MIT",
@@ -43,7 +43,7 @@
   ],
   "engines": {
     "node": ">=22",
-    "dsh": "0.2.1-rc.5"
+    "dsh": ">=0.2.1-rc.5"
   },
   "dsh": {
     "bundle": {
@@ -51,7 +51,7 @@
     }
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-tools": "0.2.1-rc.5"
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.5"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-tools": {
@@ -84,6 +84,7 @@
   ],
   "devDependencies": {
     "@types/node": "^22.20.5",
+    "semver": "^7.8.5",
     "typescript": "^5.9.3"
   }
 }

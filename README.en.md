@@ -20,7 +20,7 @@ browser_tabs        list / use / new / close
 - **Your logged-in browser.** Point it at a dedicated Chromium instance (Chrome / Chromium / Edge / Brave / Vivaldi / Opera / Arc); sign in once and it persists.
 - **Text-first.** Accessibility-tree snapshots and refs beat screenshot-VLM loops for actions; screenshots stay optional.
 - **Per-task tab groups.** Tabs the harness creates are grouped by DSH session; work tabs are never touched, and headless browsers skip grouping.
-- **Tested.** 100 unit tests (fake CDP double, no browser) + 27 integration scenarios (real headless/headful Chromium) = 123.
+- **Tested.** 102 unit tests (fake CDP double, no browser) + 27 integration scenarios (real headless/headful Chromium) = 123.
 
 ## Install
 
@@ -83,9 +83,9 @@ Standalone library / CLI examples: [docs/usage.md](docs/usage.md). Starting the 
 
 ```sh
 npm install                 # dev deps (TypeScript build); runtime stays zero-dependency
-npm test                    # build + 100 unit tests (no browser)
+npm test                    # build + 102 unit tests (no browser)
 npm run test:integration    # build + 27 integration scenarios
-npm run test:all            # build + unit + integration (127 tests)
+npm run test:all            # build + unit + integration (129 tests)
 ```
 
 CI: unit on ubuntu/windows/macOS (plus a Node 24 job); integration on ubuntu (xvfb, including the headful tab-group scenario).
@@ -99,6 +99,6 @@ CI: unit on ubuntu/windows/macOS (plus a Node 24 job); integration on ubuntu (xv
 
 ## Status
 
-v0.4.2: full `strict` typing (including `noImplicitAny`); test hygiene (automatic temp-dir cleanup, polling S16 assertions, T06 fix); CI gains macOS and Node 24 matrix entries, actions upgraded to v7 and Dependabot enabled; state files use 0600 permissions; the `bin` path is normalized, removing the publish auto-correct warning. Since v0.4.0 the source is TypeScript compiled to `dist/` with `tsc`, and the runtime stays zero-dependency. See the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog.
+v0.4.3: the DSH version requirement is relaxed to `>=0.2.1-rc.5` with no upper bound (peerDependencies synced); two semver compatibility unit tests mirror the DSH plugin-manager `includePrerelease` check; 102 unit + 27 integration = 129 tests. Since v0.4.0 the source is TypeScript compiled to `dist/` with `tsc`, and the runtime stays zero-dependency. See the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog.
 
 MIT (c) 2026 Xumi0920
