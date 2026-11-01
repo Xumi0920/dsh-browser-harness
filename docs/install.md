@@ -20,9 +20,21 @@ node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟
 
 ## 2. 安装插件
 
-插件发布在 **GitHub Packages**：`@xumi0920/dsh-browser-harness`；npmjs.org 上的 `dsh-browser-harness` 是别的项目。任选一种方式：
+插件发布在 **GitHub Packages**：`@xumi0920/dsh-browser-harness`；npmjs.org 上的 `dsh-browser-harness` 是别的项目。任选一种方式。
 
-### 2a. GitHub Packages（需要带 read:packages 的 GitHub token）
+### 2a. 一句话交给 DSH 安装（创造模式会话）
+
+在 DSH 创造模式会话里直接对模型说：
+
+> 把 `@xumi0920/dsh-browser-harness` 安装到当前 DSH profile。
+
+DSH 会调用 `plugin_manager` 的 `install_bundle` 完成安装。`plugin_manager` 是**创造模式专用工具**；每次操作需要 danger-full-access 沙箱或当次批准，执行 `dsh plugin` / pnpm 时也可能需要额外批准。本地目录同理，把包名换成绝对路径即可：
+
+> 把 `C:\\path\\to\\dsh-browser-harness` 安装到当前 profile。
+
+安装完成后重启 DSH 即可在**任意会话/预设**里使用 `browser_*` 工具（不限于创造模式）。
+
+### 2b. GitHub Packages（需要带 read:packages 的 GitHub token）
 
 ```powershell
 npm config set @xumi0920:registry https://npm.pkg.github.com
@@ -35,7 +47,7 @@ npm config set //npm.pkg.github.com/:_authToken "<YOUR_GITHUB_TOKEN>"
 
 一键脚本（从仓库获取，读取 `GITHUB_TOKEN`）：[install-github-packages.ps1](../scripts/install-github-packages.ps1)（Windows）、[install-github-packages.sh](../scripts/install-github-packages.sh)（Linux / macOS）。
 
-### 2b. 本地 clone 目录（推荐开发/自用）
+### 2c. 本地 clone 目录（推荐开发/自用）
 
 在 Creator（创造模式）空会话里让模型执行（路径换成你本机 clone 的绝对路径；JSON 里的反斜杠要写两份）：
 
@@ -45,7 +57,7 @@ plugin_manager { action: "install_bundle", target: "C:\\path\\to\\dsh-browser-ha
 
 `plugin_manager` 每次操作需要 danger-full-access 沙箱或当次批准；返回 `application: "applied"` 即已激活，遇到 `nextStep` / `restart-required` 按提示重启。
 
-### 2c. CLI 安装本地目录
+### 2d. CLI 安装本地目录
 
 ```powershell
 $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd"
@@ -53,7 +65,7 @@ $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\ds
 # 然后重启 DeepSeek Harness
 ```
 
-### 2d. Linux / macOS
+### 2e. Linux / macOS
 
 ```bash
 npm config set @xumi0920:registry https://npm.pkg.github.com

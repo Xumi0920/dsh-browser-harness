@@ -2,7 +2,7 @@
 
 ## 在 DSH 里
 
-Agent 通过 7 个 `browser_*` 工具操作专用浏览器；插件同时内嵌 `browser-harness` 技能，给出完整工作流：
+插件装好后，**任意 DSH 会话/预设**都可以使用这些工具（不限于创造模式；创造模式只影响用 `plugin_manager` 安装这一步）。Agent 通过 7 个 `browser_*` 工具操作专用浏览器；插件同时内嵌 `browser-harness` 技能，给出完整工作流：
 
 1. `browser_status` — 确认端点、浏览器版本、当前标签页；
 2. `browser_navigate {url}` — 打开页面并拿到紧凑快照（`e1`、`e2`… 引用）；
