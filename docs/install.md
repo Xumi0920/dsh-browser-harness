@@ -2,7 +2,7 @@
 
 ## 0. 前置
 
-- DSH `0.2.1-rc.5` + Node.js >= 22（`engines.dsh` / `engines.node` 会校验；版本不符插件不会加载）。
+- DSH >= `0.2.1-rc.5` + Node.js >= 22（`engines.dsh` 不设上限；安装/启动时由 DSH 用 semver（includePrerelease）校验）。
 - 一个已开启 remote debugging 的**专用** Chromium 内核浏览器。启动命令、端口约定与 registry 配置见 [configuration.md](configuration.md)。
 - 平台：Windows 与 Linux 已验证（Linux CI 用 xvfb 覆盖 headful 标签组）；macOS 未实测。
 
@@ -14,9 +14,9 @@ cd C:\path\to\dsh-browser-harness
 npm install                                   # 仅开发依赖：typescript + @types/node
 npm run build                                 # tsc 编译到 dist/（发布产物）
 
-npm test                                      # 构建 + 100 单测（fake CDP 替身，无需浏览器）
+npm test                                      # 构建 + 102 单测（fake CDP 替身，无需浏览器）
 npm run test:integration                      # 构建 + 27 场景（真实 headless/headful Chromium）
-npm run test:all                              # 构建 + 共 127 条
+npm run test:all                              # 构建 + 共 129 条
 node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟（需先 build）
 ```
 
