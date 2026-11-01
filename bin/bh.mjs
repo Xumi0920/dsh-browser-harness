@@ -40,6 +40,13 @@ async function main() {
       console.log(info.url + "\t" + info.title);
       return;
     }
+    if (command === "close") {
+      const force = args.includes("--force");
+      const targetId = args.find((arg) => !arg.startsWith("--"));
+      const result = await browser.closeTab(targetId, { force });
+      console.log(JSON.stringify(result));
+      return;
+    }
     const current = await browser.current();
     if (!current) throw new Error("no current tab; run: bh open <url>");
     const page = await browser.attach(current.targetId);
@@ -50,7 +57,7 @@ async function main() {
     else if (command === "shot") console.log(JSON.stringify(await page.screenshot({ path: args[0], fullPage: args.includes("--full") }), null, 2));
     else throw new Error("unknown command: " + command);
   } finally {
-    browser.close();
+    await browser.close();
   }
 }
 

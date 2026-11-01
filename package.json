@@ -1,6 +1,6 @@
 {
   "name": "dsh-browser-harness",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "DSH native browser tools (browser_*) backed by a zero-dependency CDP core driving a dedicated, logged-in Chrome.",
   "type": "module",
   "license": "MIT",

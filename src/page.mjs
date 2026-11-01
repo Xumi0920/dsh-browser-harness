@@ -87,6 +87,8 @@ export class Page {
     this.targetId = ids.targetId;
     /** @type {any[] | null} */
     this.lastSnapshot = null;
+    /** Monotonic ref counter: a stale ref never matches a later snapshot. */
+    this.nextRef = 0;
     /** @type {any | null} */
     this.pendingDialog = null;
     /** @type {any[]} */
@@ -94,6 +96,10 @@ export class Page {
     /** @type {any[]} */
     this.networkLog = [];
     this.networkEnabled = false;
+    /** @type {any | null} */
+    this.networkStarting = null;
+    /** Cached page instances are detached after use; a closed page refuses work. */
+    this.closed = false;
     this.dialogPolicy = browser.config.dialogPolicy ?? "auto-dismiss";
     this.focusEmulation = browser.config.focusEmulation !== false;
     this.downloadDir = browser.config.downloadDir;
@@ -251,7 +257,8 @@ export class Page {
    */
   async snapshot(options = {}) {
     const raw = await this.send("Accessibility.getFullAXTree", {}, { timeoutMs: 15_000 });
-    const first = buildSnapshot(raw.nodes || [], { maxNodes: options.maxNodes ?? 400, roles: options.roles });
+    const refStart = this.nextRef;
+    const first = buildSnapshot(raw.nodes || [], { maxNodes: options.maxNodes ?? 400, roles: options.roles, refStart });
     const withBoxes = options.includeBoxes !== false;
     if (withBoxes) {
       const boxes = new Map();
@@ -267,23 +274,34 @@ export class Page {
           }
         }));
       }
-      const second = buildSnapshot(raw.nodes || [], { maxNodes: first.nodes.length, roles: options.roles, boxes });
+      const second = buildSnapshot(raw.nodes || [], { maxNodes: first.nodes.length, roles: options.roles, boxes, refStart });
       this.lastSnapshot = second.nodes;
+      this.nextRef = refStart + second.nodes.length;
       return { ...second, targetId: this.targetId };
     }
     this.lastSnapshot = first.nodes;
+    this.nextRef = refStart + first.nodes.length;
     return { ...first, targetId: this.targetId };
   }
 
-  /** Resolve a snapshot ref, or take a fresh snapshot when it is missing. */
+  /**
+   * Resolve a snapshot ref against the latest snapshot only.
+   *
+   * A ref belongs to the snapshot that produced it. Re-snapshotting here would
+   * silently renumber refs, so a missing ref is an error instead of a remap.
+   */
   async #resolveRef(ref) {
-    if (!this.lastSnapshot) await this.snapshot();
-    let node = findRef(this.lastSnapshot, ref);
-    if (!node) {
-      await this.snapshot();
-      node = findRef(this.lastSnapshot, ref);
+    if (!this.lastSnapshot) {
+      throw elementNotFound(ref, { kind: "ref", hint: "no snapshot yet; call browser_snapshot or browser_navigate first" });
     }
-    if (!node) throw elementNotFound(ref, { kind: "ref", refs: (this.lastSnapshot || []).slice(0, 20).map((item) => item.ref) });
+    const node = findRef(this.lastSnapshot, ref);
+    if (!node) {
+      throw elementNotFound(ref, {
+        kind: "ref",
+        hint: "ref is not in the latest snapshot; take a new snapshot and use its refs",
+        refs: this.lastSnapshot.slice(0, 20).map((item) => item.ref),
+      });
+    }
     return node;
   }
 
@@ -374,8 +392,10 @@ export class Page {
   }
 
   /**
-   * Fill an input like a user: real key presses plus synthetic input/change,
-   * which keeps React/Vue controlled components in sync.
+   * Fill an input: focus it, clear with real Ctrl+A / Backspace key presses,
+   * write the value once with Input.insertText, then dispatch input/change so
+   * React/Vue controlled components stay in sync. This is not per-character
+   * typing (use type() for that).
    */
   async fill({ ref, selector, text, clearFirst = true }, options = {}) {
     const value = String(text ?? "");
@@ -539,12 +559,19 @@ export class Page {
     return this.evaluate(expressionOrFn, { ...options, contextId: context.id });
   }
 
-  /** Start capturing network responses for this call. */
+  /**
+   * Start capturing network requests/responses on this page session.
+   *
+   * Idempotent: the log lives on the (cached) Page, so events survive across
+   * tool calls while the tab stays attached.
+   */
   async startNetworkCapture({ maxEvents = 2000 } = {}) {
     this.maxNetworkEvents = maxEvents;
-    if (!this.networkEnabled) {
-      this.networkEnabled = true;
+    if (this.networkEnabled) return { ok: true, capturing: true };
+    if (this.networkStarting) return this.networkStarting;
+    const start = (async () => {
       await this.send("Network.enable", {}, { timeoutMs: 5_000 });
+      this.networkEnabled = true;
       this.on("Network.requestWillBeSent", (params) => {
         this.networkLog.push({ requestId: params.requestId, url: params.request && params.request.url, method: params.request && params.request.method, resourceType: params.type, ts: Date.now() });
         if (this.networkLog.length > this.maxNetworkEvents) this.networkLog.shift();
@@ -562,8 +589,40 @@ export class Page {
         const entry = this.networkLog.find((item) => item.requestId === params.requestId);
         if (entry) entry.error = params.errorText;
       });
+      return { ok: true, capturing: true };
+    })();
+    this.networkStarting = start;
+    try {
+      return await start;
+    } finally {
+      this.networkStarting = null;
     }
-    return { ok: true, capturing: true };
+  }
+
+  /**
+   * Attach response bodies to the most recent captured events (opt-in and slow).
+   * @param {any[]} events events from networkEvents()
+   * @param {{ limit?: number, maxBytes?: number }} [options]
+   */
+  async networkBodies(events, { limit = 10, maxBytes = 200_000 } = {}) {
+    const out = [];
+    for (const event of (events || []).slice(-limit)) {
+      const entry = { ...event };
+      if (entry.status !== undefined) {
+        try {
+          const body = await this.send("Network.getResponseBody", { requestId: entry.requestId }, { timeoutMs: 5_000 });
+          const text = body.base64Encoded ? Buffer.from(body.body, "base64").toString("utf8") : body.body;
+          if (typeof text === "string") {
+            entry.bodyTruncated = text.length > maxBytes;
+            entry.body = entry.bodyTruncated ? text.slice(0, maxBytes) : text;
+          }
+        } catch (error) {
+          entry.bodyError = String((error && error.message) || error);
+        }
+      }
+      out.push(entry);
+    }
+    return out;
   }
 
   /** Snapshot of captured network requests/responses. */
@@ -695,12 +754,28 @@ export class Page {
     }
   }
 
-  /** Detach listeners; the CDP session itself is released when the socket closes. */
+  /** Drop this page's listeners and cached snapshot state. */
   dispose() {
     for (const off of this.ownedListeners) {
       try { off(); } catch { /* ignore */ }
     }
     this.ownedListeners = [];
     this.lastSnapshot = null;
+  }
+
+  /**
+   * Release this page: drop listeners and detach its CDP session.
+   * The Page object is unusable afterwards.
+   */
+  async detach() {
+    if (this.closed) return;
+    this.closed = true;
+    const { sessionId, transport } = this;
+    this.dispose();
+    try {
+      await transport.send("Target.detachFromTarget", { sessionId }, { timeoutMs: 2_000 });
+    } catch {
+      /* target or transport already gone */
+    }
   }
 }

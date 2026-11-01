@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { boxCenter, buildSnapshot, findByRole, findRef, snapshotToText } from "../../src/ax.mjs";
+import { MAX_SNAPSHOT_TEXT_LINES, boxCenter, buildSnapshot, findByRole, findRef, formatSnapshot, snapshotToText } from "../../src/ax.mjs";
 
 const nodes = [
   { role: { value: "RootWebArea" }, ignored: false, backendDOMNodeId: 1, name: { value: "Demo" } },
@@ -42,6 +42,11 @@ test("snapshot truncates at maxNodes and reports it", () => {
   assert.equal(snapshot.truncated, true);
 });
 
+test("refStart keeps refs monotonic across snapshots", () => {
+  const snapshot = buildSnapshot(nodes, { boxes, refStart: 10 });
+  assert.deepEqual(snapshot.nodes.map((node) => node.ref), ["e11", "e12", "e13"]);
+});
+
 test("includeText adds static text roles", () => {
   const snapshot = buildSnapshot(nodes, { includeText: true });
   assert.ok(snapshot.nodes.some((node) => node.role === "StaticText"));
@@ -60,4 +65,21 @@ test("snapshotToText renders compact lines", () => {
   const text = snapshotToText(buildSnapshot(nodes, { boxes }));
   assert.match(text, /e1 button "Sign in" @140,220/);
   assert.match(text, /e2 textbox "Email" value="a@b.c"/);
+});
+
+test("formatSnapshot reports the true truncation state", () => {
+  const nodes = Array.from({ length: 250 }, (_, index) => ({ ref: "e" + (index + 1), role: "button", name: "B" + index }));
+  const rendered = formatSnapshot({ nodes, truncated: false, total: 250 });
+  assert.equal(rendered.truncated, true);
+  assert.equal(rendered.shown, MAX_SNAPSHOT_TEXT_LINES);
+  assert.match(rendered.text, /snapshot truncated \(200 of 250 nodes\)/);
+  assert.equal(snapshotToText({ nodes, truncated: false, total: 250 }), rendered.text);
+
+  const small = formatSnapshot({ nodes: nodes.slice(0, 3), truncated: false });
+  assert.equal(small.truncated, false);
+  assert.doesNotMatch(small.text, /truncated/);
+
+  const axCapped = formatSnapshot({ nodes: nodes.slice(0, 3), truncated: true, total: 250 });
+  assert.equal(axCapped.truncated, true);
+  assert.match(axCapped.text, /truncated \(3 of 250 nodes\)/);
 });
