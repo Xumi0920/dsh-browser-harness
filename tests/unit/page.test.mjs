@@ -108,3 +108,12 @@ test("scroll sends wheel deltas from the viewport center", async () => {
   assert.equal(scroll.params.x, 400);
   assert.equal(scroll.params.y, 300);
 });
+
+test("networkBodies records per-response body errors", async () => {
+  const { page, transport } = setupPage();
+  await page.startNetworkCapture();
+  transport.on("Network.getResponseBody", () => { throw new Error("No resource with given identifier"); });
+  const withBodies = await page.networkBodies([{ requestId: "r1", url: "https://api.test/x", status: 200 }]);
+  assert.match(withBodies[0].bodyError, /No resource/);
+  assert.equal(withBodies[0].body, undefined);
+});

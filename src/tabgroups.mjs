@@ -24,12 +24,27 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Stable per-lane group title, e.g. "DSH · a1b2c3". */
-export function tabGroupTitleFor(lane) {
+/** Default title template; {session} is the short session/lane tag. */
+export const TAB_GROUP_TITLE_TEMPLATE = TAB_GROUP_TITLE_PREFIX + "{session}";
+
+/** Short tag used in group titles, e.g. "a1b2c3" for lane "dsh-a1b2c3". */
+export function tabGroupSessionTag(lane) {
   const raw = String(lane || "default");
-  if (raw === "default") return TAB_GROUP_TITLE_PREFIX + "default";
+  if (raw === "default") return "default";
   const tag = raw.replace(/^dsh-/, "").replace(/[^a-zA-Z0-9]+/g, "").slice(-6);
-  return TAB_GROUP_TITLE_PREFIX + (tag || "default");
+  return tag || "default";
+}
+
+/**
+ * Stable per-lane group title, e.g. "DSH · a1b2c3".
+ * Supports a template with {session} and {lane} placeholders.
+ */
+export function tabGroupTitleFor(lane, template = TAB_GROUP_TITLE_TEMPLATE) {
+  const raw = String(lane || "default");
+  const title = String(template || TAB_GROUP_TITLE_TEMPLATE)
+    .replaceAll("{session}", tabGroupSessionTag(raw))
+    .replaceAll("{lane}", raw);
+  return title.slice(0, 64) || TAB_GROUP_TITLE_PREFIX + tabGroupSessionTag(raw);
 }
 
 /** Deterministic group color per lane. */

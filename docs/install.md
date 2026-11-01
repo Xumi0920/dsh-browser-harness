@@ -1,4 +1,4 @@
-# 安装与验证（Windows / DSH 0.2.1-rc.5）
+# 安装与验证（Windows / Linux / DSH 0.2.1-rc.5）
 
 ## 0. 前置
 
@@ -14,7 +14,13 @@
   msedge.exe --remote-debugging-port=9332 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\edge"
   brave.exe  --remote-debugging-port=9335 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\brave"
   ```
-- 平台：优先在 Windows 上验证；macOS / Linux 未实测。
+  Linux / macOS 等价命令：
+  ```bash
+  google-chrome --remote-debugging-port=9331 --user-data-dir="$HOME/.dsh/browser-cdp/profiles/chrome"
+  chromium      --remote-debugging-port=9334 --user-data-dir="$HOME/.dsh/browser-cdp/profiles/chromium"
+  microsoft-edge --remote-debugging-port=9332 --user-data-dir="$HOME/.dsh/browser-cdp/profiles/edge"
+  ```
+- 平台：Windows 与 Linux 已验证（Linux CI 用 xvfb 跑 headful 标签组场景）；macOS 未实测。
 - 标签组：默认给插件自建的标签页按任务分组（需要带界面的浏览器；headless 下自动跳过）。首次使用会把随包 MV3 扩展装进专用浏览器 profile；可在配置里用 `tabGroups: false` 关闭。
 
 ## 1. 本地自测（不需要 DSH）
@@ -27,7 +33,7 @@ cd C:\path\to\dsh-browser-harness
 
 node --test "tests/unit/**/*.test.mjs"        # 单测
 node --test "tests/integration/**/*.test.mjs" # 27 场景（含标签组 headful 场景）
-npm run test:all                              # 单测 + 场景（共 114 条）
+npm run test:all                              # 单测 + 场景（共 117 条）
 node scripts/verify.mjs --browser chrome       # 对 live 实例冒烟（需源码 checkout；也可用 edge/brave 等）
 ```
 
@@ -45,6 +51,26 @@ npm config set //npm.pkg.github.com/:_authToken "<YOUR_GITHUB_TOKEN>"
 $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd"
 & $DSH plugin --profile desktop add "@xumi0920/dsh-browser-harness"
 ```
+
+### 2d. Linux / macOS
+
+```bash
+# 0) 配置 GitHub Packages（GITHUB_TOKEN 需要 read:packages）
+npm config set @xumi0920:registry https://npm.pkg.github.com
+npm config set //npm.pkg.github.com/:_authToken "$GITHUB_TOKEN"
+
+# 1) 安装（dsh 在 PATH 中；否则传 CLI 绝对路径）
+dsh plugin --profile desktop add "@xumi0920/dsh-browser-harness"
+# 或一键脚本（仓库内）：
+GITHUB_TOKEN="$GITHUB_TOKEN" ./scripts/install-github-packages.sh desktop
+
+# 2) 启动专用浏览器（示例）
+google-chrome --remote-debugging-port=9331 --user-data-dir="$HOME/.dsh/browser-cdp/profiles/chrome" &
+```
+
+Windows 一键脚本：`scripts\install-github-packages.ps1`（读取 `$env:GITHUB_TOKEN`）。
+
+> 标签组需要带界面的浏览器：纯 headless（无 `DISPLAY`）会自动跳过；CI 用 `xvfb-run` 跑 headful 场景。配置用 `tabGroups: false` 可关闭。
 
 ### 2a. 创造模式 / 插件管理器（推荐，本地目录）
 
@@ -94,3 +120,4 @@ $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\ds
 | 工具报 `E_SELECTOR_TIMEOUT` | 先 `browser_snapshot` 重取 ref，再操作 |
 | 工具报 `E_POLICY_DENIED` | 试图关闭非本 harness 创建的标签页；需要 `force` 时先取得用户明确同意 |
 | 中文输入 | `browser_act {action:"fill"}` 会聚焦元素、Ctrl+A / Backspace 清空，再一次性 `insertText` 写入并派发 `input`/`change`；支持中文，能驱动 React/Vue 受控组件（不是逐字按键） |
+| `browser_status.tabGroups.available = false` | 标签组暂不可用：需要带界面（非 headless）浏览器，且扩展能装进专用 profile；Linux 需有 `DISPLAY`。可用 `bh groups --retry` 清冷却后重试，或 `tabGroups:false` 关闭 |

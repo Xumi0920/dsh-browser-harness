@@ -2,9 +2,9 @@
  * Per-task Chrome tab groups for harness-created tabs.
  *
  * Tab groups need a headful browser (the bundled MV3 extension's worker does
- * not start in headless Chrome), so the real grouping scenario is skipped on CI
- * and on machines without a display. The headless test still checks that the
- * bridge degrades gracefully and never breaks tab creation.
+ * not start in headless Chrome). Linux runs the headful scenario under xvfb in
+ * CI and skips it when no display is available; the headless test still checks
+ * that the bridge degrades gracefully and never breaks tab creation.
  */
 
 import test, { before, after } from "node:test";
@@ -28,9 +28,10 @@ after(async () => {
 });
 
 function canRunHeadful() {
-  if (process.env.CI) return false;
-  if (process.platform !== "win32" && !process.env.DISPLAY) return false;
-  return true;
+  // Windows/macOS have a window server; Linux needs an X/Wayland display
+  // (CI provides one through xvfb-run).
+  if (process.platform === "win32" || process.platform === "darwin") return true;
+  return Boolean(process.env.DISPLAY);
 }
 
 test("S15 headless browsers still create tabs when tab groups are unavailable", async (t) => {

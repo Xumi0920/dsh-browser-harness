@@ -261,3 +261,13 @@ test("browser_navigate forwards newTab/waitUntil and reports truncation", async 
   assert.equal(value.nodes, 250);
   assert.equal(value.truncated, true);
 });
+
+test("browser_status passes tab group status through", async () => {
+  const manager = fakeManager({
+    status: async () => ({ connected: true, version: { product: "Chrome/156" }, tabs: [], current: null, endpoints: [], tabGroups: { enabled: true, available: false, extensionId: null, error: "headless" } }),
+  });
+  const status = build(manager).find((definition) => definition.name === "browser_status");
+  const value = await status.execute({}, {});
+  assert.equal(value.tabGroups.enabled, true);
+  assert.equal(value.tabGroups.error, "headless");
+});

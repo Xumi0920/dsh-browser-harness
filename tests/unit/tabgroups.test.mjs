@@ -7,6 +7,7 @@ import {
   TAB_GROUP_EXTENSION_NAME,
   TabGroupBridge,
   tabGroupColorFor,
+  tabGroupSessionTag,
   tabGroupTitleFor,
 } from "../../src/tabgroups.mjs";
 import { FakeTransport } from "./helpers/fake-transport.mjs";
@@ -58,6 +59,10 @@ function bridgeFor(transport, options = {}) {
 test("tab group titles and colors are stable per lane", () => {
   assert.equal(tabGroupTitleFor("dsh-abc123"), "DSH · abc123");
   assert.equal(tabGroupTitleFor(undefined), "DSH · default");
+  assert.equal(tabGroupSessionTag("dsh-abc123"), "abc123");
+  assert.equal(tabGroupTitleFor("dsh-abc123", "任务 {session}"), "任务 abc123");
+  assert.equal(tabGroupTitleFor("dsh-abc123", "{lane}"), "dsh-abc123");
+  assert.equal(tabGroupTitleFor(undefined, "T-{session}"), "T-default");
   assert.ok(TAB_GROUP_COLORS.includes(tabGroupColorFor("dsh-abc123")));
   assert.equal(tabGroupColorFor("dsh-abc123"), tabGroupColorFor("dsh-abc123"));
 });
@@ -138,4 +143,19 @@ test("dispose detaches the worker session", async () => {
   assert.equal(detach.length, 1);
   assert.equal(detach[0].params.sessionId, "sw-session");
   assert.equal(bridge.info().available, false);
+});
+
+test("an extension install failure is reported once and cooled down", async () => {
+  const transport = new FakeTransport();
+  transport.on("Extensions.getExtensions", () => ({ extensions: [] }));
+  transport.on("Extensions.loadUnpacked", () => { throw new Error("load failed"); });
+  const bridge = bridgeFor(transport);
+  const result = await bridge.groupTab(fakePage(), { title: "DSH · t", color: "blue", groupId: null });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "extension-unavailable");
+  assert.match(bridge.info().error, /load failed/);
+  const calls = transport.count("Extensions.getExtensions");
+  const again = await bridge.groupTab(fakePage(), { title: "DSH · t", color: "blue", groupId: null });
+  assert.equal(again.ok, false);
+  assert.equal(transport.count("Extensions.getExtensions"), calls, "cooldown prevents retry storms");
 });

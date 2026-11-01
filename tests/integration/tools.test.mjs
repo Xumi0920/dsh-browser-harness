@@ -80,6 +80,8 @@ test("T01 browser_status exposes a connected endpoint", async (t) => {
   assert.equal(status.connected, true);
   assert.ok(Array.isArray(status.endpoints) && status.endpoints.length > 0);
   assert.ok(status.version && status.version.product, "browser version is reported");
+  assert.equal(typeof status.tabGroups, "object", "tab group bridge status is reported");
+  assert.equal(status.tabGroups.enabled, true);
 });
 
 test("T02 navigate returns snapshot refs and a click works by ref", async (t) => {
@@ -214,6 +216,11 @@ test("T10 CLI open/snapshot/info/close drive a real tab", async (t) => {
   const info = await exec(["info"]);
   assert.match(info.stdout, /"url"/);
   assert.match(info.stdout, /a\.html/);
+
+  const groups = await exec(["groups"]);
+  const groupsInfo = JSON.parse(groups.stdout);
+  assert.equal(groupsInfo.enabled, true);
+  assert.ok(Array.isArray(groupsInfo.groups));
 
   const closed = await exec(["close"]);
   assert.match(closed.stdout, /"ok":true/);
