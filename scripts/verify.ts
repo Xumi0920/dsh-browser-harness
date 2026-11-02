@@ -1,12 +1,13 @@
 /**
  * Standalone self-check, no DSH required:
- *   node scripts/verify.mjs --browser chrome
+ *   npm run verify -- --browser chrome
+ *   (or, after building: node dist-scripts/verify.js --browser chrome)
  * Verifies endpoint discovery, CDP attach, a throwaway tab, snapshot and close.
  */
 
 import { Browser } from "../dist/src/browser.js";
 import { listEndpoints } from "../dist/src/cdp/endpoint.js";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -36,5 +37,6 @@ try {
   console.log("VERIFY_OK");
 } finally {
   await browser?.close();
+  await rm(stateDir, { recursive: true, force: true });
 }
 process.exit(0);

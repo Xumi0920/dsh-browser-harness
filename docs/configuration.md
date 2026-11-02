@@ -41,6 +41,19 @@ Windows（PowerShell；`chrome.exe` 等通常不在 PATH，用完整路径，按
   --remote-debugging-port=9335 "--user-data-dir=$env:USERPROFILE\.dsh\browser-cdp\profiles\brave"
 ```
 
+便携版（把 `chrome.exe` 放在脚本同目录；不触碰日常 User Data）：
+
+```powershell
+$exe = Join-Path $PSScriptRoot 'chrome.exe'
+if (-not (Test-Path $exe)) { throw "chrome.exe not found: $exe" }
+
+$profile = Join-Path $env:USERPROFILE '.dsh\browser-cdp\profiles\chrome-portable'
+New-Item -ItemType Directory -Force -Path $profile | Out-Null
+
+& $exe --remote-debugging-port=9331 "--user-data-dir=$profile"
+# 验证端点：Invoke-RestMethod http://127.0.0.1:9331/json/version
+```
+
 Linux（以下命令名以发行版安装为准）：
 
 ```bash
@@ -49,7 +62,7 @@ chromium       --remote-debugging-port=9334 --user-data-dir="$HOME/.dsh/browser-
 microsoft-edge --remote-debugging-port=9332 --user-data-dir="$HOME/.dsh/browser-cdp/profiles/edge"
 ```
 
-macOS（未实测）：
+macOS（真实 Chromium 端到端未实测；单测 CI 覆盖 macOS）：
 
 ```bash
 open -na "Google Chrome" --args --remote-debugging-port=9331 "--user-data-dir=$HOME/.dsh/browser-cdp/profiles/chrome"

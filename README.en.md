@@ -40,7 +40,7 @@ browser_tabs        list / use / new / close
 | DSH | `>=0.2.1-rc.5` (no upper bound) |
 | Node | `>=22` |
 | Browser | any Chromium-based browser with remote debugging (default 9331; see [configuration](docs/configuration.md)) |
-| Platform | Windows / Linux verified; macOS untested |
+| Platform | Windows / Linux verified; macOS unit CI passes, real Chromium E2E untested |
 
 ## Install
 
@@ -90,6 +90,8 @@ browser_extract {mode:"text" | "html" | "js" | "network"}
 | [Architecture](docs/architecture.md) | Layers, flows, error model, safety boundaries |
 | [Extending & languages](docs/extending.md) | Native JS/TS plugins, hot-plug/HMR, MCP for Python etc. |
 | [Repository layout](docs/README.md) | Directory conventions, maintenance and release flow |
+
+> The detailed `docs/` pages are written in Chinese; this English README mirrors their key points.
 | [Security policy](SECURITY.md) | Private vulnerability reporting, supported versions, data handling |
 
 ## Extending & languages
@@ -120,4 +122,4 @@ CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu
 
 ## License
 
-MIT (c) 2026 Xumi0920 · current version **v1.0.3** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog
+MIT (c) 2026 Xumi0920 · current version **v1.0.4** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog

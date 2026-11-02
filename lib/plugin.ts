@@ -10,7 +10,7 @@ import { createTools } from "./tools.js";
 import { SKILL_CONTENT, SKILL_DESCRIPTION, SKILL_NAME } from "./skill.js";
 
 export const name = "browser-harness";
-export const inject = ["tools"];
+export const inject = ["tools", "skills"];
 
 /** Defaults; the bundle patch can override any key through config. */
 export function resolveConfig(config: any = {}) {
