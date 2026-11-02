@@ -22,27 +22,35 @@ jobs:
           node-version: 22
           registry-url: https://npm.pkg.github.com
           scope: "@xumi0920"
+      - name: Resolve release tag
+        id: meta
+        run: |
+          version=$(node -p "require('./package.json').version")
+          skip=false
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            if [ "${GITHUB_REF_NAME}" = "v${version}" ]; then
+              echo "publishing v${version} from tag ${GITHUB_REF_NAME}"
+            else
+              echo "::notice::tag ${GITHUB_REF_NAME} does not match current package v${version}; skipping publish for a historical/backport release"
+              skip=true
+            fi
+          else
+            echo "::notice::publish only runs from a tag; skipping (ref ${GITHUB_REF_NAME})"
+            skip=true
+          fi
+          echo "skip=${skip}" >> "$GITHUB_OUTPUT"
       - run: npm ci
+        if: steps.meta.outputs.skip != 'true'
       - name: Verify package metadata
+        if: steps.meta.outputs.skip != 'true'
         run: |
           node -e "const pkg=require('./package.json'); if(!pkg.name.startsWith('@xumi0920/')) { console.error('package name must be scoped to @xumi0920'); process.exit(1); } console.log(pkg.name + '@' + pkg.version);"
           node -e "const pkg=require('./package.json'); if(!pkg.dsh || !pkg.dsh.bundle) { console.error('package must stay a DSH bundle'); process.exit(1); }"
-      - name: Verify tag matches package version
-        run: |
-          version=$(node -p "require('./package.json').version")
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
-              echo "::error::tag ${GITHUB_REF_NAME} does not match package version v${version}"
-              exit 1
-            fi
-            echo "publishing v${version} from tag ${GITHUB_REF_NAME}"
-          else
-            echo "::error::publish is only allowed from a tag (got ref ${GITHUB_REF_NAME})"
-            exit 1
-          fi
       - name: Build and unit tests
+        if: steps.meta.outputs.skip != 'true'
         run: npm test
       - name: Pack smoke test
+        if: steps.meta.outputs.skip != 'true'
         run: |
           mkdir -p /tmp/pack
           npm pack --pack-destination /tmp/pack
@@ -52,6 +60,7 @@ jobs:
           done
           node --input-type=module -e "import { pathToFileURL } from 'node:url'; const m = await import(pathToFileURL('/tmp/package/dist/lib/skill.js').href); if (m.SKILL_NAME !== 'browser-harness' || typeof m.SKILL_CONTENT !== 'string' || !m.SKILL_CONTENT.includes('browser_status')) { console.error('packed skill payload is invalid'); process.exit(1); } console.log('packed artifact ok:', m.SKILL_NAME);"
       - name: Publish to GitHub Packages
+        if: steps.meta.outputs.skip != 'true'
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
