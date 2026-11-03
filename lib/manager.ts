@@ -113,6 +113,7 @@ export class BrowserManager {
       waitUntil: options.waitUntil || "load",
       timeoutMs: options.timeoutMs || 30_000,
       lane: this.laneFor(sessionId),
+      beforeNavigate: (targetPage: any) => this.#ensureNetworkCapture(targetPage),
     });
     return this.#ensureNetworkCapture(page);
   }

@@ -10,6 +10,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import {
   badArgument,
+  clickIntercepted,
   dialogOpen,
   downloadFailed,
   elementNotFound,
@@ -24,6 +25,23 @@ import { buildSnapshot, boxCenter, findRef } from "./ax.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_LOAD_TIMEOUT_MS = 30_000;
+
+function axFieldValue(node: any, key: string) {
+  const field = node && node[key];
+  if (!field) return "";
+  return String(typeof field === "object" && "value" in field ? field.value : field);
+}
+
+function filterAXNodes(nodes: any[], role: any, name: any) {
+  const wantedRole = role ? String(role) : null;
+  const wantedName = name ? String(name).toLowerCase() : null;
+  if (!wantedRole && !wantedName) return nodes;
+  return (nodes || []).filter((node: any) => {
+    if (wantedRole && axFieldValue(node, "role") !== wantedRole) return false;
+    if (wantedName && !axFieldValue(node, "name").toLowerCase().includes(wantedName)) return false;
+    return true;
+  });
+}
 
 /** US physical layout for printable ASCII (enough for agent key presses). */
 const KEY_CODES = {
@@ -110,6 +128,9 @@ export class Page {
   targetId: string;
   lastSnapshot: any;
   nextRef: number;
+  snapshotChain: Promise<any>;
+  activeRequests: Map<string, any>;
+  lastNetworkActivity: number;
   pendingDialog: any;
   dialogHistory: any[];
   networkLog: any[];
@@ -141,6 +162,11 @@ export class Page {
     this.lastSnapshot = null;
     /** Monotonic ref counter: a stale ref never matches a later snapshot. */
     this.nextRef = 0;
+    /** Serializes snapshot generation so concurrent calls cannot share refStart. */
+    this.snapshotChain = Promise.resolve();
+    /** Requests currently in flight, independent of the capped networkLog. */
+    this.activeRequests = new Map();
+    this.lastNetworkActivity = Date.now();
     /** @type {any | null} */
     this.pendingDialog = null;
     /** @type {any[]} */
@@ -310,7 +336,7 @@ export class Page {
     if (result.errorText && !/^net::ERR_ABORTED/.test(result.errorText)) {
       throw new Error("navigation failed: " + result.errorText);
     }
-    if (waitUntil !== "none") await this.waitForLoad({ timeoutMs });
+    if (waitUntil !== "none") await this.waitForLoad({ waitUntil, timeoutMs });
     this.lastSnapshot = null;
     return this.info();
   }
@@ -329,23 +355,38 @@ export class Page {
     } else {
       throw badArgument("history needs back, forward or reload");
     }
-    if (waitUntil !== "none") await this.waitForLoad({ timeoutMs });
+    if (waitUntil !== "none") await this.waitForLoad({ waitUntil, timeoutMs });
     this.lastSnapshot = null;
     return this.info();
   }
 
-  /** Poll document.readyState until it reaches `complete`. */
-  async waitForLoad({ timeoutMs = DEFAULT_LOAD_TIMEOUT_MS }: any = {} as any) {
+  /**
+   * Wait for the requested document lifecycle state.
+   *
+   * load means READYSTATE COMPLETE (load event fired); domcontentloaded may
+   * return at interactive. The old implementation accepted interactive for
+   * both, which let load resolve before subresources arrived.
+   */
+  async waitForLoad({ waitUntil = "load", timeoutMs = DEFAULT_LOAD_TIMEOUT_MS }: any = {} as any) {
+    const kind = String(waitUntil || "load");
+    const eventName = kind === "domcontentloaded" ? "Page.domContentEventFired" : "Page.loadEventFired";
+    let eventFired = false;
+    const off = this.on(eventName, () => { eventFired = true; });
     const deadline = Date.now() + timeoutMs;
-    for (;;) {
-      try {
-        const ready = await this.evaluate("document.readyState");
-        if (ready === "complete" || ready === "interactive") return { ok: true, readyState: ready };
-      } catch (error: any) {
-        if (error.code === "E_DIALOG_OPEN") throw error;
+    try {
+      for (;;) {
+        try {
+          const ready = await this.evaluate("document.readyState");
+          if (kind === "load" && ready === "complete") return { ok: true, readyState: ready, waitedFor: kind, eventFired };
+          if (kind !== "load" && (ready === "interactive" || ready === "complete")) return { ok: true, readyState: ready, waitedFor: "domcontentloaded", eventFired };
+        } catch (error: any) {
+          if (error.code === "E_DIALOG_OPEN") throw error;
+        }
+        if (Date.now() > deadline) throw waitTimeout(kind === "load" ? "document.readyState === 'complete'" : "document.readyState === 'interactive'", timeoutMs, { waitUntil: kind });
+        await new Promise((resolvePromise: any) => setTimeout(resolvePromise, 50));
       }
-      if (Date.now() > deadline) throw waitTimeout("document.readyState === 'complete'", timeoutMs);
-      await new Promise((resolvePromise: any) => setTimeout(resolvePromise, 50));
+    } finally {
+      off();
     }
   }
 
@@ -353,11 +394,18 @@ export class Page {
    * Accessibility snapshot with stable refs and optional box centers.
    * @param {{ maxNodes?: number, includeBoxes?: boolean, roles?: string[] }} [options]
    */
-  async snapshot(options: any = {} as any) {
+  snapshot(options: any = {} as any) {
+    const run = this.snapshotChain.then(() => this.#snapshotNow(options));
+    this.snapshotChain = run.catch(() => {});
+    return run;
+  }
+
+  async #snapshotNow(options: any = {} as any) {
     const params: any = options.frameId ? { frameId: options.frameId } : {};
     const raw = await this.send("Accessibility.getFullAXTree", params, { timeoutMs: 15_000 });
+    const sourceNodes = filterAXNodes(raw.nodes || [], options.role, options.name);
     const refStart = this.nextRef;
-    const first = buildSnapshot(raw.nodes || [], { maxNodes: options.maxNodes ?? 400, roles: options.roles, refStart });
+    const first = buildSnapshot(sourceNodes, { maxNodes: options.maxNodes ?? 400, roles: options.roles, refStart });
     const withBoxes = options.includeBoxes !== false;
     if (withBoxes) {
       const boxes = new Map();
@@ -373,7 +421,7 @@ export class Page {
           }
         }));
       }
-      const second = buildSnapshot(raw.nodes || [], { maxNodes: first.nodes.length, roles: options.roles, boxes, refStart });
+      const second = buildSnapshot(sourceNodes, { maxNodes: first.nodes.length, roles: options.roles, boxes, refStart });
       this.lastSnapshot = second.nodes;
       this.nextRef = refStart + second.nodes.length;
       return { ...second, targetId: this.targetId };
@@ -450,22 +498,60 @@ export class Page {
   }
 
   /**
+   * Verify the element is actually on top at the click point.
+   * Iframes are skipped (their coordinates are frame-relative); coordinate
+   * clicks are explicit and therefore not checked.
+   */
+  async #assertClickHit(backendNodeId: any, point: any) {
+    let resolved;
+    try {
+      resolved = await this.send("DOM.resolveNode", { backendNodeId }, { timeoutMs: 5_000 });
+    } catch {
+      return;
+    }
+    if (!resolved || !resolved.object || !resolved.object.objectId) return;
+    let response;
+    try {
+      response = await this.send("Runtime.callFunctionOn", {
+        objectId: resolved.object.objectId,
+        functionDeclaration: "function (x, y) { if (window.top !== window) return { skipped: true }; if (this.disabled === true || this.getAttribute('aria-disabled') === 'true') return { ok: false, reason: 'disabled' }; const hit = document.elementFromPoint(x, y); if (!hit) return { ok: false, reason: 'no-hit' }; if (hit === this || this.contains(hit)) return { ok: true }; let root = this.getRootNode && this.getRootNode(); while (root && root.host) { if (hit === root.host || root.host.contains(hit)) return { ok: true }; root = root.host.getRootNode && root.host.getRootNode(); } return { ok: false, reason: 'covered', hit: { tag: String(hit.tagName || '').toLowerCase(), id: hit.id || '', className: typeof hit.className === 'string' ? hit.className : '' } }; }",
+        arguments: [{ value: point.x }, { value: point.y }],
+        returnByValue: true,
+      }, { timeoutMs: 5_000 });
+    } catch {
+      return;
+    }
+    const result = response && response.result ? response.result.value : null;
+    if (!result || result.skipped || result.ok) return;
+    throw clickIntercepted("click target is " + result.reason + " at (" + point.x + ", " + point.y + ")", {
+      backendNodeId,
+      x: point.x,
+      y: point.y,
+      reason: result.reason,
+      hit: result.hit || null,
+    });
+  }
+
+  /**
    * Click by ref, selector or viewport coordinates.
    * @param {{ ref?: string, selector?: string, at?: {x:number,y:number} }} target
-   * @param {{ button?: string, clicks?: number, timeoutMs?: number }} [options]
+   * @param {{ button?: string, clicks?: number, force?: boolean }} [options]
    */
   async click(target: any, options: any = {} as any) {
     let point: any = null;
+    let resolvedBackendNodeId: any = null;
     if (target && target.at) {
       point = { x: Number(target.at.x), y: Number(target.at.y) };
     } else if (target && target.ref) {
       const node = await this.#resolveRef(target.ref);
-      point = await this.#centerForBackendNode(node.backendDOMNodeId);
+      resolvedBackendNodeId = node.backendDOMNodeId;
+      point = await this.#centerForBackendNode(resolvedBackendNodeId);
     } else if (target && target.selector) {
-      const backendNodeId = await this.#resolveSelector(target.selector);
-      point = await this.#centerForBackendNode(backendNodeId);
+      resolvedBackendNodeId = await this.#resolveSelector(target.selector);
+      point = await this.#centerForBackendNode(resolvedBackendNodeId);
     }
     if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) throw badArgument("click needs {ref}, {selector} or {at:{x,y}}");
+    if (resolvedBackendNodeId !== null && options.force !== true) await this.#assertClickHit(resolvedBackendNodeId, point);
     await this.clickAt(point.x, point.y, options);
     return { ok: true, x: point.x, y: point.y };
   }
@@ -633,17 +719,14 @@ export class Page {
   /** Wait until network activity has been quiet for `idleMs`. */
   async waitForNetworkIdle({ timeoutMs = 10_000, idleMs = 500 }: any = {} as any) {
     const deadline = Date.now() + timeoutMs;
-    let lastCount = this.networkLog.length;
-    let lastChange = Date.now();
     while (Date.now() < deadline) {
-      if (this.networkLog.length !== lastCount) {
-        lastCount = this.networkLog.length;
-        lastChange = Date.now();
+      const quietFor = Date.now() - this.lastNetworkActivity;
+      if (this.activeRequests.size === 0 && quietFor >= idleMs) {
+        return { ok: true, activeRequests: 0, events: this.networkLog.length, idleMs: quietFor };
       }
-      if (Date.now() - lastChange >= idleMs) return { ok: true, events: this.networkLog.length };
       await new Promise((resolvePromise: any) => setTimeout(resolvePromise, 50));
     }
-    throw waitTimeout("network idle", timeoutMs);
+    throw waitTimeout("network idle", timeoutMs, { activeRequests: this.activeRequests.size, events: this.networkLog.length });
   }
 
   /** Read visible text of the page or of one element. */
@@ -778,10 +861,13 @@ export class Page {
       await this.send("Network.enable", {}, { timeoutMs: 5_000 });
       this.networkEnabled = true;
       this.on("Network.requestWillBeSent", (params: any) => {
+        this.activeRequests.set(params.requestId, { url: params.request && params.request.url, type: params.type });
+        this.lastNetworkActivity = Date.now();
         this.networkLog.push({ requestId: params.requestId, url: params.request && params.request.url, method: params.request && params.request.method, resourceType: params.type, ts: Date.now() });
         if (this.networkLog.length > this.maxNetworkEvents) this.networkLog.shift();
       });
       this.on("Network.responseReceived", (params: any) => {
+        this.lastNetworkActivity = Date.now();
         const entry = this.networkLog.find((item: any) => item.requestId === params.requestId);
         if (entry) {
           entry.status = params.response && params.response.status;
@@ -790,7 +876,13 @@ export class Page {
           entry.resourceType = params.type || entry.resourceType;
         }
       });
+      this.on("Network.loadingFinished", (params: any) => {
+        this.activeRequests.delete(params.requestId);
+        this.lastNetworkActivity = Date.now();
+      });
       this.on("Network.loadingFailed", (params: any) => {
+        this.activeRequests.delete(params.requestId);
+        this.lastNetworkActivity = Date.now();
         const entry = this.networkLog.find((item: any) => item.requestId === params.requestId);
         if (entry) entry.error = params.errorText;
       });

@@ -47,6 +47,7 @@ A plain public read needs no browser. If `web_fetch` can read it, use `web_fetch
 | `E_SELECTOR_TIMEOUT` / `E_ELEMENT_NOT_FOUND` | element missing or ref stale | re-snapshot, use a fresh ref or a CSS selector |
 | `E_POLICY_DENIED` | unsafe target (file/internal page, non-owned URL match), screenshot path outside `screenshotDir`, or closing a tab the harness did not create | ask the user; force-close only after they explicitly agree |
 | `E_NO_DIALOG` | `dialog` action was called with no open dialog (for example under auto-dismiss) | re-check the page state; use `dialogPolicy:"manual"` when confirmations need a decision |
+| `E_CLICK_INTERCEPTED` | another element covers the click target, or the target is disabled | close/dismiss the overlay, re-snapshot, or retry with `force:true` only if you deliberately accept the overlay |
 | `E_DIALOG_OPEN` | JS dialog blocking | dialogs auto-dismiss by default; retry once |
 | `E_TIMEOUT` | operation exceeded its budget | check `browser_status`, reduce scope, retry |
 

@@ -22,6 +22,9 @@
 - `browser_extract {mode:"console"}` 返回最近 console/Log 事件（URL/文本尽力脱敏）；页面控制台内容本身仍可能包含敏感信息。
 - `browser_act {action:"dialog"}` 仅在使用 `dialogPolicy: "manual"` 且当前有弹窗时可用；默认 `auto-dismiss` 会自动取消 confirm。
 - `browser_extract {mode:"frames"}` 列出 iframe；`browser_snapshot {frameId}` 对 iframe 生成 e1… 引用，随后可直接用 ref `click/fill/type`。`browser_act {action:"highlight"}` 用 CDP Overlay 高亮元素，适合 headful 调试。
+- `browser_act {action:"click"}` 在点击 ref/selector 前检查目标是否被遮挡；被遮挡返回 `E_CLICK_INTERCEPTED`。确需点击坐标或接受遮挡时用 `x/y` 或 `force:true`。
+- `browser_navigate` 的 `waitUntil:"load"` 现在等待 `readyState=complete`，`domcontentloaded` 才允许 interactive；首次导航在导航前开启网络抓取，首屏请求不会漏记。
+- `browser_snapshot` 的 `role/name` 过滤发生在节点上限之前；不再出现“目标在 450 个按钮最后但返回 nodes:0”。
 
 ## 独立库（不装 DSH）
 

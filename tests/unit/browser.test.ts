@@ -51,6 +51,13 @@ test("attach reuses one Page per target", async () => {
   assert.equal(transport.count("Target.attachToTarget"), 1);
 });
 
+test("concurrent attaches share one in-flight CDP session", async () => {
+  const { browser, transport } = await setup({ targets: [pageTarget("t1")] });
+  const [first, second] = await Promise.all([browser.attach("t1"), browser.attach("t1")]);
+  assert.equal(first, second);
+  assert.equal(transport.count("Target.attachToTarget"), 1);
+});
+
 test("closeTab refuses non-owned tabs unless forced", async () => {
   const { browser, transport } = await setup({ targets: [pageTarget("t1")] });
   await assert.rejects(browser.closeTab("t1"), (error: any) => {

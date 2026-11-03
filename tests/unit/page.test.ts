@@ -265,3 +265,69 @@ test("snapshot can target an iframe and highlight uses Overlay", async () => {
   assert.equal(highlight.params.backendNodeId, 5);
   assert.equal(highlight.params.highlightConfig.showInfo, true);
 });
+
+test("concurrent snapshots are serialized and old refs stay stale", async () => {
+  const transport = new FakeTransport();
+  let axCall = 0;
+  transport.on("Accessibility.getFullAXTree", () => {
+    axCall += 1;
+    return { nodes: [{ role: { value: "button" }, backendDOMNodeId: axCall === 1 ? 10 : 20, name: { value: axCall === 1 ? "First" : "Second" } }] };
+  });
+  transport.on("DOM.getBoxModel", (params) => quad(params.backendNodeId === 10 ? 10 : 100, 20, 20, 20));
+  const page = new Page({ transport, config: { dialogPolicy: "auto-dismiss", focusEmulation: false, stateDir: "/tmp/bh-unit" } }, { sessionId: "s1", targetId: "t1" });
+  const [first, second] = await Promise.all([page.snapshot(), page.snapshot()]);
+  assert.deepEqual(first.nodes.map((node) => node.ref), ["e1"]);
+  assert.deepEqual(second.nodes.map((node) => node.ref), ["e2"]);
+  assert.equal(second.nodes[0].backendDOMNodeId, 20);
+  await assert.rejects(page.click({ ref: first.nodes[0].ref }), (error) => {
+    assert.equal(error.code, "E_ELEMENT_NOT_FOUND");
+    return true;
+  });
+});
+
+test("snapshot role/name filtering happens before the node cap", async () => {
+  const transport = new FakeTransport();
+  const nodes = Array.from({ length: 450 }, (_, index) => ({ role: { value: "button" }, backendDOMNodeId: 100 + index, name: { value: "button-" + (index + 1) } }));
+  transport.on("Accessibility.getFullAXTree", () => ({ nodes }));
+  transport.on("DOM.getBoxModel", () => quad(1, 1, 10, 10));
+  const page = new Page({ transport, config: { dialogPolicy: "auto-dismiss", focusEmulation: false, stateDir: "/tmp/bh-unit" } }, { sessionId: "s1", targetId: "t1" });
+  const snapshot = await page.snapshot({ maxNodes: 250, role: "button", name: "button-450" });
+  assert.equal(snapshot.nodes.length, 1);
+  assert.equal(snapshot.nodes[0].name, "button-450");
+});
+
+test("click rejects a covered target unless force is set", async () => {
+  const { page, transport } = setupPage();
+  await page.snapshot();
+  transport.on("Runtime.callFunctionOn", () => ({ result: { value: { ok: false, reason: "covered", hit: { tag: "div", id: "overlay" } } } }));
+  await assert.rejects(page.click({ ref: "e1" }), (error) => {
+    assert.equal(error.code, "E_CLICK_INTERCEPTED");
+    assert.equal(error.details.hit.id, "overlay");
+    return true;
+  });
+  const forced = await page.click({ ref: "e1" }, { force: true });
+  assert.equal(forced.ok, true);
+});
+
+test("waitUntil load waits for complete, not interactive", async () => {
+  const { page, transport } = setupPage();
+  const states = ["interactive", "interactive", "complete"];
+  transport.on("Runtime.evaluate", () => ({ result: { value: states.shift() || "complete" } }));
+  const result = await page.waitForLoad({ waitUntil: "load", timeoutMs: 1_000 });
+  assert.equal(result.readyState, "complete");
+  assert.equal(result.waitedFor, "load");
+});
+
+test("network idle does not treat a capped log as idle while requests are active", async () => {
+  const transport = new FakeTransport();
+  const page = new Page({ transport, config: { dialogPolicy: "auto-dismiss", focusEmulation: false, stateDir: "/tmp/bh-unit" } }, { sessionId: "s1", targetId: "t1" });
+  await page.startNetworkCapture({ maxEvents: 5 });
+  transport.emit("Network.requestWillBeSent", { requestId: "r1", request: { url: "https://example.test/slow" }, type: "Fetch" });
+  await assert.rejects(page.waitForNetworkIdle({ timeoutMs: 150, idleMs: 30 }), (error) => {
+    assert.equal(error.code, "E_TIMEOUT");
+    return true;
+  });
+  transport.emit("Network.loadingFinished", { requestId: "r1" });
+  const idle = await page.waitForNetworkIdle({ timeoutMs: 500, idleMs: 30 });
+  assert.equal(idle.activeRequests, 0);
+});

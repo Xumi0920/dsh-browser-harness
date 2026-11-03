@@ -14,9 +14,9 @@ cd C:\path\to\dsh-browser-harness
 npm install                                   # 开发依赖：typescript / @types/node / @types/chrome / semver
 npm run build                                 # tsc → dist/ + extension/sw.js（发布产物）
 
-npm test                                      # 构建源码与测试，跑 158 单测（fake CDP 替身）
-npm run test:integration                      # 构建 + 33 场景（真实 headless/headful Chromium）
-npm run test:all                              # 构建 + 共 191 条
+npm test                                      # 构建源码与测试，跑 164 单测（fake CDP 替身）
+npm run test:integration                      # 构建 + 35 场景（真实 headless/headful Chromium）
+npm run test:all                              # 构建 + 共 199 条
 npm run verify -- --browser chrome            # 对 live 实例冒烟（需先 build）
 ```
 
@@ -137,5 +137,6 @@ $DSH = "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\ds
 | 安装后工具不出现 | 是否重启 DSH；确认 profile 的 dependencies / bundles 含 scoped 包名；DSH/Node 版本是否满足 `engines` |
 | 浏览器弹 "Allow remote debugging?" | 用的是日常浏览器；改用专用 profile 实例 |
 | `E_SELECTOR_TIMEOUT` / `E_ELEMENT_NOT_FOUND` | 先 `browser_snapshot` 重取 ref，再操作 |
+| `E_CLICK_INTERCEPTED` | 目标被遮挡/禁用：关闭遮罩、等待弹层消失，或显式使用坐标/`force:true` |
 | `E_POLICY_DENIED` | 试图关闭非本 harness 创建的标签页，或导航到非 http(s) 地址；需要 `force` 关闭时先取得用户明确同意 |
 | 标签组不可用（`tabGroups.available=false`） | 见 [tab-groups.md](tab-groups.md) 的“状态与排查” |

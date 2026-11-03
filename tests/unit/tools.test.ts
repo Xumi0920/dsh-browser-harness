@@ -472,7 +472,7 @@ test("browser_snapshot frameId and browser_extract frames route to iframe APIs",
   const tools = build(manager);
   await tools.find((definition) => definition.name === "browser_snapshot").execute({ frameId: "f1" }, {});
   const frames = await tools.find((definition) => definition.name === "browser_extract").execute({ mode: "frames" }, {});
-  assert.deepEqual(seen[0], ["snapshot", { maxNodes: 50, frameId: "f1" }]);
+  assert.deepEqual(seen[0], ["snapshot", { maxNodes: 50, frameId: "f1", role: undefined, name: undefined }]);
   assert.deepEqual(seen[1], ["frames"]);
   assert.equal(frames.count, 1);
 });

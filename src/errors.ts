@@ -39,6 +39,7 @@ export const codes = Object.freeze({
   E_STALE_TARGET: "E_STALE_TARGET",
   E_NO_TAB: "E_NO_TAB",
   E_ELEMENT_NOT_FOUND: "E_ELEMENT_NOT_FOUND",
+  E_CLICK_INTERCEPTED: "E_CLICK_INTERCEPTED",
   E_SELECTOR_TIMEOUT: "E_SELECTOR_TIMEOUT",
   E_DIALOG_OPEN: "E_DIALOG_OPEN",
   E_FRAME_NOT_FOUND: "E_FRAME_NOT_FOUND",
@@ -94,6 +95,9 @@ export function noTab(message: any = "no page tab is available; call open(url) f
 }
 export function elementNotFound(selector: any, details: any = {} as any) {
   return new HarnessError(codes.E_ELEMENT_NOT_FOUND, `element not found: ${selector}`, { details: { selector, ...details } });
+}
+export function clickIntercepted(message: any, details: any = {} as any) {
+  return new HarnessError(codes.E_CLICK_INTERCEPTED, message, { details });
 }
 export function selectorTimeout(selector: any, timeoutMs: any, details: any = {} as any) {
   return new HarnessError(codes.E_SELECTOR_TIMEOUT, `waiting for ${JSON.stringify(selector)} timed out after ${timeoutMs}ms`, {

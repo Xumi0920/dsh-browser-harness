@@ -313,3 +313,22 @@ test("T33 iframe extraction, frame snapshot and ref click work", async (t) => {
   assert.match(output.value, /clicked/);
   await run("browser_tabs", { action: "close", targetId: nav.targetId });
 });
+
+test("T34 first navigation is captured before subresource traffic", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/a.html", newTab: true });
+  const network = await run("browser_extract", { mode: "network", urlContains: "/a.html" });
+  assert.ok(network.events.some((event) => String(event.url).includes("/a.html")), "document request was captured");
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});
+
+test("T35 click reports an intercepting overlay instead of succeeding", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/overlay.html", newTab: true });
+  const ref = /(e\d+) button "target"/.exec(nav.snapshot)[1];
+  await assert.rejects(run("browser_act", { action: "click", ref }), (error) => {
+    assert.match(String(error.message), /E_CLICK_INTERCEPTED/);
+    return true;
+  });
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});

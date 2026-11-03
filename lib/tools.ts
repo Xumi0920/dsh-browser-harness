@@ -232,10 +232,10 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       },
       output: jsonOutput,
       timeoutMs: 30_000,
-      isConcurrencySafe: () => true,
+      isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
         const page = await manager.pageFor(sessionId);
-        const snapshot = await page.snapshot({ maxNodes: Math.min(Number(args.maxNodes) || maxSnapshotNodes, 400), frameId: args.frameId });
+        const snapshot = await page.snapshot({ maxNodes: Math.min(Number(args.maxNodes) || maxSnapshotNodes, 400), frameId: args.frameId, role: args.role, name: args.name });
         let nodes = snapshot.nodes;
         if (args.role || args.name) nodes = findByRole(nodes, { role: args.role, name: args.name });
         const rendered = formatSnapshot({ ...snapshot, nodes });
@@ -260,6 +260,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         dy: { type: "number", description: "scroll delta y" },
         button: { type: "string", enum: ["left", "right", "middle"], description: "mouse button for click" },
         clicks: { type: "number", description: "click count (default 1)" },
+        force: { type: "boolean", description: "click despite an overlay hit-test failure; prefer fixing the overlay" },
         accept: { type: "boolean", description: "dialog: accept (true, default) or dismiss (false)" },
         promptText: { type: "string", description: "dialog: text for a prompt() dialog" },
       },
@@ -272,7 +273,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         if (action === "click") {
           const target = args.ref || args.selector ? { ref: args.ref, selector: args.selector } : args.x !== undefined && args.y !== undefined ? { at: { x: args.x, y: args.y } } : null;
           if (!target) throw new HarnessError("E_BAD_ARG", "click needs ref, selector, or x+y");
-          return { action, ...(await page.click(target, { button: args.button, clicks: Number(args.clicks) || 1 })) };
+          return { action, ...(await page.click(target, { button: args.button, clicks: Number(args.clicks) || 1, force: args.force === true })) };
         }
         if (action === "hover") {
           if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "hover needs ref or selector");

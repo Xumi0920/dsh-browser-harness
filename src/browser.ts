@@ -74,6 +74,7 @@ export class Browser {
   config: any;
   version: any;
   pages: Map<string, any>;
+  attaching: Map<string, Promise<any>>;
   tabGroups: any;
   /**
    * @param {{
@@ -95,6 +96,8 @@ export class Browser {
     this.version = null;
     /** @type {Map<string, Page>} one reused Page per target (CDP session) */
     this.pages = new Map();
+    /** @type {Map<string, Promise<Page>>} in-flight attaches, one session per target */
+    this.attaching = new Map();
     /** Chrome tab groups for harness-created tabs (per DSH session/task). */
     this.tabGroups = new TabGroupBridge(this, {
       enabled: this.config.tabGroups !== false,
@@ -172,17 +175,27 @@ export class Browser {
   async attach(targetId: any) {
     const cached = this.pages.get(targetId);
     if (cached && !cached.closed) return cached;
-    let result;
+    const pending = this.attaching.get(targetId);
+    if (pending) return pending;
+    const attach = (async () => {
+      let result;
+      try {
+        result = await this.transport.send("Target.attachToTarget", { targetId, flatten: true }, { timeoutMs: 5_000 });
+      } catch (error: any) {
+        if (/No target|target.*(closed|not found)|Session with given id not found/i.test(String(error.message))) throw targetGone(targetId);
+        throw error;
+      }
+      const page = new Page(this, { sessionId: result.sessionId, targetId });
+      await page.enableDomains();
+      this.pages.set(targetId, page);
+      return page;
+    })();
+    this.attaching.set(targetId, attach);
     try {
-      result = await this.transport.send("Target.attachToTarget", { targetId, flatten: true }, { timeoutMs: 5_000 });
-    } catch (error: any) {
-      if (/No target|target.*(closed|not found)|Session with given id not found/i.test(String(error.message))) throw targetGone(targetId);
-      throw error;
+      return await attach;
+    } finally {
+      this.attaching.delete(targetId);
     }
-    const page = new Page(this, { sessionId: result.sessionId, targetId });
-    await page.enableDomains();
-    this.pages.set(targetId, page);
-    return page;
   }
 
   /** Detach and forget the cached Page for a target. */
@@ -205,7 +218,7 @@ export class Browser {
   }
 
   /** Reuse the remembered tab when it matches, otherwise open a new one. */
-  async open(url: any, { newTab = false, waitUntil = "load", timeoutMs = 30_000, lane = this.lane }: any = {} as any) {
+  async open(url: any, { newTab = false, waitUntil = "load", timeoutMs = 30_000, lane = this.lane, beforeNavigate = null }: any = {} as any) {
     if (typeof url !== "string" || url.length === 0) throw badArgument("open(url) needs a URL");
     assertNavigableUrl(url);
     if (!newTab) {
@@ -215,21 +228,23 @@ export class Browser {
         const owned = state.ownedTabs.some((tab: any) => tab.targetId === existing.targetId);
         if (owned) {
           const page = await this.attach(existing.targetId);
+          if (typeof beforeNavigate === "function") await beforeNavigate(page);
           await page.navigate(url, { waitUntil, timeoutMs });
           await this.#rememberCurrent(page, lane);
           return page;
         }
       }
     }
-    return this.newTab(url, { waitUntil, timeoutMs, lane });
+    return this.newTab(url, { waitUntil, timeoutMs, lane, beforeNavigate });
   }
 
   /** Create a background tab (never foregrounded) and optionally navigate it. */
-  async newTab(url: any = "about:blank", { waitUntil = "load", timeoutMs = 30_000, lane = this.lane }: any = {} as any) {
+  async newTab(url: any = "about:blank", { waitUntil = "load", timeoutMs = 30_000, lane = this.lane, beforeNavigate = null }: any = {} as any) {
     assertNavigableUrl(url);
     const created = await this.transport.send("Target.createTarget", { url: "about:blank", background: true }, { timeoutMs: 10_000 });
     const page = await this.attach(created.targetId);
     await stateStore.rememberOwnedTab(lane, { targetId: created.targetId, url: "about:blank" }, this.config.stateDir);
+    if (typeof beforeNavigate === "function") await beforeNavigate(page);
     if (url && url !== "about:blank") await page.navigate(url, { waitUntil, timeoutMs });
     await this.#rememberCurrent(page, lane);
     await this.#groupOwnedTab(page, lane);
