@@ -66,7 +66,9 @@ CDP 没有标签组 API，因此随包带一个极小 MV3 扩展（仅 `tabs` / 
 - `browser_status` 端点诊断使用字段白名单（不返回完整 `httpUrl`/`wsUrl`）；连接错误只保留稳定错误码和安全提示，不拼接原始 CDP URL/cause；页面正文/HTML/截图仍可能敏感；
 - 状态文件只保存去掉 userinfo/query/fragment 的 URL（POSIX 0600）；
 - `browser_extract` 的 `network` / `js` / `console` 只在显式请求时返回；JS 模式可产生副作用，工具标记为非并发；console 文本只做 URL 级尽力脱敏；
-- `browser_wait` 是轮询工具；`browser_act` 的 hover/dialog 与 `browser_navigate` 历史导航都走同一 Page，不引入额外后台进程；
+- `browser_wait` 是轮询工具；`browser_act` 的 hover/dialog/highlight 与 `browser_navigate` 历史导航都走同一 Page，不引入额外后台进程；
+- iframe：`browser_extract {mode:"frames"}` 调 `Page.getFrameTree`；`browser_snapshot {frameId}` 把 frameId 传给 `Accessibility.getFullAXTree`；`browser_extract {mode:"js", frameId}` 用执行上下文进入子 frame；
+- 下载优先消费 `Browser.downloadWillBegin` / `Browser.downloadProgress` 事件，保留文件系统轮询作为不支持事件时的回退；
 - 宽泛 CDP 端口回退（含 9222/9223）只在显式 `browser: "auto"` / `BH_ALLOW_FALLBACK=1` 时启用；
 - 全部后台操作，不抢前台；遇登录墙停手问人；
 - 标签组扩展权限最小化，只存在于专用浏览器 profile。

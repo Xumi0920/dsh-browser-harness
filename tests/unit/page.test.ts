@@ -254,3 +254,14 @@ test("history back/forward/reload navigate through CDP history", async () => {
   await page.history("reload");
   assert.equal(transport.count("Page.reload"), 1);
 });
+
+test("snapshot can target an iframe and highlight uses Overlay", async () => {
+  const { page, transport } = setupPage();
+  await page.snapshot({ frameId: "frame-1" });
+  const axCall = transport.calls.filter((call) => call.method === "Accessibility.getFullAXTree").at(-1);
+  assert.equal(axCall.params.frameId, "frame-1");
+  await page.highlight({ selector: "#name" });
+  const highlight = transport.calls.find((call) => call.method === "Overlay.highlightNode");
+  assert.equal(highlight.params.backendNodeId, 5);
+  assert.equal(highlight.params.highlightConfig.showInfo, true);
+});

@@ -18,9 +18,9 @@
 browser_status      端点 / 浏览器版本 / 标签页 / 当前标签页
 browser_wait        selector / text / network_idle / delay
 browser_navigate    打开 URL，或 back / forward / reload
-browser_snapshot    紧凑引用（e1…），含角色、名称、视口中心坐标
-browser_act         click / hover / type / fill / press / scroll / dialog
-browser_extract     text / html / JS / network / console
+browser_snapshot    紧凑引用（e1…）；可选 frameId 快照 iframe
+browser_act         click / hover / highlight / type / fill / press / scroll / dialog
+browser_extract     text / html / JS / network / console / frames
 browser_screenshot  整页或元素级 PNG 路径
 browser_pdf         页面 PDF 路径
 browser_upload      文件输入上传，路径限制在 uploadDir
@@ -34,7 +34,7 @@ browser_tabs        list / use / new / close
 - **真实登录态**：接自己起好的专用 Chromium 实例，登录一次长期有效；不碰日常浏览器。
 - **文本优先**：无障碍树 + ref 比“截图喂视觉模型”更准更省，截图只是补充。
 - **按任务标签组**：插件自建的标签页自动按 DSH 会话分组，工作标签页不受影响；headless 自动跳过。
-- **可验证**：156 单测（fake CDP）+ 32 集成场景（真实 headless/headful Chromium）= 188 条，CI 覆盖三平台。
+- **可验证**：158 单测（fake CDP）+ 33 集成场景（真实 headless/headful Chromium）= 191 条，CI 覆盖三平台。
 - **收紧的边界**：`browser_tabs use` 只接受 page + http(s)/about:blank（非自建页需精确 targetId）；截图/PDF 限定 `screenshotDir` 且不覆盖；上传限定 `uploadDir`、下载限定 `downloadDir` 并拒绝 symlink 逃逸；fill 不回显输入值；JS 模式标非并发；工具输出对 token 类 URL/headers 尽力脱敏；宽泛端口回退改为显式 `auto`；标签组不再临时改写页面标题。
 
 ## 环境要求
@@ -106,10 +106,10 @@ browser_extract {mode:"text" | "html" | "js" | "network"}
 
 ```sh
 npm install                 # 开发依赖（TypeScript），运行时零依赖
-npm run test:all            # 构建 + 156 单测 + 32 集成场景 = 188 条
+npm run test:all            # 构建 + 158 单测 + 33 集成场景 = 191 条
 ```
 
-CI：单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场景跑 ubuntu + xvfb（门禁 32 条，S15/S16 必须实跑）。测试与脚本同样由 `tsc` 编译（`dist-tests/` / `dist-scripts/`），与运行时源码共用 NodeNext 配置。
+CI：单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场景跑 ubuntu + xvfb（门禁 33 条，S15/S16 必须实跑）。测试与脚本同样由 `tsc` 编译（`dist-tests/` / `dist-scripts/`），与运行时源码共用 NodeNext 配置。
 
 ## 安全边界
 
@@ -124,4 +124,4 @@ CI：单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场�
 
 ## 许可
 
-MIT © 2026 Xumi0920 · 当前版本 **v1.2.1** · 全量 TypeScript（源码/测试/脚本/扩展）· 更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)
+MIT © 2026 Xumi0920 · 当前版本 **v1.3.0** · 全量 TypeScript（源码/测试/脚本/扩展）· 更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)

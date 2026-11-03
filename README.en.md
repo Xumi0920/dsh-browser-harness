@@ -18,9 +18,9 @@
 browser_status      endpoint / browser version / tabs / current tab
 browser_wait        selector / text / network_idle / delay
 browser_navigate    open a URL, or back / forward / reload
-browser_snapshot    compact refs (e1 ...) with role, name and viewport center
-browser_act         click / hover / type / fill / press / scroll / dialog
-browser_extract     text / html / JS / network / console
+browser_snapshot    compact refs (e1 ...); optional frameId for an iframe
+browser_act         click / hover / highlight / type / fill / press / scroll / dialog
+browser_extract     text / html / JS / network / console / frames
 browser_screenshot  full-page or element PNG path
 browser_pdf         page PDF path
 browser_upload      set a file input; paths confined to uploadDir
@@ -34,7 +34,7 @@ browser_tabs        list / use / new / close
 - **Your real login state.** Point it at a dedicated Chromium instance; sign in once and it persists. Your daily browser is never touched.
 - **Text-first.** Accessibility-tree snapshots and refs beat screenshot-VLM loops; screenshots stay optional.
 - **Per-task tab groups.** Tabs the harness creates are grouped per DSH session; work tabs are never grouped, and headless browsers skip grouping.
-- **Tested.** 156 unit tests (fake CDP) + 32 integration scenarios (real headless/headful Chromium) = 188, with CI on three platforms.
+- **Tested.** 158 unit tests (fake CDP) + 33 integration scenarios (real headless/headful Chromium) = 191, with CI on three platforms.
 - **Hardened boundaries.** `browser_tabs use` accepts only page targets with http(s)/about:blank URLs (non-owned tabs need an exact targetId); screenshots/PDF stay inside `screenshotDir` and never overwrite; uploads are confined to `uploadDir`, downloads to `downloadDir`, with symlink-escape checks; `fill` never echoes the entered value; JS mode is marked non-concurrent; token-like URLs/headers are redacted in tool output; broad port fallback is explicit `auto` only; tab grouping no longer mutates page titles.
 
 ## Requirements
@@ -108,7 +108,7 @@ browser_extract {mode:"text" | "html" | "js" | "network"}
 
 ```sh
 npm install                 # dev deps (TypeScript); runtime stays zero-dependency
-npm run test:all            # build + 156 unit + 32 integration = 188 tests
+npm run test:all            # build + 158 unit + 33 integration = 191 tests
 ```
 
 CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu + xvfb (27-scenario gate, S15/S16 must actually run). Tests and scripts are compiled by `tsc` too (`dist-tests/` / `dist-scripts/`), sharing the runtime NodeNext config.
@@ -126,4 +126,4 @@ CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu
 
 ## License
 
-MIT (c) 2026 Xumi0920 · current version **v1.2.1** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog
+MIT (c) 2026 Xumi0920 · current version **v1.3.0** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog

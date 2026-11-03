@@ -354,7 +354,8 @@ export class Page {
    * @param {{ maxNodes?: number, includeBoxes?: boolean, roles?: string[] }} [options]
    */
   async snapshot(options: any = {} as any) {
-    const raw = await this.send("Accessibility.getFullAXTree", {}, { timeoutMs: 15_000 });
+    const params: any = options.frameId ? { frameId: options.frameId } : {};
+    const raw = await this.send("Accessibility.getFullAXTree", params, { timeoutMs: 15_000 });
     const refStart = this.nextRef;
     const first = buildSnapshot(raw.nodes || [], { maxNodes: options.maxNodes ?? 400, roles: options.roles, refStart });
     const withBoxes = options.includeBoxes !== false;
@@ -478,6 +479,24 @@ export class Page {
     const point = await this.#centerForBackendNode(backendNodeId);
     await this.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y }, { timeoutMs: 5_000 });
     return { ok: true, x: point.x, y: point.y };
+  }
+
+  /** Highlight a ref/selector in the page (headful debugging aid). */
+  async highlight(target: any) {
+    let backendNodeId;
+    if (target && target.ref) backendNodeId = (await this.#resolveRef(target.ref)).backendDOMNodeId;
+    else if (target && target.selector) backendNodeId = await this.#resolveSelector(target.selector);
+    else throw badArgument("highlight needs {ref} or {selector}");
+    await this.send("Overlay.enable", {}, { timeoutMs: 5_000 });
+    await this.send("Overlay.highlightNode", {
+      backendNodeId,
+      highlightConfig: {
+        showInfo: true,
+        contentColor: { r: 111, g: 168, b: 220, a: 0.35 },
+        borderColor: { r: 40, g: 90, b: 160, a: 0.9 },
+      },
+    }, { timeoutMs: 5_000 });
+    return { ok: true };
   }
 
   /** Dispatch a real mouse click at viewport CSS coordinates. */
@@ -918,26 +937,48 @@ export class Page {
     const directory = resolve(dir || this.downloadDir || join(this.browser.config.stateDir || tmpdir(), "downloads"));
     await mkdir(directory, { recursive: true });
     const before = new Set(await readdir(directory).catch(() => []));
+    let guid: any = null;
+    let state: any = null;
+    const offWillBegin = this.on("Browser.downloadWillBegin", (params: any) => {
+      if (!guid) guid = params.guid;
+    });
+    const offProgress = this.on("Browser.downloadProgress", (params: any) => {
+      if (!guid) guid = params.guid;
+      if (params.guid !== guid) return;
+      state = { state: params.state, receivedBytes: params.receivedBytes, totalBytes: params.totalBytes, guid: params.guid };
+    });
     await this.browser.setDownloadBehavior({ behavior: "allow", downloadPath: directory, eventsEnabled: true });
     try {
       await trigger();
       const deadline = Date.now() + timeoutMs;
       while (Date.now() < deadline) {
-        const names = await readdir(directory).catch(() => []);
-        const fresh = names.filter((name: any) => !before.has(name));
-        const partial = fresh.filter((name: any) => name.endsWith(".crdownload"));
-        const complete = fresh.filter((name: any) => !name.endsWith(".crdownload"));
-        if (complete.length > 0 && partial.length === 0) {
-          const file = join(directory, complete[0]);
-          const info = await stat(file);
-          return { ok: true, path: file, bytes: info.size, filename: complete[0] };
+        if (state && state.state === "canceled") throw downloadFailed("download was canceled", { directory, guid });
+        if (state && state.state === "completed") {
+          const completed = await this.#freshDownload(directory, before);
+          if (completed) return completed;
         }
+        // Fallback for Chromium/CDP builds that do not emit download events.
+        const completed = await this.#freshDownload(directory, before);
+        if (completed) return completed;
         await new Promise((resolvePromise: any) => setTimeout(resolvePromise, 100));
       }
       throw downloadFailed("download did not finish within " + timeoutMs + "ms", { directory });
     } finally {
+      offWillBegin();
+      offProgress();
       await this.browser.setDownloadBehavior({ behavior: "default" }).catch(() => {});
     }
+  }
+
+  async #freshDownload(directory: any, before: any) {
+    const names = await readdir(directory).catch(() => []);
+    const fresh = names.filter((name: any) => !before.has(name));
+    const partial = fresh.filter((name: any) => name.endsWith(".crdownload"));
+    const complete = fresh.filter((name: any) => !name.endsWith(".crdownload"));
+    if (complete.length === 0 || partial.length > 0) return null;
+    const file = join(directory, complete[0]);
+    const info = await stat(file);
+    return { ok: true, path: file, bytes: info.size, filename: complete[0] };
   }
 
   /** Drop this page's listeners and cached snapshot state. */

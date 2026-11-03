@@ -223,18 +223,19 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
     tool({
       name: "browser_snapshot",
       description:
-        "Return the current page's compact accessibility snapshot: one line per actionable element with its ref (e1...), role, name and viewport center. Refs are snapshot-scoped; take a new snapshot after navigation or DOM changes.",
+        "Return the current page's compact accessibility snapshot: one line per actionable element with its ref (e1...), role, name and viewport center. Pass frameId (from browser_extract mode:'frames') to snapshot an iframe. Refs are snapshot-scoped; take a new snapshot after navigation or DOM changes.",
       parameters: {
         maxNodes: { type: "number", description: "maximum nodes to return (default 250, capped at 400)" },
         role: { type: "string", description: "only include this ARIA role (e.g. button)" },
         name: { type: "string", description: "only include nodes whose name contains this text (case-insensitive)" },
+        frameId: { type: "string", description: "optional iframe frameId from browser_extract mode:'frames'" },
       },
       output: jsonOutput,
       timeoutMs: 30_000,
       isConcurrencySafe: () => true,
       execute: wrap(async (args: any, sessionId: any) => {
         const page = await manager.pageFor(sessionId);
-        const snapshot = await page.snapshot({ maxNodes: Math.min(Number(args.maxNodes) || maxSnapshotNodes, 400) });
+        const snapshot = await page.snapshot({ maxNodes: Math.min(Number(args.maxNodes) || maxSnapshotNodes, 400), frameId: args.frameId });
         let nodes = snapshot.nodes;
         if (args.role || args.name) nodes = findByRole(nodes, { role: args.role, name: args.name });
         const rendered = formatSnapshot({ ...snapshot, nodes });
@@ -245,9 +246,9 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
     tool({
       name: "browser_act",
       description:
-        "Perform one browser action: click a ref/selector/coordinate, hover an element, type into the focused element (or focus a ref/selector first), fill an input like a user, press a key, scroll, or accept/dismiss the current JavaScript dialog. Use refs from browser_navigate/browser_snapshot; verify the result afterwards (snapshot or browser_extract). fill returns only length/verified, never the entered value.",
+        "Perform one browser action: click a ref/selector/coordinate, hover or highlight an element, type into the focused element (or focus a ref/selector first), fill an input like a user, press a key, scroll, or accept/dismiss the current JavaScript dialog. Use refs from browser_navigate/browser_snapshot (including iframe snapshots); verify the result afterwards (snapshot or browser_extract). fill returns only length/verified, never the entered value.",
       parameters: {
-        action: { type: "string", required: true, enum: ["click", "hover", "type", "fill", "press", "scroll", "dialog"], description: "action to perform" },
+        action: { type: "string", required: true, enum: ["click", "hover", "highlight", "type", "fill", "press", "scroll", "dialog"], description: "action to perform" },
         ref: { type: "string", description: "snapshot ref such as e3" },
         selector: { type: "string", description: "CSS selector (use instead of ref/coordinates)" },
         x: { type: "number", description: "viewport x for click" },
@@ -277,6 +278,10 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
           if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "hover needs ref or selector");
           return { action, ...(await page.hover({ ref: args.ref, selector: args.selector })) };
         }
+        if (action === "highlight") {
+          if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "highlight needs ref or selector");
+          return { action, ...(await page.highlight({ ref: args.ref, selector: args.selector })) };
+        }
         if (action === "type") {
           if (args.ref || args.selector) await page.focus({ ref: args.ref, selector: args.selector });
           return { action, ...(await page.type(String(args.text ?? ""))) };
@@ -301,13 +306,15 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
     tool({
       name: "browser_extract",
       description:
-        "Read from the current page: visible text (text), raw HTML (html), a JavaScript expression result (js), captured network responses (network), or recent console/log events (console). Prefer browser_snapshot for interaction targets and this tool for content/data. js mode executes arbitrary page JavaScript with user-gesture semantics: it can change page state and is treated as non-concurrent; URLs/headers with token-like values are redacted in output, page content itself is not.",
+        "Read from the current page: visible text (text), raw HTML (html), a JavaScript expression result (js), captured network responses (network), recent console/log events (console), or the iframe tree (frames). Prefer browser_snapshot for interaction targets and this tool for content/data. js mode executes arbitrary page JavaScript with user-gesture semantics: it can change page state and is treated as non-concurrent; URLs/headers with token-like values are redacted in output, page content itself is not.",
       parameters: {
-        mode: { type: "string", required: true, enum: ["text", "html", "js", "network", "console"], description: "what to read" },
+        mode: { type: "string", required: true, enum: ["text", "html", "js", "network", "console", "frames"], description: "what to read" },
         selector: { type: "string", description: "CSS selector for text/html modes (defaults to body)" },
         expression: { type: "string", description: "JavaScript expression for js mode; string/serialized results are capped at 200k chars with truncated:true" },
         includeBody: { type: "boolean", description: "network mode: include response bodies (slower)" },
         urlContains: { type: "string", description: "network mode: only responses whose URL contains this" },
+        frameId: { type: "string", description: "optional iframe frameId for text/html/js modes" },
+        frameUrl: { type: "string", description: "optional iframe URL substring for text/html/js modes" },
       },
       output: jsonOutput,
       timeoutMs: 30_000,
@@ -315,22 +322,34 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       execute: wrap(async (args: any, sessionId: any) => {
         const page = await manager.pageFor(sessionId);
         const mode = String(args.mode);
+        const frameMatch = args.frameId || args.frameUrl ? { frameId: args.frameId, urlContains: args.frameUrl } : null;
+        if (mode === "frames") {
+          const frames = await page.frames();
+          return { mode, frames, count: frames.length };
+        }
         if (mode === "text") {
-          const value = await page.text(args.selector);
+          const value = frameMatch
+            ? await page.evaluateInFrame(frameMatch, (selector: any) => selector ? (document.querySelector(selector) ? document.querySelector(selector).innerText : null) : (document.body ? document.body.innerText : ""), { args: [args.selector || null] })
+            : await page.text(args.selector);
           const text = typeof value === "string" ? value : "";
           const truncated = text.length > 200_000;
           return { mode, value: truncated ? text.slice(0, 200_000) : value, truncated };
         }
         if (mode === "html") {
-          const value = await page.evaluate((selector: any) => {
+          const expression = (selector: any) => {
             const element = selector ? document.querySelector(selector) : document.documentElement;
             return element ? element.outerHTML : null;
-          }, { args: [args.selector || null] });
+          };
+          const value = frameMatch
+            ? await page.evaluateInFrame(frameMatch, expression, { args: [args.selector || null] })
+            : await page.evaluate(expression, { args: [args.selector || null] });
           return { mode, value: typeof value === "string" && value.length > 200_000 ? value.slice(0, 200_000) : value, truncated: typeof value === "string" && value.length > 200_000 };
         }
         if (mode === "js") {
           if (!args.expression) throw new HarnessError("E_BAD_ARG", "js mode needs expression");
-          const value = await page.evaluate(String(args.expression));
+          const value = frameMatch
+            ? await page.evaluateInFrame(frameMatch, String(args.expression))
+            : await page.evaluate(String(args.expression));
           if (typeof value === "string" && value.length > 200_000) {
             return { mode, value: value.slice(0, 200_000), truncated: true };
           }

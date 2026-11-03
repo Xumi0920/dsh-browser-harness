@@ -7,8 +7,8 @@
 1. `browser_status` — 确认端点、浏览器版本、当前标签页；
 2. `browser_navigate {url}` / `{action:"back"|"forward"|"reload"}` — 打开页面或浏览器历史导航，并拿到紧凑快照（`e1`、`e2`… 引用）；
 3. `browser_wait` — 等待 selector / text / network_idle，或固定 delay，避免反复快照盲等；
-4. `browser_act` — `{action:"click"|"hover", ref}` / `{action:"fill", selector, text}` / `{action:"type", ref, text}` / `{action:"press", key}` / `{action:"scroll", dy}` / `{action:"dialog", accept}`；
-5. `browser_extract` — `text` / `html` / `js` / `network`（最多最近 100 条请求，`includeBody` 较慢）/ `console`（最近 console/Log 事件）；
+4. `browser_act` — `{action:"click"|"hover"|"highlight", ref}` / `{action:"fill", selector, text}` / `{action:"type", ref, text}` / `{action:"press", key}` / `{action:"scroll", dy}` / `{action:"dialog", accept}`；
+5. `browser_extract` — `text` / `html` / `js` / `network`（最多最近 100 条请求，`includeBody` 较慢）/ `console`（最近 console/Log 事件）/ `frames`（iframe 树）；`text/html/js` 可传 `frameId`/`frameUrl` 进入 iframe；
 6. `browser_snapshot` / `browser_screenshot`（整页或 ref/selector 元素）复核；`browser_pdf` 导出 PDF；
 7. `browser_upload` 设置文件输入（路径限制在 `uploadDir`）；`browser_download` 点击触发下载并等待落盘（文件在 `downloadDir`）；`browser_tabs` 管理自建标签页。
 
@@ -21,6 +21,7 @@
 - `browser_upload` 只接受 `uploadDir`（默认 `<stateDir>/uploads`）内的普通文件，拒绝 `..`/symlink 逃逸；`browser_download` 只写入 `downloadDir`（默认 `<stateDir>/downloads`）。
 - `browser_extract {mode:"console"}` 返回最近 console/Log 事件（URL/文本尽力脱敏）；页面控制台内容本身仍可能包含敏感信息。
 - `browser_act {action:"dialog"}` 仅在使用 `dialogPolicy: "manual"` 且当前有弹窗时可用；默认 `auto-dismiss` 会自动取消 confirm。
+- `browser_extract {mode:"frames"}` 列出 iframe；`browser_snapshot {frameId}` 对 iframe 生成 e1… 引用，随后可直接用 ref `click/fill/type`。`browser_act {action:"highlight"}` 用 CDP Overlay 高亮元素，适合 headful 调试。
 
 ## 独立库（不装 DSH）
 

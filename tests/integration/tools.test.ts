@@ -253,6 +253,8 @@ test("T29 browser_act hover and browser_extract console work on a real page", as
   const nav = await run("browser_navigate", { url: server.url + "/form.html", newTab: true });
   const hovered = await run("browser_act", { action: "hover", selector: "#submit" });
   assert.equal(hovered.ok, true);
+  const highlighted = await run("browser_act", { action: "highlight", selector: "#submit" });
+  assert.equal(highlighted.ok, true);
   await run("browser_extract", { mode: "js", expression: "console.error('console-probe')" });
   await run("browser_wait", { mode: "delay", delayMs: 30 });
   const consoleResult = await run("browser_extract", { mode: "console" });
@@ -293,5 +295,21 @@ test("T32 browser_download clicks a link and returns the downloaded file", async
   assert.match(downloaded.filename, /report\.csv/);
   assert.ok(downloaded.bytes > 0);
   assert.match(await readFile(downloaded.path, "utf8"), /id,name|alpha/);
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});
+
+test("T33 iframe extraction, frame snapshot and ref click work", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/iframe.html", newTab: true });
+  const frames = await run("browser_extract", { mode: "frames" });
+  const child = frames.frames.find((frame) => frame.url.includes("iframe-child"));
+  assert.ok(child, "child frame is listed");
+  const snapshot = await run("browser_snapshot", { frameId: child.frameId });
+  assert.match(snapshot.text, /button/);
+  const ref = snapshot.text.match(/(e\d+)\s+button/);
+  assert.ok(ref, "frame snapshot exposes a button ref");
+  await run("browser_act", { action: "click", ref: ref[1] });
+  const output = await run("browser_extract", { mode: "js", frameId: child.frameId, expression: "document.getElementById('inner-out').textContent" });
+  assert.match(output.value, /clicked/);
   await run("browser_tabs", { action: "close", targetId: nav.targetId });
 });
