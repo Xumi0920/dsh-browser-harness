@@ -232,7 +232,7 @@ test("T10 CLI open/snapshot/info/close drive a real tab", async (t) => {
   assert.ok(Array.isArray(groupsInfo.groups));
 
   const closed = await exec(["close"]);
-  assert.match(closed.stdout, /"ok":true/);
+  assert.match(closed.stdout, /"ok":\s*true/);
 
   const doctor = await runCli(process.execPath, [bh, "doctor"], { env, timeout: 30_000 });
   assert.match(doctor.stdout, /chrome/);
@@ -571,4 +571,45 @@ test("T49 browser_snapshot paginates the full filtered set beyond 400", async (t
   assert.equal(firstPage.total, 450);
   assert.match(firstPage.text, /button-1/);
   await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});
+
+test("T50 CLI exposes navigate, act, wait, extract, snapshot, tabs, task, screenshot and PDF", async (t) => {
+  if (needChrome(t)) return;
+  const stateDir = await tempDir("bh-cli-surface-");
+  const env = { ...process.env, BH_CDP_URL: chrome.httpUrl, BH_STATE_DIR: stateDir };
+  const bh = join(ROOT, "dist", "bin", "bh.js");
+  const exec = (args) => runCli(process.execPath, [bh, ...args], { env, timeout: 30_000 });
+
+  const opened = await exec(["navigate", server.url + "/form.html"]);
+  assert.match(opened.stdout, /form\.html/);
+  const filled = await exec(["act", "fill", "--selector", "#name", "--text", "Ada"]);
+  assert.match(filled.stdout, /"ok":\s*true/);
+  const clicked = await exec(["act", "click", "--selector", "#submit", "--expect-text", "submitted:Ada", "--expect-selector", "#ok"]);
+  assert.match(clicked.stdout, /"ok":\s*true/);
+  assert.match(clicked.stdout, /"expectation"/);
+  const extracted = await exec(["extract", "text", "--selector", "#ok"]);
+  assert.match(extracted.stdout, /submitted:Ada/);
+  const waited = await exec(["wait", "text", "--text", "submitted"]);
+  assert.match(waited.stdout, /"matched":\s*true/);
+  const snapshot = JSON.parse((await exec(["snapshot", "--role", "button", "--limit", "2", "--json"])).stdout);
+  assert.ok(snapshot.total >= 1);
+  assert.ok(snapshot.nodes >= 1);
+  const status = JSON.parse((await exec(["status"])).stdout);
+  assert.equal(status.connected, true);
+  const currentTarget = status.current && status.current.targetId;
+  const task = JSON.parse((await exec(["task", "status"])).stdout);
+  assert.ok(task.task.state);
+  const shot = JSON.parse((await exec(["shot"])).stdout);
+  assert.match(shot.path, /\.png$/);
+  const pdf = JSON.parse((await exec(["pdf"])).stdout);
+  assert.match(pdf.path, /\.pdf$/);
+  const created = JSON.parse((await exec(["tabs", "new", server.url + "/b.html"])).stdout);
+  assert.ok(created.created || created.targetId);
+  const tabId = created.created || created.targetId;
+  const used = JSON.parse((await exec(["tabs", "use", tabId])).stdout);
+  assert.ok(used.targetId);
+  const closed = JSON.parse((await exec(["tabs", "close", tabId])).stdout);
+  assert.equal(closed.ok, true);
+  assert.ok(currentTarget);
+  await exec(["tabs", "close", currentTarget]);
 });

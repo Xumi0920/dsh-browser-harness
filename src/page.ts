@@ -839,6 +839,12 @@ export class Page {
   }
 
   async screenshot({ path: filePath, fullPage = false, clip }: any = {} as any) {
+    // captureScreenshot can stall on a background target after input; activate first (best effort).
+    try {
+      await this.browser.transport.send("Target.activateTarget", { targetId: this.targetId }, { timeoutMs: 5_000 });
+    } catch {
+      /* activation is an optimization */
+    }
     const params: any = { format: "png", fromSurface: true, captureBeyondViewport: Boolean(fullPage) };
     if (clip) {
       const { x, y, width, height } = clip;

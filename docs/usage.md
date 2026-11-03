@@ -47,9 +47,19 @@ await bh.close();
 
 ```sh
 node dist/bin/bh.js doctor              # 列出已知端点与状态
-node dist/bin/bh.js tabs                # 列出标签页
-node dist/bin/bh.js open <url>          # 打开 URL（记为自建标签页）
-node dist/bin/bh.js info | snapshot | text [sel] | js <expr> | shot [path]   # path 相对 screenshotDir
+node dist/bin/bh.js status              # browser_status JSON
+node dist/bin/bh.js tabs [list|new <url>|use <targetId> [--borrow]|close [targetId] [--force]]
+node dist/bin/bh.js navigate <url> [--new-tab]   # open 是 navigate 的别名
+node dist/bin/bh.js info | snapshot [--role r --name n --offset 0 --limit 50 --json]
+node dist/bin/bh.js act click --selector "#submit" --expect-text "Saved"
+node dist/bin/bh.js act fill --selector "#name" --text "Ada"
+node dist/bin/bh.js act drag --selector "#source" --to-selector "#target" --steps 12
+node dist/bin/bh.js wait text --text "Saved"
+node dist/bin/bh.js extract text --selector "#result"   # 也可 html/js/network/console/frames
+node dist/bin/bh.js text [selector] | js <expr>
+node dist/bin/bh.js shot [path] [--full] | pdf [path] | diagnose [--no-screenshot]
+node dist/bin/bh.js upload --selector "#file" --path a.txt | download --selector "#dl"
+node dist/bin/bh.js task status|start|pause|resume|close [--cleanup close-owned|leave]
 node dist/bin/bh.js close [targetId] [--force]
 node dist/bin/bh.js groups [--retry]    # 标签组状态/列表；--retry 重试安装扩展
 ```
