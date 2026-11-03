@@ -1,12 +1,10 @@
-import { booleanFlag, rejectUnknownFlags } from "./common.js";
-
-const MODES = ["text", "html", "js", "network", "console", "frames"];
-const FLAGS = ["selector", "expression", "include-body", "url-contains", "frame-id", "frame-url"];
+import { booleanFlag } from "./common.js";
+import { EXTRACT_MODES, validateExtractFlags } from "./extract-options.js";
 
 export function parseExtractArgs(positional: string[], flags: any) {
-  rejectUnknownFlags(flags, FLAGS, "extract");
   const mode = String(positional[0] || "text");
-  if (!MODES.includes(mode)) throw new Error("extract needs one of: " + MODES.join(", "));
+  if (!EXTRACT_MODES.includes(mode)) throw new Error("extract needs one of: " + EXTRACT_MODES.join(", "));
+  validateExtractFlags(mode, flags);
   const args: any = {
     mode,
     ...(flags.selector !== undefined ? { selector: String(flags.selector) } : {}),
@@ -27,6 +25,5 @@ export function parseExtractArgs(positional: string[], flags: any) {
     throw new Error("extract " + mode + " does not accept positional arguments");
   }
   if (args.includeBody === true && mode !== "network") throw new Error("extract --include-body is only valid for network");
-  if (args.selector !== undefined && mode !== "text" && mode !== "html") throw new Error("extract --selector is only valid for text/html");
   return args;
 }

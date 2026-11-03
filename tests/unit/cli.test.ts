@@ -72,6 +72,8 @@ test("act subcommand validates action-specific targets and values", async () => 
   assert.throws(() => act(["click"]), /needs ref\/selector or x and y/);
   assert.throws(() => act(["drag", "--selector", "#a"]), /needs --to-ref or --to-selector/);
   assert.throws(() => act(["fill", "--selector", "#name", "--bogus"]), /unknown option/);
+  assert.throws(() => act(["hover", "--values", "a"]), /unknown option/);
+  assert.throws(() => act(["dialog", "--force"]), /unknown option/);
   assert.throws(() => act(["scroll", "--dx", "wat"]), /expects a number/);
 });
 
@@ -89,7 +91,8 @@ test("extract subcommand validates mode, selector and expression", async () => {
   assert.throws(() => extract(["js"]), /needs an expression/);
   assert.throws(() => extract(["text", "#a", "#b"]), /at most one selector/);
   assert.throws(() => extract(["network", "#a"]), /does not accept positional/);
-  assert.throws(() => extract(["network", "--selector", "#a"]), /only valid for text\/html/);
+  assert.throws(() => extract(["network", "--selector", "#a"]), /unknown option/);
+  assert.throws(() => extract(["console", "--url-contains", "x"]), /unknown option/);
 });
 
 test("tabs subcommand validates action, target and URL", async () => {

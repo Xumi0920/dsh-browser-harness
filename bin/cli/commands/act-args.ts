@@ -1,16 +1,10 @@
-import { booleanFlag, numberValue, rejectUnknownFlags } from "./common.js";
-
-const ACTIONS = ["click", "hover", "highlight", "drag", "type", "fill", "selectOption", "check", "uncheck", "press", "scroll", "dialog"];
-const FLAGS = [
-  "ref", "selector", "x", "y", "text", "key", "modifiers", "dx", "dy", "button", "clicks",
-  "values", "force", "prompt-text", "to-ref", "to-selector", "steps", "accept", "dismiss",
-  "expect-url", "expect-text", "expect-selector", "expect-timeout-ms",
-];
+import { booleanFlag, numberValue } from "./common.js";
+import { ACT_ACTIONS, validateActFlags } from "./act-options.js";
 
 export function parseActArgs(positional: string[], flags: any) {
-  rejectUnknownFlags(flags, FLAGS, "act");
   const action = String(positional[0] || "");
-  if (!ACTIONS.includes(action)) throw new Error("act needs one of: " + ACTIONS.join(", "));
+  if (!ACT_ACTIONS.includes(action)) throw new Error("act needs one of: " + ACT_ACTIONS.join(", "));
+  validateActFlags(action, flags);
   const args: any = { action };
   for (const key of ["ref", "selector", "text", "key", "modifiers", "button", "expect-url", "expect-text", "expect-selector"]) {
     if (flags[key] !== undefined) args[key.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = flags[key];

@@ -634,7 +634,7 @@ test("T52 CLI validates act/extract/tabs before touching the browser", async () 
   await assert.rejects(exec(["act"]), /act needs one of/);
   await assert.rejects(exec(["act", "click"]), /needs ref\/selector or x and y/);
   await assert.rejects(exec(["extract", "js"]), /needs an expression/);
-  await assert.rejects(exec(["extract", "network", "--selector", "#x"]), /only valid for text\/html/);
+  await assert.rejects(exec(["extract", "network", "--selector", "#x"]), /unknown option/);
   await assert.rejects(exec(["tabs", "use"]), /exactly one targetId/);
   await assert.rejects(exec(["tabs", "new", "file:///etc/passwd"]), /refusing to open/);
 });
