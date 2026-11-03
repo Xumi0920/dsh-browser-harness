@@ -654,3 +654,21 @@ test("T53 CLI validates snapshot pagination and accepts full filtered pages", as
   assert.equal(page.nodes, 50);
   await exec(["close"]);
 });
+
+test("T54 CLI subcommand help works before creating a browser", async () => {
+  const stateDir = await tempDir("bh-cli-help-");
+  const bh = join(ROOT, "dist", "bin", "bh.js");
+  const env = { ...process.env, BH_STATE_DIR: stateDir };
+  const exec = (args) => runCli(process.execPath, [bh, ...args], { env, timeout: 15_000 });
+  const help = await exec(["help", "snapshot"]);
+  assert.match(help.stdout, /--offset/);
+  assert.match(help.stdout, /max 100000/);
+  assert.match(help.stdout, /--max-nodes/);
+  const flagHelp = await exec(["snapshot", "--help"]);
+  assert.equal(flagHelp.stdout, help.stdout);
+  const navHelp = await exec(["navigate", "--help"]);
+  assert.match(navHelp.stdout, /navigate <http/);
+  const all = await exec(["help"]);
+  assert.match(all.stdout, /snapshot/);
+  assert.match(all.stdout, /act/);
+});

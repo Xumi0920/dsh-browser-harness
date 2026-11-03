@@ -13,21 +13,40 @@ import { commandUsages, findCommand } from "./cli/registry.js";
 
 const [commandName, ...rest] = process.argv.slice(2);
 
+function printCommands() {
+  console.log("usage: bh <command> [options]");
+  for (const usage of commandUsages(commands)) console.log("  " + usage);
+}
+
 async function main() {
   if (!commandName || commandName === "help" || commandName === "--help") {
-    console.log("usage: bh <command> [options]");
-    for (const usage of commandUsages(commands)) console.log("  " + usage);
+    const requested = commandName === "help" ? parseCliArgs(rest).positional[0] : null;
+    if (requested) {
+      const selected = findCommand(commands, requested);
+      if (!selected) {
+        console.error("unknown command: " + requested);
+        process.exitCode = 2;
+        return;
+      }
+      console.log(selected.usage);
+      return;
+    }
+    printCommands();
     return;
   }
   const definition = findCommand(commands, commandName);
   if (!definition) {
     console.error("unknown command: " + commandName);
-    console.error("usage: bh <command> [options]");
+    printCommands();
     process.exitCode = 2;
     return;
   }
 
   const { flags, positional } = parseCliArgs(rest);
+  if (flags.help === true) {
+    console.log(definition.usage);
+    return;
+  }
   let manager: any = null;
   const context: any = { manager: null, stateDir: defaultStateDir(), invoke: async () => { throw new Error("browser is not available for this command"); } };
   if (definition.needsBrowser !== false) {

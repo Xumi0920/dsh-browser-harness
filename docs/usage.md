@@ -46,6 +46,7 @@ await bh.close();
 ## CLI
 
 ```sh
+node dist/bin/bh.js help [command]      # 全局/子命令 usage；也支持 <command> --help
 node dist/bin/bh.js doctor              # 列出已知端点与状态
 node dist/bin/bh.js status              # browser_status JSON
 node dist/bin/bh.js tabs [list|new <url>|use <targetId> [--borrow]|close [targetId] [--force]]
