@@ -1,0 +1,16 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Complex Form - Fixture</title></head>
+<body>
+  <button id="menu" onclick="document.getElementById('options').hidden = false">Choose</button>
+  <ul id="options" hidden>
+    <li role="option" id="opt-a" onclick="select('Alpha')">Alpha</li>
+    <li role="option" id="opt-b" onclick="select('Beta')">Beta</li>
+  </ul>
+  <p id="selected">not selected</p>
+  <script>
+    function select(value) {
+      document.getElementById('selected').textContent = 'Selected: ' + value;
+      document.getElementById('options').hidden = true;
+    }
+  </script>
+</body></html>

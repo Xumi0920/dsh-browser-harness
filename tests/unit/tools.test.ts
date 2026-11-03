@@ -637,3 +637,15 @@ test("read-only mode blocks mutations but allows read tools", async () => {
   const nav = await byName("browser_navigate").execute({ url: "https://example.com" }, {});
   assert.match(nav.url, /example\.com/);
 });
+
+test("browser_act drag routes source/target and steps to the page", async () => {
+  const seen = [];
+  const manager = fakeManager();
+  manager.pageFor = async () => ({
+    drag: async (source, target, options) => { seen.push([source, target, options]); return { ok: true, steps: options.steps }; },
+  });
+  const act = build(manager).find((definition) => definition.name === "browser_act");
+  const value = await act.execute({ action: "drag", ref: "e1", toSelector: "#drop", steps: 4 }, {});
+  assert.equal(value.ok, true);
+  assert.deepEqual(seen[0], [{ ref: "e1", selector: undefined }, { ref: undefined, selector: "#drop" }, { steps: 4 }]);
+});

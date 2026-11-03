@@ -588,6 +588,30 @@ export class Page {
     return { ok: true };
   }
 
+  /** Drag from one ref/selector to another using a real mouse sequence. */
+  async drag(source: any, target: any, { steps = 10, button = "left" }: any = {} as any) {
+    const from = await this.#centerForDragTarget(source, "source");
+    const to = await this.#centerForDragTarget(target, "target");
+    const count = Math.max(1, Math.min(Number(steps) || 10, 100));
+    await this.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: from.x, y: from.y, button: "none", buttons: 0 }, { timeoutMs: 5_000 });
+    await this.send("Input.dispatchMouseEvent", { type: "mousePressed", x: from.x, y: from.y, button, buttons: 1, clickCount: 1 }, { timeoutMs: 5_000 });
+    for (let index = 1; index <= count; index += 1) {
+      const x = from.x + (to.x - from.x) * (index / count);
+      const y = from.y + (to.y - from.y) * (index / count);
+      await this.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y, button, buttons: 1 }, { timeoutMs: 5_000 });
+    }
+    await this.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: to.x, y: to.y, button, buttons: 0, clickCount: 1 }, { timeoutMs: 5_000 });
+    return { ok: true, from, to, steps: count };
+  }
+
+  async #centerForDragTarget(target: any, role: string) {
+    let backendNodeId;
+    if (target && target.ref) backendNodeId = (await this.#resolveRef(target.ref)).backendDOMNodeId;
+    else if (target && target.selector) backendNodeId = await this.#resolveSelector(target.selector);
+    else throw badArgument("drag " + role + " needs {ref} or {selector}");
+    return this.#centerForBackendNode(backendNodeId);
+  }
+
   /** Dispatch a real mouse click at viewport CSS coordinates. */
   async clickAt(x: any, y: any, { button = "left", clicks = 1 }: any = {} as any) {
     const mouseButton = String(button).toLowerCase();

@@ -7,7 +7,7 @@
 1. `browser_status` — 确认端点、浏览器版本、当前标签页；
 2. `browser_navigate {url}` / `{action:"back"|"forward"|"reload"}` — 打开页面或浏览器历史导航，并拿到紧凑快照（`e1`、`e2`… 引用）；
 3. `browser_wait` — 等待出现/消失、URL/文本变化、response、network_idle 或 delay，避免反复快照盲等；
-4. `browser_act` — `{action:"click"|"hover"|"highlight", ref}` / `{action:"fill", selector, text}` / `{action:"type", ref, text}` / `{action:"selectOption", selector, values}` / `{action:"check"|"uncheck", ref}` / `{action:"press", key}` / `{action:"scroll", dy}` / `{action:"dialog", accept}`；可附加 `expectUrl`/`expectText`/`expectSelector`，失败返回 `E_EXPECTATION_FAILED`；
+4. `browser_act` — `{action:"click"|"hover"|"highlight", ref}` / `{action:"drag", ref, toRef|toSelector}` / `{action:"fill", selector, text}` / `{action:"type", ref, text}` / `{action:"selectOption", selector, values}` / `{action:"check"|"uncheck", ref}` / `{action:"press", key}` / `{action:"scroll", dy}` / `{action:"dialog", accept}`；可附加 `expectUrl`/`expectText`/`expectSelector`，失败返回 `E_EXPECTATION_FAILED`；
 5. `browser_extract` — `text` / `html` / `js` / `network` / `console` / `frames`；`text/html/js` 可传 `frameId`/`frameUrl`；
 6. `browser_snapshot`（支持 `offset`/`limit` 分页和 checked/selected/expanded 状态）/ `browser_screenshot` / `browser_pdf` 复核；`browser_diagnose` 生成失败诊断包；
 7. `browser_upload` / `browser_download` 处理文件；`browser_tabs` 管理自建标签页；

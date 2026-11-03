@@ -75,6 +75,13 @@ async function performAct(page: any, args: any) {
     if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "highlight needs ref or selector");
     return { action, ...(await page.highlight({ ref: args.ref, selector: args.selector })) };
   }
+  if (action === "drag") {
+    const source = args.ref || args.selector ? { ref: args.ref, selector: args.selector } : null;
+    const target = args.toRef || args.toSelector ? { ref: args.toRef, selector: args.toSelector } : null;
+    if (!source) throw new HarnessError("E_BAD_ARG", "drag needs source ref or selector");
+    if (!target) throw new HarnessError("E_BAD_ARG", "drag needs toRef or toSelector");
+    return { action, ...(await page.drag(source, target, { steps: args.steps })) };
+  }
   if (action === "type") {
     if (args.ref || args.selector) await page.focus({ ref: args.ref, selector: args.selector });
     return { action, ...(await page.type(String(args.text ?? ""))) };
@@ -407,9 +414,9 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
     tool({
       name: "browser_act",
       description:
-        "Perform one browser action: click a ref/selector/coordinate, hover or highlight an element, type into the focused element (or focus a ref/selector first), fill an input like a user, select native options, check/uncheck a checkbox, press a key, scroll, or accept/dismiss the current JavaScript dialog. After the action, optional expectUrl/expectText/expectSelector assertions wait for the page to reach the expected state and fail with E_EXPECTATION_FAILED instead of returning a false success. fill returns only length/verified, never the entered value.",
+        "Perform one browser action: click a ref/selector/coordinate, hover or highlight an element, drag from a ref/selector to another ref/selector, type into the focused element (or focus a ref/selector first), fill an input like a user, select native options, check/uncheck a checkbox, press a key, scroll, or accept/dismiss the current JavaScript dialog. After the action, optional expectUrl/expectText/expectSelector assertions wait for the page to reach the expected state and fail with E_EXPECTATION_FAILED instead of returning a false success. fill returns only length/verified, never the entered value.",
       parameters: {
-        action: { type: "string", required: true, enum: ["click", "hover", "highlight", "type", "fill", "selectOption", "check", "uncheck", "press", "scroll", "dialog"], description: "action to perform" },
+        action: { type: "string", required: true, enum: ["click", "hover", "highlight", "drag", "type", "fill", "selectOption", "check", "uncheck", "press", "scroll", "dialog"], description: "action to perform" },
         ref: { type: "string", description: "snapshot ref such as e3" },
         selector: { type: "string", description: "CSS selector (use instead of ref/coordinates)" },
         x: { type: "number", description: "viewport x for click" },
@@ -428,6 +435,9 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         expectUrl: { type: "string", description: "after the action, wait until location.href contains this value" },
         expectText: { type: "string", description: "after the action, wait until page body text contains this value" },
         expectSelector: { type: "string", description: "after the action, wait until this selector exists and is visible" },
+        toRef: { type: "string", description: "drag: target snapshot ref" },
+        toSelector: { type: "string", description: "drag: target CSS selector" },
+        steps: { type: "number", description: "drag: interpolation steps (default 10, capped at 100)" },
         expectTimeoutMs: { type: "number", description: "expectation wait in milliseconds (default 5000, capped at 30000)" },
       },
       output: jsonOutput,

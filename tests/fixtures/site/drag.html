@@ -1,0 +1,14 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Drag - Fixture</title></head>
+<body>
+  <div id="source" style="position:absolute;left:20px;top:20px;width:100px;height:40px;background:#9cf">drag me</div>
+  <div id="target" style="position:absolute;left:300px;top:20px;width:140px;height:60px;background:#fc9">drop here</div>
+  <script>
+    var dragging = false;
+    var source = document.getElementById('source');
+    var target = document.getElementById('target');
+    source.addEventListener('mousedown', function () { dragging = true; source.style.left = '250px'; });
+    document.addEventListener('mousemove', function () { if (dragging) source.style.left = '250px'; });
+    document.addEventListener('mouseup', function () { if (dragging) { dragging = false; target.textContent = 'dropped'; } });
+  </script>
+</body></html>

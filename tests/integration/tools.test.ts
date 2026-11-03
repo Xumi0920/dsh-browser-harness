@@ -539,3 +539,22 @@ test("T46 read-only tools allow inspection but block mutations", async (t) => {
   await assert.rejects(ro("browser_tabs", { action: "new", url: server.url + "/a.html" }), /E_READ_ONLY/);
   await run("browser_tabs", { action: "close", targetId: nav.targetId });
 });
+
+test("T47 browser_act drag moves a pointer-draggable element", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/drag.html", newTab: true });
+  const dragged = await run("browser_act", { action: "drag", selector: "#source", toSelector: "#target", steps: 12 });
+  assert.equal(dragged.ok, true);
+  const text = await run("browser_extract", { mode: "text", selector: "#target" });
+  assert.equal(text.value, "dropped");
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});
+
+test("T48 custom dropdown form can be driven by click and asserted", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/complex-form.html", newTab: true });
+  await run("browser_act", { action: "click", selector: "#menu" });
+  const selected = await run("browser_act", { action: "click", selector: "#opt-b", expectText: "Selected: Beta", expectSelector: "#selected" });
+  assert.equal(selected.expectation.ok, true);
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});

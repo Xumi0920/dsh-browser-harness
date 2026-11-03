@@ -331,3 +331,15 @@ test("network idle does not treat a capped log as idle while requests are active
   const idle = await page.waitForNetworkIdle({ timeoutMs: 500, idleMs: 30 });
   assert.equal(idle.activeRequests, 0);
 });
+
+test("drag dispatches a real mouse sequence from source to target", async () => {
+  const { page, transport } = setupPage();
+  await page.snapshot();
+  const result = await page.drag({ ref: "e2" }, { selector: "#drop" }, { steps: 4 });
+  assert.equal(result.ok, true);
+  assert.equal(result.steps, 4);
+  assert.equal(transport.count("Input.dispatchMouseEvent"), 7);
+  const pressed = transport.calls.find((call) => call.method === "Input.dispatchMouseEvent" && call.params.type === "mousePressed");
+  const released = transport.calls.find((call) => call.method === "Input.dispatchMouseEvent" && call.params.type === "mouseReleased");
+  assert.ok(pressed && released);
+});
