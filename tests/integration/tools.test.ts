@@ -509,3 +509,15 @@ test("T44 persisted context id is validated and disposed by a new manager", asyn
     await b.close();
   }
 });
+
+test("T45 browser_act expectations assert page state and fail loudly", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/form.html", newTab: true });
+  const required = await run("browser_act", { action: "click", selector: "#submit", expectText: "name is required" });
+  assert.equal(required.expectation.ok, true);
+  await run("browser_act", { action: "fill", selector: "#name", text: "Ada" });
+  const submitted = await run("browser_act", { action: "click", selector: "#submit", expectText: "submitted:Ada", expectSelector: "#ok" });
+  assert.equal(submitted.expectation.ok, true);
+  await assert.rejects(run("browser_act", { action: "click", selector: "#submit", expectText: "never", expectTimeoutMs: 200 }), /E_EXPECTATION_FAILED/);
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});

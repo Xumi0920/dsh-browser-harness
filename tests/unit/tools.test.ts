@@ -582,3 +582,33 @@ test("browser_snapshot exposes checked/selected/expanded states", async () => {
   assert.equal(snapshot.nodes[1].expanded, true);
   assert.ok(snapshot.snapshotVersion >= 1);
 });
+
+test("browser_act runs result expectations after the action", async () => {
+  const seen = [];
+  const manager = fakeManager();
+  manager.pageFor = async () => ({
+    click: async () => ({ ok: true, x: 1, y: 2 }),
+    waitForFunction: async (expression) => { seen.push(["fn", String(expression)]); return true; },
+    waitForSelector: async (selector, options) => { seen.push(["selector", selector, options.visible]); return { tag: "div" }; },
+    info: async () => ({ url: "https://example.com/done" }),
+  });
+  const act = build(manager).find((definition) => definition.name === "browser_act");
+  const value = await act.execute({ action: "click", ref: "e1", expectUrl: "/done", expectText: "Saved", expectSelector: "#ok" }, {});
+  assert.equal(value.action, "click");
+  assert.equal(value.expectation.ok, true);
+  assert.equal(value.expectation.expectUrl, "/done");
+  assert.ok(seen.some((entry) => entry[0] === "selector" && entry[1] === "#ok" && entry[2] === true));
+  assert.ok(seen.some((entry) => entry[0] === "fn" && entry[1].includes("/done")));
+});
+
+test("browser_act reports E_EXPECTATION_FAILED when assertions fail", async () => {
+  const manager = fakeManager();
+  manager.pageFor = async () => ({
+    click: async () => ({ ok: true }),
+    waitForFunction: async () => { throw new Error("still loading"); },
+    waitForSelector: async () => null,
+    info: async () => ({ url: "https://example.com" }),
+  });
+  const act = build(manager).find((definition) => definition.name === "browser_act");
+  await assert.rejects(act.execute({ action: "click", ref: "e1", expectText: "Saved" }, {}), /E_EXPECTATION_FAILED/);
+});

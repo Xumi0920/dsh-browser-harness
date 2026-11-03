@@ -60,6 +60,83 @@ function redactStatus(status: any) {
 
 
 
+async function performAct(page: any, args: any) {
+  const action = String(args.action);
+  if (action === "click") {
+    const target = args.ref || args.selector ? { ref: args.ref, selector: args.selector } : args.x !== undefined && args.y !== undefined ? { at: { x: args.x, y: args.y } } : null;
+    if (!target) throw new HarnessError("E_BAD_ARG", "click needs ref, selector, or x+y");
+    return { action, ...(await page.click(target, { button: args.button, clicks: Number(args.clicks) || 1, force: args.force === true })) };
+  }
+  if (action === "hover") {
+    if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "hover needs ref or selector");
+    return { action, ...(await page.hover({ ref: args.ref, selector: args.selector })) };
+  }
+  if (action === "highlight") {
+    if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "highlight needs ref or selector");
+    return { action, ...(await page.highlight({ ref: args.ref, selector: args.selector })) };
+  }
+  if (action === "type") {
+    if (args.ref || args.selector) await page.focus({ ref: args.ref, selector: args.selector });
+    return { action, ...(await page.type(String(args.text ?? ""))) };
+  }
+  if (action === "dialog") {
+    if (!page.dialog()) throw new HarnessError("E_NO_DIALOG", "no JavaScript dialog is open");
+    return { action, ...(await page.handleDialog({ accept: args.accept !== false, promptText: args.promptText })) };
+  }
+  if (action === "fill") {
+    if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "fill needs ref or selector");
+    return { action, ...(await page.fill({ ref: args.ref, selector: args.selector, text: String(args.text ?? "") }, { verify: true })) };
+  }
+  if (action === "selectOption") {
+    if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "selectOption needs ref or selector");
+    if (!Array.isArray(args.values) || args.values.length === 0) throw new HarnessError("E_BAD_ARG", "selectOption needs values");
+    return { action, ...(await page.selectOption({ ref: args.ref, selector: args.selector }, args.values)) };
+  }
+  if (action === "check" || action === "uncheck") {
+    if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", action + " needs ref or selector");
+    return { action, ...(await page.setChecked({ ref: args.ref, selector: args.selector }, action === "check")) };
+  }
+  if (action === "press") {
+    const modifiers = String(args.modifiers || "").split(",").map((part: any) => part.trim()).filter(Boolean);
+    return { action, ...(await page.press(String(args.key || "Enter"), { modifiers })) };
+  }
+  if (action === "scroll") return { action, ...(await page.scroll({ dx: Number(args.dx) || 0, dy: Number(args.dy) || 0 })) };
+  throw new HarnessError("E_BAD_ARG", "unknown action: " + action);
+}
+
+async function applyActExpectations(page: any, args: any, result: any) {
+  const expectUrl = args.expectUrl === undefined ? null : String(args.expectUrl);
+  const expectText = args.expectText === undefined ? null : String(args.expectText);
+  const expectSelector = args.expectSelector === undefined ? null : String(args.expectSelector);
+  if (!expectUrl && !expectText && !expectSelector) return result;
+  const timeoutMs = Math.min(Math.max(Number(args.expectTimeoutMs) || 5_000, 100), 30_000);
+  const started = Date.now();
+  try {
+    await Promise.all([
+      expectUrl ? page.waitForFunction("location.href.includes(" + JSON.stringify(expectUrl) + ")", { timeoutMs }) : null,
+      expectText ? page.waitForFunction("(() => { const body = document.body ? document.body.innerText : ''; return body.includes(" + JSON.stringify(expectText) + "); })()", { timeoutMs }) : null,
+      expectSelector ? page.waitForSelector(expectSelector, { timeoutMs, visible: true }) : null,
+    ]);
+  } catch (error: any) {
+    throw new HarnessError("E_EXPECTATION_FAILED", "action completed but result expectations were not met", {
+      cause: error,
+      details: { expectUrl, expectText, expectSelector, timeoutMs },
+    });
+  }
+  const info = await page.info().catch(() => null);
+  return {
+    ...result,
+    expectation: {
+      ok: true,
+      elapsedMs: Date.now() - started,
+      url: info ? redactUrlForOutput(info.url) : null,
+      expectUrl,
+      expectText,
+      expectSelector,
+    },
+  };
+}
+
 function withPage(manager: any, sessionId: any, fn: any) {
   if (typeof manager.withPage === "function") return manager.withPage(sessionId, fn);
   return manager.pageFor(sessionId).then((page: any) => fn(page));
@@ -326,7 +403,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
     tool({
       name: "browser_act",
       description:
-        "Perform one browser action: click a ref/selector/coordinate, hover or highlight an element, type into the focused element (or focus a ref/selector first), fill an input like a user, select native options, check/uncheck a checkbox, press a key, scroll, or accept/dismiss the current JavaScript dialog. Use refs from browser_navigate/browser_snapshot (including iframe snapshots); verify the result afterwards (snapshot or browser_extract). fill returns only length/verified, never the entered value.",
+        "Perform one browser action: click a ref/selector/coordinate, hover or highlight an element, type into the focused element (or focus a ref/selector first), fill an input like a user, select native options, check/uncheck a checkbox, press a key, scroll, or accept/dismiss the current JavaScript dialog. After the action, optional expectUrl/expectText/expectSelector assertions wait for the page to reach the expected state and fail with E_EXPECTATION_FAILED instead of returning a false success. fill returns only length/verified, never the entered value.",
       parameters: {
         action: { type: "string", required: true, enum: ["click", "hover", "highlight", "type", "fill", "selectOption", "check", "uncheck", "press", "scroll", "dialog"], description: "action to perform" },
         ref: { type: "string", description: "snapshot ref such as e3" },
@@ -344,53 +421,18 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         force: { type: "boolean", description: "click despite an overlay hit-test failure; prefer fixing the overlay" },
         accept: { type: "boolean", description: "dialog: accept (true, default) or dismiss (false)" },
         promptText: { type: "string", description: "dialog: text for a prompt() dialog" },
+        expectUrl: { type: "string", description: "after the action, wait until location.href contains this value" },
+        expectText: { type: "string", description: "after the action, wait until page body text contains this value" },
+        expectSelector: { type: "string", description: "after the action, wait until this selector exists and is visible" },
+        expectTimeoutMs: { type: "number", description: "expectation wait in milliseconds (default 5000, capped at 30000)" },
       },
       output: jsonOutput,
-      timeoutMs: 30_000,
+      timeoutMs: 65_000,
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
         return withPage(manager, sessionId, async (page: any) => {
-        const action = String(args.action);
-        if (action === "click") {
-          const target = args.ref || args.selector ? { ref: args.ref, selector: args.selector } : args.x !== undefined && args.y !== undefined ? { at: { x: args.x, y: args.y } } : null;
-          if (!target) throw new HarnessError("E_BAD_ARG", "click needs ref, selector, or x+y");
-          return { action, ...(await page.click(target, { button: args.button, clicks: Number(args.clicks) || 1, force: args.force === true })) };
-        }
-        if (action === "hover") {
-          if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "hover needs ref or selector");
-          return { action, ...(await page.hover({ ref: args.ref, selector: args.selector })) };
-        }
-        if (action === "highlight") {
-          if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "highlight needs ref or selector");
-          return { action, ...(await page.highlight({ ref: args.ref, selector: args.selector })) };
-        }
-        if (action === "type") {
-          if (args.ref || args.selector) await page.focus({ ref: args.ref, selector: args.selector });
-          return { action, ...(await page.type(String(args.text ?? ""))) };
-        }
-        if (action === "dialog") {
-          if (!page.dialog()) throw new HarnessError("E_NO_DIALOG", "no JavaScript dialog is open");
-          return { action, ...(await page.handleDialog({ accept: args.accept !== false, promptText: args.promptText })) };
-        }
-        if (action === "fill") {
-          if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "fill needs ref or selector");
-          return { action, ...(await page.fill({ ref: args.ref, selector: args.selector, text: String(args.text ?? "") }, { verify: true })) };
-        }
-        if (action === "selectOption") {
-          if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "selectOption needs ref or selector");
-          if (!Array.isArray(args.values) || args.values.length === 0) throw new HarnessError("E_BAD_ARG", "selectOption needs values");
-          return { action, ...(await page.selectOption({ ref: args.ref, selector: args.selector }, args.values)) };
-        }
-        if (action === "check" || action === "uncheck") {
-          if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", action + " needs ref or selector");
-          return { action, ...(await page.setChecked({ ref: args.ref, selector: args.selector }, action === "check")) };
-        }
-        if (action === "press") {
-          const modifiers = String(args.modifiers || "").split(",").map((part: any) => part.trim()).filter(Boolean);
-          return { action, ...(await page.press(String(args.key || "Enter"), { modifiers })) };
-        }
-        if (action === "scroll") return { action, ...(await page.scroll({ dx: Number(args.dx) || 0, dy: Number(args.dy) || 0 })) };
-        throw new HarnessError("E_BAD_ARG", "unknown action: " + action);
+        const result = await performAct(page, args);
+        return applyActExpectations(page, args, result);
         });
       }),
     }),

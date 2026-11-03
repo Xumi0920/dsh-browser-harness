@@ -19,7 +19,7 @@ browser_status      endpoint / browser version / tabs / current tab
 browser_wait        appear/disappear, URL/text change, response, network_idle, delay
 browser_navigate    open a URL, or back / forward / reload
 browser_snapshot    compact refs (e1 ...); frameId, pagination, checked/selected/expanded
-browser_act         click / hover / highlight / type / fill / selectOption / check / uncheck / press / scroll / dialog
+browser_act         click / hover / highlight / type / fill / selectOption / check / uncheck / press / scroll / dialog; optional expectUrl/expectText/expectSelector assertions
 browser_extract     text / html / JS / network / console / frames
 browser_screenshot  full-page or element PNG path
 browser_pdf         page PDF path
@@ -38,7 +38,7 @@ browser_tabs        list / use / new / close
 - **Per-task tab groups.** Tabs the harness creates are grouped per DSH session; work tabs are never grouped, and headless browsers skip grouping.
 - **Reliable actions.** Snapshots are serialized per page, concurrent attaches share one session, clicks hit-test for overlays (`E_CLICK_INTERCEPTED`), `load` waits for complete, the first navigation is network-captured, and network idle uses active requests plus last-activity time.
 - **Task lifecycle and tab locks.** Each DSH session is a Task; page operations hold an exclusive target lease, cross-task conflicts return `E_TAB_LOCKED`/`E_LOCK_TIMEOUT`, and `browser_task` supports status/pause/resume/close. Since v1.8, leases also live under `<stateDir>/locks` with heartbeat and stale recovery for cross-manager mutual exclusion; optional `isolation: "context"` gives each task its own cookie/storage context (no shared login).
-- **Tested.** 173 unit tests (fake CDP) + 44 integration scenarios (real headless/headful Chromium) = 215, with CI on three platforms.
+- **Tested.** 175 unit tests (fake CDP) + 45 integration scenarios (real headless/headful Chromium) = 215, with CI on three platforms.
 - **Hardened boundaries.** `browser_tabs use` accepts only page targets with http(s)/about:blank URLs; non-owned tabs require explicit `{borrow:true}`, and tabs owned by another Task return `E_TAB_OWNER_CONFLICT`; screenshots/PDF stay inside `screenshotDir` and never overwrite; uploads are confined to `uploadDir`, downloads to `downloadDir`, with symlink-escape checks; `fill` never echoes the entered value; JS mode is marked non-concurrent; token-like URLs/headers are redacted in tool output; broad port fallback is explicit `auto` only; tab grouping no longer mutates page titles.
 
 ## Requirements
@@ -112,7 +112,7 @@ browser_extract {mode:"text" | "html" | "js" | "network" | "console" | "frames"}
 
 ```sh
 npm install                 # dev deps (TypeScript); runtime stays zero-dependency
-npm run test:all            # build + 173 unit + 44 integration = 217 tests
+npm run test:all            # build + 175 unit + 45 integration = 220 tests
 ```
 
 CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu + xvfb (27-scenario gate, S15/S16 must actually run). Tests and scripts are compiled by `tsc` too (`dist-tests/` / `dist-scripts/`), sharing the runtime NodeNext config.
@@ -130,4 +130,4 @@ CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu
 
 ## License
 
-MIT (c) 2026 Xumi0920 · current version **v1.8.3** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog
+MIT (c) 2026 Xumi0920 · current version **v1.9.0** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog
