@@ -205,3 +205,32 @@ test("task subcommand validates action and cleanup policy", async () => {
   assert.throws(() => task(["close", "--cleanup", "wat"]), /close-owned or leave/);
   assert.throws(() => task(["status", "extra"]), /one action only/);
 });
+
+test("remaining CLI subcommands validate their arguments", async () => {
+  const { parseCloseArgs } = await import("../../dist/bin/cli/commands/close-args.js");
+  const { parseGroupsArgs } = await import("../../dist/bin/cli/commands/groups-args.js");
+  const { parsePdfArgs } = await import("../../dist/bin/cli/commands/pdf-args.js");
+  const { parseDiagnoseArgs } = await import("../../dist/bin/cli/commands/diagnose-args.js");
+  const { parseTextArgs } = await import("../../dist/bin/cli/commands/text-args.js");
+  const { parseJsArgs } = await import("../../dist/bin/cli/commands/js-args.js");
+  const parse = (parser: any, tokens: string[]) => {
+    const parsed = parseCliArgs(tokens);
+    return parser(parsed.positional, parsed.flags);
+  };
+  assert.deepEqual(parse(parseCloseArgs, []), { targetId: null, force: false });
+  assert.deepEqual(parse(parseCloseArgs, ["T1", "--force"]), { targetId: "T1", force: true });
+  assert.throws(() => parse(parseCloseArgs, ["a", "b"]), /at most one targetId/);
+  assert.deepEqual(parse(parseGroupsArgs, []), { retry: false });
+  assert.equal(parse(parseGroupsArgs, ["--retry=false"]).retry, false);
+  assert.throws(() => parse(parseGroupsArgs, ["extra"]), /accepts no arguments/);
+  assert.deepEqual(parse(parsePdfArgs, ["out.pdf", "--no-background"]), { path: "out.pdf", printBackground: false });
+  assert.throws(() => parse(parsePdfArgs, ["a", "b"]), /at most one path/);
+  assert.throws(() => parse(parsePdfArgs, ["--no-background=maybe"]), /expects a boolean/);
+  assert.deepEqual(parse(parseDiagnoseArgs, ["--no-screenshot"]), { screenshot: false, path: undefined });
+  assert.throws(() => parse(parseDiagnoseArgs, ["a", "b"]), /at most one path/);
+  assert.deepEqual(parse(parseTextArgs, ["#x"]), { selector: "#x" });
+  assert.throws(() => parse(parseTextArgs, ["a", "b"]), /at most one selector/);
+  assert.throws(() => parse(parseTextArgs, [""]), /must not be empty/);
+  assert.deepEqual(parse(parseJsArgs, ["document.title"]), { expression: "document.title" });
+  assert.throws(() => parse(parseJsArgs, []), /needs an expression/);
+});

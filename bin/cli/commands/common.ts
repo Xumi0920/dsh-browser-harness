@@ -11,6 +11,11 @@ export function rejectUnknownFlags(flags: any, allowed: string[], command: strin
   }
 }
 
+export function rejectAllArgs(positional: string[], flags: any, command: string) {
+  rejectUnknownFlags(flags, [], command);
+  if (positional.length > 0) throw new Error(command + " accepts no arguments");
+}
+
 export function booleanFlag(value: any, name: string) {
   if (value === undefined) return false;
   if (value === true || value === "true") return true;

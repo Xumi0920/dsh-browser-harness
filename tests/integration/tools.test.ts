@@ -717,3 +717,16 @@ test("T57 CLI validates wait/task arguments before touching the browser", async 
   await assert.rejects(exec(["task", "bogus"]), /task needs one of/);
   await assert.rejects(exec(["task", "status", "--cleanup", "leave"]), /unknown option/);
 });
+
+test("T58 CLI validates remaining command arguments before the browser", async () => {
+  const stateDir = await tempDir("bh-cli-remaining-");
+  const bh = join(ROOT, "dist", "bin", "bh.js");
+  const env = { ...process.env, BH_STATE_DIR: stateDir };
+  const exec = (args) => runCli(process.execPath, [bh, ...args], { env, timeout: 15_000 });
+  await assert.rejects(exec(["close", "a", "b"]), /at most one targetId/);
+  await assert.rejects(exec(["groups", "extra"]), /accepts no arguments/);
+  await assert.rejects(exec(["pdf", "a", "b"]), /at most one path/);
+  await assert.rejects(exec(["diagnose", "a", "b"]), /at most one path/);
+  await assert.rejects(exec(["text", "a", "b"]), /at most one selector/);
+  await assert.rejects(exec(["js"]), /needs an expression/);
+});
