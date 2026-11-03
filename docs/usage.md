@@ -9,7 +9,7 @@
 3. `browser_wait` — 等待出现/消失、URL/文本变化、response、network_idle 或 delay，避免反复快照盲等；
 4. `browser_act` — `{action:"click"|"hover"|"highlight", ref}` / `{action:"drag", ref, toRef|toSelector}` / `{action:"fill", selector, text}` / `{action:"type", ref, text}` / `{action:"selectOption", selector, values}` / `{action:"check"|"uncheck", ref}` / `{action:"press", key}` / `{action:"scroll", dy}` / `{action:"dialog", accept}`；可附加 `expectUrl`/`expectText`/`expectSelector`，失败返回 `E_EXPECTATION_FAILED`；
 5. `browser_extract` — `text` / `html` / `js` / `network` / `console` / `frames`；`text/html/js` 可传 `frameId`/`frameUrl`；
-6. `browser_snapshot`（支持 `offset`/`limit` 分页和 checked/selected/expanded 状态）/ `browser_screenshot` / `browser_pdf` 复核；`browser_diagnose` 生成失败诊断包；
+6. `browser_snapshot`（`offset`/`limit` 对过滤后的完整节点集分页，支持越过 400；`total` 返回总数；checked/selected/expanded 状态）/ `browser_screenshot` / `browser_pdf` 复核；`browser_diagnose` 生成失败诊断包；
 7. `browser_upload` / `browser_download` 处理文件；`browser_tabs` 管理自建标签页；
 8. `browser_task` 查看/暂停/恢复/关闭/重新开始当前 Task；页面操作持有 target 独占锁，跨任务冲突返回 `E_TAB_LOCKED` 或 `E_LOCK_TIMEOUT`；closed Task 需 `{action:"start"}` 新建任务壳；
 9. `browser_tabs use` 非自建 tab 必须显式 `{borrow:true}`；其他 Task 自建 tab 返回 `E_TAB_OWNER_CONFLICT`。

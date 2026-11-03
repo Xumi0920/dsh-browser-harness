@@ -79,8 +79,10 @@ export function buildSnapshot(nodes: any, options: any = {} as any) {
   const roleSet = options.roles ? new Set(options.roles) : INTERACTIVE_ROLES;
   const boxes = options.boxes;
   const refStart = Number.isFinite(options.refStart) ? Number(options.refStart) : 0;
+  const offset = Math.max(0, Number(options.offset) || 0);
   const out: any[] = [];
   let matched = 0;
+  let skipped = 0;
   for (const node of nodes || []) {
     if (!node || node.ignored) continue;
     const role = String((node.role && node.role.value) || "");
@@ -90,6 +92,7 @@ export function buildSnapshot(nodes: any, options: any = {} as any) {
     if (!isInteractive && !isText) continue;
     if (typeof node.backendDOMNodeId !== "number") continue;
     matched += 1;
+    if (skipped < offset) { skipped += 1; continue; }
     if (out.length >= maxNodes) continue;
     const name = String(axValue(node, "name") ?? "").replace(/\s+/g, " ").trim();
     const value = axValue(node, "value");
@@ -119,7 +122,7 @@ export function buildSnapshot(nodes: any, options: any = {} as any) {
     }
     out.push(row);
   }
-  return { nodes: out, truncated: matched > out.length, total: matched };
+  return { nodes: out, truncated: matched > offset + out.length, total: matched, offset };
 }
 
 function safeJson(value: any) {

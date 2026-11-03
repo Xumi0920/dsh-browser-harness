@@ -406,9 +406,10 @@ export class Page {
     const params: any = options.frameId ? { frameId: options.frameId } : {};
     const raw = await this.send("Accessibility.getFullAXTree", params, { timeoutMs: 15_000 });
     const sourceNodes = filterAXNodes(raw.nodes || [], options.role, options.name);
-    const refStart = this.nextRef;
+    const offset = Math.max(0, Number(options.offset) || 0);
+    const refStart = this.nextRef + offset;
     this.snapshotVersion += 1;
-    const first = buildSnapshot(sourceNodes, { maxNodes: options.maxNodes ?? 400, roles: options.roles, refStart });
+    const first = buildSnapshot(sourceNodes, { maxNodes: options.maxNodes ?? 400, roles: options.roles, refStart, offset });
     const withBoxes = options.includeBoxes !== false;
     if (withBoxes) {
       const boxes = new Map();
@@ -424,7 +425,7 @@ export class Page {
           }
         }));
       }
-      const second = buildSnapshot(sourceNodes, { maxNodes: first.nodes.length, roles: options.roles, boxes, refStart });
+      const second = buildSnapshot(sourceNodes, { maxNodes: first.nodes.length, roles: options.roles, boxes, refStart, offset });
       this.lastSnapshot = second.nodes;
       this.nextRef = refStart + second.nodes.length;
       return { ...second, targetId: this.targetId, snapshotVersion: this.snapshotVersion };

@@ -343,3 +343,18 @@ test("drag dispatches a real mouse sequence from source to target", async () => 
   const released = transport.calls.find((call) => call.method === "Input.dispatchMouseEvent" && call.params.type === "mouseReleased");
   assert.ok(pressed && released);
 });
+
+test("snapshot offset paginates beyond 400 and keeps filtered totals", async () => {
+  const transport = new FakeTransport();
+  const nodes = Array.from({ length: 450 }, (_, index) => ({ role: { value: "button" }, backendDOMNodeId: 100 + index, name: { value: "button-" + (index + 1) } }));
+  transport.on("Accessibility.getFullAXTree", () => ({ nodes }));
+  transport.on("DOM.getBoxModel", () => quad(1, 1, 10, 10));
+  const page = new Page({ transport, config: { dialogPolicy: "auto-dismiss", focusEmulation: false, stateDir: "/tmp/bh-unit" } }, { sessionId: "s1", targetId: "t1" });
+  const snapshot = await page.snapshot({ maxNodes: 50, offset: 400 });
+  assert.equal(snapshot.total, 450);
+  assert.equal(snapshot.nodes.length, 50);
+  assert.equal(snapshot.nodes[0].name, "button-401");
+  assert.equal(snapshot.nodes.at(-1).name, "button-450");
+  assert.deepEqual(snapshot.nodes.map((node) => node.ref).slice(0, 2), ["e401", "e402"]);
+  assert.equal(snapshot.truncated, false);
+});

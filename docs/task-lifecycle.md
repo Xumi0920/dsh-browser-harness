@@ -291,7 +291,7 @@ v1.8.0 Phase B 实现：
 
 - 严格 `borrow:true` 与 `E_TAB_OWNER_CONFLICT` / `E_TAB_BORROW_REQUIRED`；
 - 借用 tab 记录、其他 Task 借用冲突、close 不关闭用户 tab；
-- T48 集成测试覆盖 strict manager；
+- T49 集成测试覆盖 strict manager；
 - Plugin 默认 `strictTabOwnership: true`，可通过配置关闭。
 
 尚未实现（保留为 Phase C）：
@@ -355,7 +355,7 @@ isolation: shared   # shared | context
 
 ### 17.5 v1.8.x 实现状态
 
-Phase C1（文件租约，v1.8.0/v1.9.2）已实现：
+Phase C1（文件租约，v1.8.0/v1.9.3）已实现：
 
 - `TabLockManager` 文件租约：`<stateDir>/locks/<sha256(targetId)>.json`；
 - 文件 `wx` 原子获取、5s 心跳、30s stale 回收、同宿主 pid 检查、token 校验释放；
@@ -363,7 +363,7 @@ Phase C1（文件租约，v1.8.0/v1.9.2）已实现：
 - 两个 manager 共享 stateDir 的集成测试（T42）验证互斥；
 - fail-closed：文件租约不可写/获取失败返回 `E_LEASE_FAILED`，不回退内存锁。
 
-Phase C2（L2 context，v1.9.2）已实现：
+Phase C2（L2 context，v1.9.3）已实现：
 
 - 配置 `isolation: "shared" | "context"`，默认 `"shared"`；
 - context 模式每 Task `Target.createBrowserContext`，新 tab 创建在该 context；

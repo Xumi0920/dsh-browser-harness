@@ -558,3 +558,17 @@ test("T48 custom dropdown form can be driven by click and asserted", async (t) =
   assert.equal(selected.expectation.ok, true);
   await run("browser_tabs", { action: "close", targetId: nav.targetId });
 });
+
+test("T49 browser_snapshot paginates the full filtered set beyond 400", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/many-buttons.html", newTab: true });
+  const page = await run("browser_snapshot", { role: "button", offset: 400, limit: 50 });
+  assert.equal(page.total, 450);
+  assert.equal(page.nodes, 50);
+  assert.match(page.text, /button-401/);
+  assert.match(page.text, /button-450/);
+  const firstPage = await run("browser_snapshot", { role: "button", offset: 0, limit: 2 });
+  assert.equal(firstPage.total, 450);
+  assert.match(firstPage.text, /button-1/);
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});
