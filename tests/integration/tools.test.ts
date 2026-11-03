@@ -458,3 +458,33 @@ test("T42 file leases block a second manager on the same tab", async (t) => {
     await b.close();
   }
 });
+
+test("T43 context isolation separates cookies from the shared profile", async (t) => {
+  if (needChrome(t)) return;
+  const sharedA = "it-shared-a";
+  const sharedB = "it-shared-b";
+  const sharedName = "bh_shared_" + Date.now();
+  const url = server.url + "/cookie.html?name=" + sharedName + "&value=1";
+  try {
+    await manager.withNavigatedPage(sharedA, url, {}, async (page) => page.evaluate("document.cookie"));
+    const sharedValue = await manager.withNavigatedPage(sharedB, url, {}, async (page) => page.evaluate("document.cookie"));
+    assert.match(String(sharedValue), new RegExp(sharedName), "shared profile must expose the cookie");
+
+    const contextNameA = "bh_ctx_a_" + Date.now();
+    const contextNameB = "bh_ctx_b_" + Date.now();
+    const contexts = new BrowserManager({ cdpUrl: chrome.httpUrl, stateDir, isolation: "context" });
+    try {
+      const contextA = await contexts.withNavigatedPage("ctx-a", server.url + "/cookie.html?name=" + contextNameA + "&value=1", {}, async (page) => page.evaluate("document.cookie"));
+      assert.match(String(contextA), new RegExp(contextNameA));
+      const contextB = await contexts.withNavigatedPage("ctx-b", server.url + "/cookie.html?name=" + contextNameB + "&value=1", {}, async (page) => page.evaluate("document.cookie"));
+      assert.ok(!String(contextB).includes(contextNameA), "context B must not see context A's cookie");
+      const ids = await manager.connection.transport.send("Target.getBrowserContexts", {}, { timeoutMs: 5_000 });
+      assert.ok((ids.browserContextIds || []).length >= 2, "each context task got an isolated browser context");
+    } finally {
+      await contexts.close();
+    }
+  } finally {
+    await manager.closeTask(sharedA, { cleanup: "close-owned" }).catch(() => {});
+    await manager.closeTask(sharedB, { cleanup: "close-owned" }).catch(() => {});
+  }
+});

@@ -218,7 +218,7 @@ export class Browser {
   }
 
   /** Reuse the remembered tab when it matches, otherwise open a new one. */
-  async open(url: any, { newTab = false, waitUntil = "load", timeoutMs = 30_000, lane = this.lane, beforeNavigate = null }: any = {} as any) {
+  async open(url: any, { newTab = false, waitUntil = "load", timeoutMs = 30_000, lane = this.lane, beforeNavigate = null, browserContextId = null }: any = {} as any) {
     if (typeof url !== "string" || url.length === 0) throw badArgument("open(url) needs a URL");
     assertNavigableUrl(url);
     if (!newTab) {
@@ -235,13 +235,15 @@ export class Browser {
         }
       }
     }
-    return this.newTab(url, { waitUntil, timeoutMs, lane, beforeNavigate });
+    return this.newTab(url, { waitUntil, timeoutMs, lane, beforeNavigate, browserContextId });
   }
 
   /** Create a background tab (never foregrounded) and optionally navigate it. */
-  async newTab(url: any = "about:blank", { waitUntil = "load", timeoutMs = 30_000, lane = this.lane, beforeNavigate = null }: any = {} as any) {
+  async newTab(url: any = "about:blank", { waitUntil = "load", timeoutMs = 30_000, lane = this.lane, beforeNavigate = null, browserContextId = null }: any = {} as any) {
     assertNavigableUrl(url);
-    const created = await this.transport.send("Target.createTarget", { url: "about:blank", background: true }, { timeoutMs: 10_000 });
+    const createParams: any = { url: "about:blank", background: true };
+    if (browserContextId) createParams.browserContextId = browserContextId;
+    const created = await this.transport.send("Target.createTarget", createParams, { timeoutMs: 10_000 });
     const page = await this.attach(created.targetId);
     await stateStore.rememberOwnedTab(lane, { targetId: created.targetId, url: "about:blank" }, this.config.stateDir);
     if (typeof beforeNavigate === "function") await beforeNavigate(page);

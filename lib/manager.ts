@@ -24,6 +24,7 @@ export class BrowserManager {
   locks: TabLockManager;
   laneGates: Map<string, Promise<void>>;
   borrowedTabs: Map<string, Set<string>>;
+  contexts: Map<string, string>;
   constructor(config: any = {} as any) {
     this.config = {
       browser: undefined,
@@ -40,6 +41,7 @@ export class BrowserManager {
       fileLeaseDir: config.fileLeaseDir,
       fileLeaseHeartbeatMs: Number(config.fileLeaseHeartbeatMs) || 5_000,
       fileLeaseStaleMs: Number(config.fileLeaseStaleMs) || 30_000,
+      isolation: config.isolation === "context" ? "context" : "shared",
       ...config,
     };
     this.connection = null;
@@ -48,6 +50,7 @@ export class BrowserManager {
     this.locks = new TabLockManager({ timeoutMs: Number(config.taskLockTimeoutMs) || 5_000 });
     this.laneGates = new Map();
     this.borrowedTabs = new Map();
+    this.contexts = new Map();
   }
 
   /** Connect once and reuse; concurrent callers share the same promise. */
@@ -58,6 +61,7 @@ export class BrowserManager {
     if (!this.connection) {
       await this.locks.clear();
       this.borrowedTabs.clear();
+      this.contexts.clear();
     }
     this.connecting = (async () => {
       try {
@@ -125,6 +129,42 @@ export class BrowserManager {
   }
 
 
+
+  async #ensureTaskContext(task: any) {
+    if (this.config.isolation !== "context") return null;
+    const existing = this.contexts.get(task.id);
+    if (existing) return existing;
+    const browser = await this.ensure();
+    let result;
+    try {
+      result = await browser.transport.send("Target.createBrowserContext", {}, { timeoutMs: 10_000 });
+    } catch (error: any) {
+      throw new HarnessError(codes.E_L2_UNSUPPORTED, "browser does not support Target.createBrowserContext for isolation:context", { cause: error });
+    }
+    const contextId = result && result.browserContextId;
+    if (!contextId) throw new HarnessError(codes.E_L2_UNSUPPORTED, "browser returned no browserContextId for isolation:context");
+    this.contexts.set(task.id, contextId);
+    return contextId;
+  }
+
+  async #disposeTaskContext(taskId: any) {
+    const contextId = this.contexts.get(String(taskId));
+    if (!contextId) return false;
+    this.contexts.delete(String(taskId));
+    try {
+      const browser = await this.ensure();
+      await browser.transport.send("Target.disposeBrowserContext", { browserContextId: contextId }, { timeoutMs: 5_000 });
+    } catch {
+      /* browser/context already gone */
+    }
+    return true;
+  }
+
+  async #disposeAllContexts() {
+    const ids = [...this.contexts.keys()];
+    for (const taskId of ids) await this.#disposeTaskContext(taskId);
+  }
+
   #stateDir(browser: any) {
     return browser && browser.config ? browser.config.stateDir : this.config.stateDir;
   }
@@ -189,6 +229,7 @@ export class BrowserManager {
       const { task } = await this.#taskFor(sessionId);
       this.#assertTaskActive(task);
       const browser = await this.ensure();
+      const browserContextId = await this.#ensureTaskContext(task);
       let lease: any = null;
       try {
         const page = await browser.open(String(url), {
@@ -196,6 +237,7 @@ export class BrowserManager {
           waitUntil: options.waitUntil || "load",
           timeoutMs: options.timeoutMs || 30_000,
           lane,
+          browserContextId,
           beforeNavigate: async (targetPage: any) => {
             await this.#ensureNetworkCapture(targetPage);
             const current = await readState(lane, this.#stateDir(await this.ensure()));
@@ -266,6 +308,7 @@ export class BrowserManager {
         task: next,
       }), dir);
       await this.locks.releaseTask(task.id);
+      this.contexts.delete(task.id);
       return { ok: true, task: next };
     });
   }
@@ -281,7 +324,10 @@ export class BrowserManager {
       const policy = cleanup === "leave" || cleanup === "close-owned" ? cleanup : task.cleanupPolicy;
       const ownedTabs = Array.isArray(state.ownedTabs) ? state.ownedTabs.map((tab: any) => tab.targetId).filter(Boolean) : [];
       const closedTabs = [];
-      if (policy === "close-owned") {
+      if (this.contexts.has(task.id)) {
+        await this.#disposeTaskContext(task.id);
+        closedTabs.push(...ownedTabs);
+      } else if (policy === "close-owned") {
         for (const targetId of ownedTabs) {
           let lease: any = null;
           try {
@@ -405,12 +451,16 @@ export class BrowserManager {
       const { task, state, dir } = await this.#taskFor(sessionId);
       this.#assertTaskActive(task);
       const browser = await this.ensure();
-      if (this.config.strictTabOwnership === true && browser.transport && typeof browser.transport.send === "function") {
+      const contextIsolation = this.config.isolation === "context";
+      if ((this.config.strictTabOwnership === true || contextIsolation) && browser.transport && typeof browser.transport.send === "function") {
         const targets = await browser.transport.send("Target.getTargets", {}, { timeoutMs: 5_000 });
         const exact = (targets.targetInfos || []).find((target: any) => target.targetId === String(targetId) && target.type === "page");
         if (exact) {
           const owned = Array.isArray(state.ownedTabs) && state.ownedTabs.some((tab: any) => tab.targetId === exact.targetId);
-          if (!owned) {
+          if (contextIsolation && !owned) {
+            throw new HarnessError(codes.E_POLICY_DENIED, "context isolation cannot borrow tabs outside this task's browser context", { details: { targetId: exact.targetId } });
+          }
+          if (this.config.strictTabOwnership === true && !owned) {
             const owner = await this.#targetOwner(exact.targetId, dir, task.id);
             if (owner) throw new HarnessError(codes.E_TAB_OWNER_CONFLICT, "tab " + exact.targetId + " is owned by task " + owner, { details: { targetId: exact.targetId, ownerTaskId: owner } });
             const borrowedBy = this.#borrowedByOther(exact.targetId, task.id);
@@ -435,7 +485,8 @@ export class BrowserManager {
       const { task } = await this.#taskFor(sessionId);
       this.#assertTaskActive(task);
       const browser = await this.ensure();
-      const page = await browser.newTab(url || "about:blank", { lane });
+      const browserContextId = await this.#ensureTaskContext(task);
+      const page = await browser.newTab(url || "about:blank", { lane, browserContextId });
       return this.#ensureNetworkCapture(page);
     });
   }
@@ -479,10 +530,12 @@ export class BrowserManager {
 
   async close() {
     const connection = this.connection;
+    await this.#disposeAllContexts().catch(() => {});
     this.connection = null;
     this.endpointsCache = { at: 0, value: null };
     await this.locks.clear();
     this.laneGates.clear();
+    this.contexts.clear();
     if (connection) {
       try { await connection.close(); } catch { /* ignore */ }
     }
