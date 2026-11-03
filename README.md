@@ -37,8 +37,8 @@ browser_tabs        list / use / new / close
 - **文本优先**：无障碍树 + ref 比“截图喂视觉模型”更准更省，截图只是补充。
 - **按任务标签组**：插件自建的标签页自动按 DSH 会话分组，工作标签页不受影响；headless 自动跳过。
 - **操作可靠性**：快照按页串行、attach 并发去重；click 默认做遮挡/命中检查（`E_CLICK_INTERCEPTED`）；`load` 等 `complete`；首次导航前开启网络抓取；网络空闲基于活动请求集合与最后活动时间。
-- **任务生命周期与标签页锁**：每个 DSH session 是一个 Task；页面操作持有 target 独占 lease，跨任务冲突返回 `E_TAB_LOCKED`/`E_LOCK_TIMEOUT`；支持 `browser_task` 的 status/pause/resume/close。
-- **可验证**：172 单测（fake CDP）+ 41 集成场景（真实 headless/headful Chromium）= 213 条，CI 覆盖三平台。
+- **任务生命周期与标签页锁**：每个 DSH session 是一个 Task；页面操作持有 target 独占 lease，跨任务冲突返回 `E_TAB_LOCKED`/`E_LOCK_TIMEOUT`；支持 `browser_task` 的 status/pause/resume/close。v1.8 起 lease 默认写入 `<stateDir>/locks`，跨 manager 进程通过文件租约/心跳互斥。
+- **可验证**：173 单测（fake CDP）+ 42 集成场景（真实 headless/headful Chromium）= 215 条，CI 覆盖三平台。
 - **收紧的边界**：`browser_tabs use` 只接受 page + http(s)/about:blank；非自建 tab 需显式 `{borrow:true}`，其他 Task 自建 tab 返回 `E_TAB_OWNER_CONFLICT`；截图/PDF 限定 `screenshotDir` 且不覆盖；上传限定 `uploadDir`、下载限定 `downloadDir` 并拒绝 symlink 逃逸；fill 不回显输入值；JS 模式标非并发；工具输出对 token 类 URL/headers 尽力脱敏；宽泛端口回退改为显式 `auto`；标签组不再临时改写页面标题。
 
 ## 环境要求
@@ -110,10 +110,10 @@ browser_extract {mode:"text" | "html" | "js" | "network" | "console" | "frames"}
 
 ```sh
 npm install                 # 开发依赖（TypeScript），运行时零依赖
-npm run test:all            # 构建 + 172 单测 + 41 集成场景 = 213 条
+npm run test:all            # 构建 + 173 单测 + 42 集成场景 = 215 条
 ```
 
-CI：单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场景跑 ubuntu + xvfb（门禁 41 条，S15/S16 必须实跑）。测试与脚本同样由 `tsc` 编译（`dist-tests/` / `dist-scripts/`），与运行时源码共用 NodeNext 配置。
+CI：单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场景跑 ubuntu + xvfb（门禁 42 条，S15/S16 必须实跑）。测试与脚本同样由 `tsc` 编译（`dist-tests/` / `dist-scripts/`），与运行时源码共用 NodeNext 配置。
 
 ## 安全边界
 
@@ -128,4 +128,4 @@ CI：单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场�
 
 ## 许可
 
-MIT © 2026 Xumi0920 · 当前版本 **v1.7.0** · 全量 TypeScript（源码/测试/脚本/扩展）· 更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)
+MIT © 2026 Xumi0920 · 当前版本 **v1.8.0** · 全量 TypeScript（源码/测试/脚本/扩展）· 更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)

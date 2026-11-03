@@ -1,6 +1,6 @@
 # 任务生命周期与标签页锁模型
 
-> 状态：Phase A（v1.6.x）+ Phase B 严格借用（v1.7.0）已实现；跨进程锁/context 隔离仍属后续阶段  
+> 状态：Phase A（v1.6.x）+ Phase B 严格借用（v1.8.0）已实现；v1.8.0 边界已定：文件租约默认、L2 可选、L3 暂不做  
 > 目标读者：维护者、DSH 插件集成方  
 > 适用范围：共享同一浏览器 profile 的多 DSH 会话/任务
 
@@ -232,6 +232,7 @@ v1.6 先保证**锁互斥**；v1.7 起插件默认启用严格所有权：非自
 |---|---|
 | `E_TAB_LOCKED` | 锁被另一 Task 持有 |
 | `E_LOCK_TIMEOUT` | 等锁超时 |
+| `E_LEASE_FAILED` | 文件租约无法写入/创建（fail-closed） |
 | `E_TASK_PAUSED` | 任务已暂停 |
 | `E_TASK_CLOSING` | 任务正在关闭 |
 | `E_TASK_CLOSED` | 任务已关闭 |
@@ -266,13 +267,14 @@ v1.6 先保证**锁互斥**；v1.7 起插件默认启用严格所有权：非自
 - `browser_task` status/pause/resume/close/start。
 - 单 manager 进程内锁；严格借用策略暂不启用。
 
-### Phase B（v1.7.0 已实现）
+### Phase B（v1.8.0 已实现）
 - 严格所有权/借用、`borrow:true`、`E_TAB_OWNER_CONFLICT`、`E_TAB_BORROW_REQUIRED`。
 - 借用 tab 归属、借用中其他 Task 拒绝、close 不清除用户 tab。
 
-### Phase C（后续）
-- 跨进程锁（state 文件租约 + pid/heartbeat）。
-- Task context/profile 隔离（L2/L3）。
+### Phase C（v1.8.0 边界已定）
+- **默认文件租约**：跨 manager 进程的 target lease + pid/heartbeat + stale 回收。
+- **L2 可选**：`isolation: "context"` 时每 Task 一个 `Target.createBrowserContext`。
+- **L3 暂不做**：不实现独立 browser/profile 隔离。
 
 ## 15. v1.6 Phase A 实现状态
 
@@ -285,11 +287,11 @@ v1.6 先保证**锁互斥**；v1.7 起插件默认启用严格所有权：非自
 - pause 释放 lease；close 默认关闭 owned tabs 并写 `closed` tombstone；
 - 单测覆盖锁互斥/重入/超时、任务状态、集成覆盖跨 session 锁与 pause/resume/close。
 
-v1.7.0 Phase B 实现：
+v1.8.0 Phase B 实现：
 
 - 严格 `borrow:true` 与 `E_TAB_OWNER_CONFLICT` / `E_TAB_BORROW_REQUIRED`；
 - 借用 tab 记录、其他 Task 借用冲突、close 不关闭用户 tab；
-- T41 集成测试覆盖 strict manager；
+- T42 集成测试覆盖 strict manager；
 - Plugin 默认 `strictTabOwnership: true`，可通过配置关闭。
 
 尚未实现（保留为 Phase C）：
@@ -298,9 +300,85 @@ v1.7.0 Phase B 实现：
 - L2 browser context / L3 独立 profile 隔离；
 - 浏览器重启后的 target 级自动恢复测试（当前仅清理锁、按 state 重新解析）。
 
-## 16. 已选默认值
+## 17. v1.8.0 边界（已确定）
+
+### 17.1 范围内
+
+#### A. 默认文件租约
+
+- 所有 manager 默认启用 `fileLease: true`，不再只依赖内存锁。
+- 租约目录：`<stateDir>/locks`；每个 target 一个文件：`<sha256(targetId)>.json`。
+- 文件内容：`targetId/taskId/token/pid/acquiredAt/heartbeatAt/version`。
+- 获取：内存锁 + 文件 `wx` 原子创建；目标已被其他进程持有则等待 `taskLockTimeoutMs`（默认 5000ms），超时 `E_LOCK_TIMEOUT`。
+- 心跳：5s；stale 阈值 30s；同宿主 pid 不存在时可提前回收。
+- 释放：校验 token 后 unlink；任务级释放清理全部租约。
+- 默认 fail-closed：文件租约不可写/不可获取时拒绝操作，不静默退回内存锁。
+- stateDir 必须对应单一浏览器/profile；不同浏览器共用 stateDir 会产生 targetId 冲突，文档明确警告。
+
+#### B. L2 可选 context 隔离
+
+- 配置 `isolation: "shared" | "context"`，默认 `"shared"`，保持现有登录态共享体验。
+- `"context"` 模式：每 Task 通过 `Target.createBrowserContext` 创建独立 browser context；新 tab 在该 context 内创建。
+- 隔离 cookies/localStorage/cache；不共享主 profile 登录态。
+- Task close 时 `Target.disposeBrowserContext`；context 内 owned tabs 一并清理。
+- L2 Task 不允许借用主 profile 用户 tab；跨 context target 视为 owner conflict。
+- contextId 不持久化为跨浏览器重启的可靠资源：重启后校验失败则新建 context；旧 context 页面不自动恢复。
+- 浏览器不支持 `Target.createBrowserContext` 时 fail-closed（`E_L2_UNSUPPORTED`），不静默降级到 shared。
+- 标签组、上传/下载目录、截图目录仍按全局配置；L2 只隔离浏览器存储，不隔离宿主文件系统。
+
+### 17.2 范围外（明确不做）
+
+- **L3 独立 browser/profile 隔离**：不在 v1.8.0。
+- 多浏览器实例编排、自动启动/重启浏览器。
+- 跨主机时钟/网络文件系统一致性；文件租约只保证同一 stateDir、可原子创建文件的共享文件系统。
+- MCP、只读模式、拖拽、自动失败诊断包、工具结果断言、CLI 对齐：仍属于 v1.9 或后续。
+
+### 17.3 验收标准
+
+1. 两个 manager 进程/实例共享同一 stateDir 时，同一 target 的第二个长操作收到 `E_LOCK_TIMEOUT`，不静默并发。
+2. 进程崩溃/心跳超时后，后续 manager 能回收 stale 文件租约；token 不匹配时不删除他人新租约。
+3. shared 模式 215 条既有测试全部通过，行为不变。
+4. context 模式两个 Task 的 cookies 相互隔离；关闭 Task 会 dispose context。
+5. context 不支持时 fail-closed；默认 shared 时 L2 配置不生效。
+6. 文档明确 stateDir 单浏览器约束、L2 不共享登录态、L3 未实现。
+
+### 17.4 默认配置（拟）
+
+```yaml
+fileLease: true
+taskLockTimeoutMs: 5000
+fileLeaseDir: <stateDir>/locks
+fileLeaseHeartbeatMs: 5000
+fileLeaseStaleMs: 30000
+isolation: shared   # shared | context
+```
+
+### 17.5 v1.8.0 Phase C1 实现状态
+
+已实现：
+
+- `TabLockManager` 文件租约：`<stateDir>/locks/<sha256(targetId)>.json`；
+- 文件 `wx` 原子获取、5s 心跳、30s stale 回收、同宿主 pid 检查、token 校验释放；
+- 插件默认 `fileLease: true`；`fileLeaseDir/heartbeatMs/staleMs` 可配置；
+- 两个 manager 共享 stateDir 的集成测试（T42）验证互斥；
+- fail-closed：文件租约不可写/获取失败返回 `E_LEASE_FAILED`，不回退内存锁。
+
+尚未实现：
+
+- L2 `isolation: "context"`（下一阶段 C2）；
+- L3 独立 profile（明确不做）。
+
+### 17.6 推荐实现顺序
+
+1. FileLeaseManager + 心跳/stale 回收 + 双 manager 测试。
+2. L2 context 资源管理（create/validate/dispose）+ cookie 隔离测试。
+3. 文档、配置、CI 门禁与 v1.8.0 发布。
+
+## 18. 已选默认值
 
 - 锁等待 `5000ms`，超时返回 `E_LOCK_TIMEOUT`。
 - Task 结束默认 `cleanupPolicy:"close-owned"`。
 - `pause/resume/close` 通过 `browser_task` 暴露；页面工具默认不暴露。
-- v1.6 只做单 manager 内存锁；跨进程和 context/profile 隔离明确延后。
+- v1.6 只做单 manager 内存锁；v1.8 起默认文件租约。
+- v1.8 只做 L2 context 可选；L3 独立 profile 明确不做。
+- 文件租约 fail-closed；stateDir 单浏览器/profile 约束写入文档。

@@ -437,3 +437,24 @@ test("T41 strict ownership requires borrow and rejects other-task tabs", async (
     await run("browser_tabs", { action: "close", targetId: owned.targetId });
   }
 });
+
+test("T42 file leases block a second manager on the same tab", async (t) => {
+  if (needChrome(t)) return;
+  const session = "it-tools-file-lease";
+  const a = new BrowserManager({ cdpUrl: chrome.httpUrl, stateDir, fileLease: true });
+  const b = new BrowserManager({ cdpUrl: chrome.httpUrl, stateDir, fileLease: true });
+  try {
+    const nav = await a.navigate(session, server.url + "/a.html", { newTab: true });
+    await b.useTab(session, nav.targetId);
+    let blocked = null;
+    await a.withPage(session, async () => {
+      blocked = await b.withPage(session, async () => null, { timeoutMs: 100 }).then(() => null, (error) => error);
+    });
+    assert.ok(blocked, "second manager must be blocked by the file lease");
+    assert.equal(blocked.code, "E_LOCK_TIMEOUT");
+    await a.closeTask(session, { cleanup: "close-owned" });
+  } finally {
+    await a.close();
+    await b.close();
+  }
+});

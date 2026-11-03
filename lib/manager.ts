@@ -8,6 +8,7 @@
  * network and DOM state survives across calls.
  */
 
+import { join } from "node:path";
 import { Browser } from "../src/browser.js";
 import { noTab, HarnessError, codes } from "../src/errors.js";
 import { listEndpoints } from "../src/cdp/endpoint.js";
@@ -35,6 +36,10 @@ export class BrowserManager {
       browserFactory: undefined,
       strictTabOwnership: config.strictTabOwnership === true,
       allowBorrowUserTabs: config.allowBorrowUserTabs !== false,
+      fileLease: config.fileLease === true,
+      fileLeaseDir: config.fileLeaseDir,
+      fileLeaseHeartbeatMs: Number(config.fileLeaseHeartbeatMs) || 5_000,
+      fileLeaseStaleMs: Number(config.fileLeaseStaleMs) || 30_000,
       ...config,
     };
     this.connection = null;
@@ -51,7 +56,7 @@ export class BrowserManager {
     if (this.connecting) return this.connecting;
     // A new connection invalidates all in-memory leases from the old session.
     if (!this.connection) {
-      this.locks.clear();
+      await this.locks.clear();
       this.borrowedTabs.clear();
     }
     this.connecting = (async () => {
@@ -74,6 +79,13 @@ export class BrowserManager {
           lane: "dsh",
         });
         this.connection = browser;
+        const browserStateDir = browser.config && browser.config.stateDir;
+        this.locks.configureFileLease({
+          fileLease: this.config.fileLease === true && Boolean(browserStateDir || this.config.fileLeaseDir),
+          fileDir: this.config.fileLeaseDir || (browserStateDir ? join(browserStateDir, "locks") : null),
+          heartbeatMs: this.config.fileLeaseHeartbeatMs,
+          staleMs: this.config.fileLeaseStaleMs,
+        });
         return browser;
       } catch (error: any) {
         // Keep the stable code and a safe hint; never copy the raw connect error
@@ -469,7 +481,7 @@ export class BrowserManager {
     const connection = this.connection;
     this.connection = null;
     this.endpointsCache = { at: 0, value: null };
-    this.locks.clear();
+    await this.locks.clear();
     this.laneGates.clear();
     if (connection) {
       try { await connection.close(); } catch { /* ignore */ }
