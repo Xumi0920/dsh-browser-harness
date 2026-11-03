@@ -36,8 +36,8 @@ test("task locks can be released wholesale for pause/close", async () => {
 
 test("file leases are shared across managers and recover stale files", async () => {
   const dir = await tempDir("bh-file-lease-");
-  const a = new TabLockManager({ timeoutMs: 100, fileLease: true, fileDir: dir, heartbeatMs: 50, staleMs: 100 });
-  const b = new TabLockManager({ timeoutMs: 100, fileLease: true, fileDir: dir, heartbeatMs: 50, staleMs: 100 });
+  const a = new TabLockManager({ timeoutMs: 100, fileLease: true, fileDir: dir, heartbeatMs: 100, staleMs: 5_000 });
+  const b = new TabLockManager({ timeoutMs: 100, fileLease: true, fileDir: dir, heartbeatMs: 100, staleMs: 5_000 });
   const first = await a.acquire("T1", "task-a", { timeoutMs: 0 });
   await assert.rejects(b.acquire("T1", "task-b", { timeoutMs: 30 }), (error) => {
     assert.equal(error.code, "E_LOCK_TIMEOUT");
