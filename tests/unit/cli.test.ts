@@ -125,9 +125,19 @@ test("snapshot subcommand validates pagination and filters", async () => {
   assert.equal(snapshot(["--max-nodes", "10"]).args.limit, 10);
   assert.throws(() => snapshot(["extra"]), /no positional/);
   assert.throws(() => snapshot(["--offset", "-1"]), /zero or greater/);
+  assert.throws(() => snapshot(["--offset", "100001"]), /at most 100000/);
   assert.throws(() => snapshot(["--limit", "0"]), /between 1 and 400/);
   assert.throws(() => snapshot(["--limit", "401"]), /between 1 and 400/);
   assert.throws(() => snapshot(["--limit", "10", "--max-nodes", "20"]), /cannot use both/);
   assert.throws(() => snapshot(["--bogus"]), /unknown option/);
   assert.throws(() => snapshot(["--role", ""]), /must not be empty/);
+});
+
+test("snapshot renderer keeps text separate from JSON metadata", async () => {
+  const { renderSnapshotResult } = await import("../../dist/bin/cli/commands/snapshot-render.js");
+  const result = { targetId: "T1", snapshotVersion: 2, nodes: 1, total: 1, offset: 0, limit: 1, text: "e1 button \"Save\"" };
+  assert.equal(renderSnapshotResult(result, false), "e1 button \"Save\"");
+  const parsed = JSON.parse(renderSnapshotResult(result, true));
+  assert.equal(parsed.targetId, "T1");
+  assert.equal(parsed.text, undefined);
 });
