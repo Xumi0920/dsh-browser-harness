@@ -13,13 +13,18 @@ export function parseCliArgs(tokens: string[]): ParsedArgs {
       positional.push(token);
       continue;
     }
-    const key = token.slice(2);
+    const raw = token.slice(2);
+    const equals = raw.indexOf("=");
+    if (equals >= 0) {
+      flags[raw.slice(0, equals)] = raw.slice(equals + 1);
+      continue;
+    }
     const next = tokens[index + 1];
     if (next !== undefined && !next.startsWith("--")) {
-      flags[key] = next;
+      flags[raw] = next;
       index += 1;
     } else {
-      flags[key] = true;
+      flags[raw] = true;
     }
   }
   return { flags, positional };

@@ -613,3 +613,15 @@ test("T50 CLI exposes navigate, act, wait, extract, snapshot, tabs, task, screen
   assert.ok(currentTarget);
   await exec(["tabs", "close", currentTarget]);
 });
+
+test("T51 CLI validates navigate and shot arguments before touching the browser", async () => {
+  const stateDir = await tempDir("bh-cli-validate-");
+  const bh = join(ROOT, "dist", "bin", "bh.js");
+  const env = { ...process.env, BH_STATE_DIR: stateDir };
+  const exec = (args) => runCli(process.execPath, [bh, ...args], { env, timeout: 15_000 });
+  await assert.rejects(exec(["navigate"]), /navigate needs a URL/);
+  await assert.rejects(exec(["navigate", "https://a.example", "https://b.example"]), /exactly one URL/);
+  await assert.rejects(exec(["navigate", "file:///etc/passwd"]), /refusing to open/);
+  await assert.rejects(exec(["shot", "a.png", "b.png"]), /at most one path/);
+  await assert.rejects(exec(["shot", "--bogus"]), /unknown option for shot/);
+});

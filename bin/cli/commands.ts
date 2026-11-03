@@ -1,6 +1,8 @@
 import type { CliCommand, CliContext } from "./registry.js";
 import { numberFlag, pick } from "./args.js";
 import { listEndpoints } from "../../src/cdp/endpoint.js";
+import { navigateCommand } from "./commands/navigate.js";
+import { shotCommand } from "./commands/shot.js";
 
 async function currentTarget(ctx: CliContext) {
   const status = await ctx.invoke("browser_status");
@@ -26,15 +28,7 @@ export const commands: CliCommand[] = [
       console.log(JSON.stringify(await ctx.invoke("browser_status"), null, 2));
     },
   },
-  {
-    name: "navigate",
-    aliases: ["open"],
-    usage: "navigate <url> [--new-tab] — open/reuse a tab",
-    async run(ctx, positional, flags) {
-      const result = await ctx.invoke("browser_navigate", { url: positional[0] || "about:blank", newTab: flags["new-tab"] === true });
-      console.log(result.url + "\t" + result.title);
-    },
-  },
+  navigateCommand,
   {
     name: "info",
     usage: "info — current page info as JSON",
@@ -167,14 +161,7 @@ export const commands: CliCommand[] = [
       console.log(JSON.stringify(await ctx.invoke("browser_act", args), null, 2));
     },
   },
-  {
-    name: "shot",
-    aliases: ["screenshot"],
-    usage: "shot [path] [--full] — screenshot inside screenshotDir",
-    async run(ctx, positional, flags) {
-      console.log(JSON.stringify(await ctx.invoke("browser_screenshot", { path: positional[0], fullPage: flags.full === true }), null, 2));
-    },
-  },
+  shotCommand,
   {
     name: "pdf",
     usage: "pdf [path] [--no-background]",

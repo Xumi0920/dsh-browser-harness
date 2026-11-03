@@ -26,3 +26,33 @@ test("CLI command skeleton exposes aliases and one usage line per command", () =
   }
   assert.equal(commandUsages(commands).length, commands.length);
 });
+
+test("navigate subcommand validates URL and options", async () => {
+  const { parseNavigateArgs } = await import("../../dist/bin/cli/commands/navigate.js");
+  const nav = (tokens: string[]) => {
+    const parsed = parseCliArgs(tokens);
+    return parseNavigateArgs(parsed.positional, parsed.flags);
+  };
+  assert.deepEqual(nav(["https://example.com"]), { url: "https://example.com", newTab: false });
+  assert.deepEqual(nav(["about:blank", "--new-tab"]), { url: "about:blank", newTab: true });
+  assert.throws(() => nav([]), /needs a URL/);
+  assert.throws(() => nav(["https://a", "https://b"]), /exactly one URL/);
+  assert.throws(() => nav(["https://a", "--bogus"]), /unknown option/);
+  assert.throws(() => nav(["file:///etc/passwd"]), /refusing to open/);
+  assert.throws(() => nav(["https://a", "--new-tab=maybe"]), /expects a boolean/);
+});
+
+test("shot subcommand validates path and flags", async () => {
+  const { parseShotArgs } = await import("../../dist/bin/cli/commands/shot.js");
+  const shot = (tokens: string[]) => {
+    const parsed = parseCliArgs(tokens);
+    return parseShotArgs(parsed.positional, parsed.flags);
+  };
+  assert.deepEqual(shot([]), { path: undefined, fullPage: false });
+  assert.deepEqual(shot(["page.png", "--full"]), { path: "page.png", fullPage: true });
+  assert.deepEqual(shot(["--full=false"]), { path: undefined, fullPage: false });
+  assert.throws(() => shot(["a.png", "b.png"]), /at most one path/);
+  assert.throws(() => shot([""]), /must not be empty/);
+  assert.throws(() => shot(["a.png", "--nope"]), /unknown option/);
+  assert.throws(() => shot(["--full=maybe"]), /expects a boolean/);
+});
