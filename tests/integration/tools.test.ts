@@ -488,3 +488,24 @@ test("T43 context isolation separates cookies from the shared profile", async (t
     await manager.closeTask(sharedB, { cleanup: "close-owned" }).catch(() => {});
   }
 });
+
+test("T44 persisted context id is validated and disposed by a new manager", async (t) => {
+  if (needChrome(t)) return;
+  const session = "it-context-persist";
+  const a = new BrowserManager({ cdpUrl: chrome.httpUrl, stateDir, isolation: "context" });
+  const b = new BrowserManager({ cdpUrl: chrome.httpUrl, stateDir, isolation: "context" });
+  try {
+    const nav = await a.withNavigatedPage(session, server.url + "/a.html", { newTab: true }, async (page) => ({ targetId: page.targetId }));
+    const contextId = a.contexts.get(a.laneFor(session));
+    assert.ok(contextId, "context id exists for the task");
+    const restored = await b.pageFor(session);
+    assert.equal(restored.targetId, nav.targetId);
+    await b.closeTask(session, { cleanup: "close-owned" });
+    const contexts = await a.connection.transport.send("Target.getBrowserContexts", {});
+    assert.ok(!(contexts.browserContextIds || []).includes(contextId), "disposed context is gone");
+  } finally {
+    await a.closeTask(session, { cleanup: "close-owned" }).catch(() => {});
+    await a.close();
+    await b.close();
+  }
+});

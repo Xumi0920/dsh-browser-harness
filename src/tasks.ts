@@ -20,6 +20,7 @@ export interface TaskRecord {
   createdAt: string;
   updatedAt: string;
   cleanupPolicy: "close-owned" | "leave";
+  browserContextId?: string | null;
 }
 
 interface HeldLock {

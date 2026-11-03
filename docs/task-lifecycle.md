@@ -291,7 +291,7 @@ v1.8.0 Phase B 实现：
 
 - 严格 `borrow:true` 与 `E_TAB_OWNER_CONFLICT` / `E_TAB_BORROW_REQUIRED`；
 - 借用 tab 记录、其他 Task 借用冲突、close 不关闭用户 tab；
-- T43 集成测试覆盖 strict manager；
+- T44 集成测试覆盖 strict manager；
 - Plugin 默认 `strictTabOwnership: true`，可通过配置关闭。
 
 尚未实现（保留为 Phase C）：
@@ -322,7 +322,7 @@ v1.8.0 Phase B 实现：
 - 隔离 cookies/localStorage/cache；不共享主 profile 登录态。
 - Task close 时 `Target.disposeBrowserContext`；context 内 owned tabs 一并清理。
 - L2 Task 不允许借用主 profile 用户 tab；跨 context target 视为 owner conflict。
-- contextId 不持久化为跨浏览器重启的可靠资源：重启后校验失败则新建 context；旧 context 页面不自动恢复。
+- contextId 持久化到 TaskRecord；manager 恢复时通过 `Target.getBrowserContexts` 校验，失效则清空并新建 context；旧 context 页面不自动恢复。
 - 浏览器不支持 `Target.createBrowserContext` 时 fail-closed（`E_L2_UNSUPPORTED`），不静默降级到 shared。
 - 标签组、上传/下载目录、截图目录仍按全局配置；L2 只隔离浏览器存储，不隔离宿主文件系统。
 
@@ -355,7 +355,7 @@ isolation: shared   # shared | context
 
 ### 17.5 v1.8.x 实现状态
 
-Phase C1（文件租约，v1.8.0/v1.8.2）已实现：
+Phase C1（文件租约，v1.8.0/v1.8.3）已实现：
 
 - `TabLockManager` 文件租约：`<stateDir>/locks/<sha256(targetId)>.json`；
 - 文件 `wx` 原子获取、5s 心跳、30s stale 回收、同宿主 pid 检查、token 校验释放；
@@ -363,12 +363,13 @@ Phase C1（文件租约，v1.8.0/v1.8.2）已实现：
 - 两个 manager 共享 stateDir 的集成测试（T42）验证互斥；
 - fail-closed：文件租约不可写/获取失败返回 `E_LEASE_FAILED`，不回退内存锁。
 
-Phase C2（L2 context，v1.8.2）已实现：
+Phase C2（L2 context，v1.8.3）已实现：
 
 - 配置 `isolation: "shared" | "context"`，默认 `"shared"`；
 - context 模式每 Task `Target.createBrowserContext`，新 tab 创建在该 context；
 - Task close 时 `Target.disposeBrowserContext`，上下文内 tab 一并清理；
 - 实测：shared 模式同源页面共享 cookie；context 模式两个 Task 的 cookie 相互隔离；
+- contextId 持久化、恢复时校验；新 manager 可通过持久化 contextId dispose context（T44）；
 - context 模式禁止借用主 profile tab，`Target.createBrowserContext` 不支持时 `E_L2_UNSUPPORTED`；
 - 资源成本：每个 context 增加独立浏览器存储/渲染上下文，但不是独立 browser 进程；扩展、下载/截图/上传目录仍全局共享；
 - 限制：contextId 不保证跨浏览器重启恢复；旧 context 页面不自动恢复。

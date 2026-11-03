@@ -130,11 +130,24 @@ export class BrowserManager {
 
 
 
-  async #ensureTaskContext(task: any) {
+  async #ensureTaskContext(task: any, dir: any) {
     if (this.config.isolation !== "context") return null;
     const existing = this.contexts.get(task.id);
     if (existing) return existing;
     const browser = await this.ensure();
+    if (task.browserContextId) {
+      try {
+        const known = await browser.transport.send("Target.getBrowserContexts", {}, { timeoutMs: 5_000 });
+        if ((known.browserContextIds || []).includes(task.browserContextId)) {
+          this.contexts.set(task.id, task.browserContextId);
+          return task.browserContextId;
+        }
+      } catch {
+        /* validation unavailable; create a fresh context below */
+      }
+      task.browserContextId = null;
+      await setTask(task.id, task, dir);
+    }
     let result;
     try {
       result = await browser.transport.send("Target.createBrowserContext", {}, { timeoutMs: 10_000 });
@@ -144,11 +157,13 @@ export class BrowserManager {
     const contextId = result && result.browserContextId;
     if (!contextId) throw new HarnessError(codes.E_L2_UNSUPPORTED, "browser returned no browserContextId for isolation:context");
     this.contexts.set(task.id, contextId);
+    task.browserContextId = contextId;
+    await setTask(task.id, task, dir);
     return contextId;
   }
 
-  async #disposeTaskContext(taskId: any) {
-    const contextId = this.contexts.get(String(taskId));
+  async #disposeTaskContext(taskId: any, explicitId: any = null) {
+    const contextId = explicitId || this.contexts.get(String(taskId));
     if (!contextId) return false;
     this.contexts.delete(String(taskId));
     try {
@@ -226,10 +241,10 @@ export class BrowserManager {
   async withNavigatedPage(sessionId: any, url: any, options: any = {} as any, fn: any) {
     const lane = this.laneFor(sessionId);
     return this.#withLaneGate(lane, async () => {
-      const { task } = await this.#taskFor(sessionId);
+      const { task, dir } = await this.#taskFor(sessionId);
       this.#assertTaskActive(task);
       const browser = await this.ensure();
-      const browserContextId = await this.#ensureTaskContext(task);
+      const browserContextId = await this.#ensureTaskContext(task, dir);
       let lease: any = null;
       try {
         const page = await browser.open(String(url), {
@@ -299,7 +314,10 @@ export class BrowserManager {
     return this.#withLaneGate(lane, async () => {
       const { task, dir } = await this.#taskFor(sessionId);
       if (task.state !== "closed") throw new HarnessError(codes.E_BAD_ARG || "E_BAD_ARG", "task " + task.id + " is " + task.state + "; start is only valid after close");
-      const next = { ...task, state: "active", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), cleanupPolicy: task.cleanupPolicy };
+      if (task.browserContextId || this.contexts.has(task.id)) {
+        await this.#disposeTaskContext(task.id, task.browserContextId).catch(() => {});
+      }
+      const next = { ...task, state: "active", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), cleanupPolicy: task.cleanupPolicy, browserContextId: null };
       await updateState(lane, (currentState: any) => ({
         ...currentState,
         current: null,
@@ -324,8 +342,9 @@ export class BrowserManager {
       const policy = cleanup === "leave" || cleanup === "close-owned" ? cleanup : task.cleanupPolicy;
       const ownedTabs = Array.isArray(state.ownedTabs) ? state.ownedTabs.map((tab: any) => tab.targetId).filter(Boolean) : [];
       const closedTabs = [];
-      if (this.contexts.has(task.id)) {
-        await this.#disposeTaskContext(task.id);
+      const contextId = task.browserContextId || this.contexts.get(task.id);
+      if (contextId) {
+        await this.#disposeTaskContext(task.id, contextId);
         closedTabs.push(...ownedTabs);
       } else if (policy === "close-owned") {
         for (const targetId of ownedTabs) {
@@ -346,11 +365,11 @@ export class BrowserManager {
         current: null,
         ownedTabs: [],
         group: null,
-        task: { ...closing, state: "closed" },
+        task: { ...closing, state: "closed", browserContextId: null },
       }), dir);
       await this.locks.releaseTask(task.id);
       this.borrowedTabs.delete(task.id);
-      return { ok: true, task: { ...closing, state: "closed" }, closedTabs, cleanupPolicy: policy };
+      return { ok: true, task: { ...closing, state: "closed", browserContextId: null }, closedTabs, cleanupPolicy: policy };
     });
   }
 
@@ -482,10 +501,10 @@ export class BrowserManager {
   async openTab(sessionId: any, url: any = "about:blank") {
     const lane = this.laneFor(sessionId);
     return this.#withLaneGate(lane, async () => {
-      const { task } = await this.#taskFor(sessionId);
+      const { task, dir } = await this.#taskFor(sessionId);
       this.#assertTaskActive(task);
       const browser = await this.ensure();
-      const browserContextId = await this.#ensureTaskContext(task);
+      const browserContextId = await this.#ensureTaskContext(task, dir);
       const page = await browser.newTab(url || "about:blank", { lane, browserContextId });
       return this.#ensureNetworkCapture(page);
     });
