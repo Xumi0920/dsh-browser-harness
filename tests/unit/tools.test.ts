@@ -1,6 +1,6 @@
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
-import { writeFile } from "node:fs/promises";
+import { realpath, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createTools } from "../../dist/lib/tools.js";
 import { HarnessError } from "../../dist/src/errors.js";
@@ -435,7 +435,7 @@ test("browser_upload confines files to uploadDir and sets the file input", async
   const value = await upload.execute({ selector: "#file", path: "resume.txt" }, {});
   assert.equal(value.ok, true);
   assert.deepEqual(seen[0][0], { ref: undefined, selector: "#file" });
-  assert.deepEqual(seen[0][1], [join(dir, "resume.txt")]);
+  assert.deepEqual(seen[0][1], [await realpath(join(dir, "resume.txt"))]);
   await assert.rejects(upload.execute({ selector: "#file", path: "../escape.txt" }, {}), /E_POLICY_DENIED|E_BAD_ARG/);
 });
 
