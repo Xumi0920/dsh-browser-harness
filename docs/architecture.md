@@ -9,7 +9,7 @@ DSH 会话 / Creator 模式
         │  browser_* 工具调用
 ┌───────▼────────────────────────────────────────────┐
 │ lib/  DSH 插件层                                    │
-│  index.js   注册 11 个工具 + 内嵌 skill（读 skills/） │
+│  index.js   注册 12 个工具 + 内嵌 skill（读 skills/） │
 │  tools.js   参数/输出/错误适配                       │
 │  manager.js 会话 lane、连接复用、tab 委派            │
 │  skill.js   从 skills/browser-harness/SKILL.md 读技能│

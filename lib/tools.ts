@@ -148,12 +148,14 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
     tool({
       name: "browser_wait",
       description:
-        "Wait for the page to reach a state before the next action: a selector appears, text appears, network activity becomes idle, or a fixed delay. Prefer this over repeatedly calling browser_snapshot.",
+        "Wait for the page to reach a state before the next action: a selector/text/URL appears or disappears, a response completes, network activity becomes idle, or a fixed delay. Prefer this over repeatedly calling browser_snapshot.",
       parameters: {
-        mode: { type: "string", required: true, enum: ["selector", "text", "network_idle", "delay"], description: "what to wait for" },
-        selector: { type: "string", description: "selector mode: CSS selector to wait for" },
-        text: { type: "string", description: "text mode: visible page text to wait for" },
+        mode: { type: "string", required: true, enum: ["selector", "selector_hidden", "text", "text_gone", "text_changed", "url", "url_changed", "response", "network_idle", "delay"], description: "what to wait for" },
+        selector: { type: "string", description: "selector/selector_hidden mode: CSS selector" },
+        text: { type: "string", description: "text/text_gone mode: visible page text" },
+        url: { type: "string", description: "url/url_changed/response mode: URL substring" },
         visible: { type: "boolean", description: "selector mode: require the element to be visible too" },
+        includeBody: { type: "boolean", description: "response mode: include the response body" },
         timeoutMs: { type: "number", description: "maximum wait in milliseconds (default 30000, capped at 120000)" },
         delayMs: { type: "number", description: "delay mode: milliseconds to wait (default 1000)" },
         idleMs: { type: "number", description: "network_idle mode: quiet window in milliseconds (default 500)" },
@@ -175,11 +177,49 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
           const found = await page.waitForSelector(String(args.selector), { timeoutMs, visible: Boolean(args.visible) });
           return { mode, matched: true, selector: args.selector, found };
         }
+        if (mode === "selector_hidden") {
+          if (!args.selector) throw new HarnessError("E_BAD_ARG", "selector_hidden mode needs selector");
+          const selector = JSON.stringify(String(args.selector));
+          const expression = "(() => { const el = document.querySelector(" + selector + "); if (!el) return true; if (typeof el.checkVisibility === 'function') return !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }); return getComputedStyle(el).display === 'none' || getComputedStyle(el).visibility === 'hidden'; })()";
+          await page.waitForFunction(expression, { timeoutMs });
+          return { mode, hidden: true, selector: args.selector };
+        }
         if (mode === "text") {
           if (!args.text) throw new HarnessError("E_BAD_ARG", "text mode needs text");
           const expression = "(() => { const body = document.body ? document.body.innerText : ''; return body.includes(" + JSON.stringify(String(args.text)) + "); })()";
           await page.waitForFunction(expression, { timeoutMs });
           return { mode, matched: true, text: args.text };
+        }
+        if (mode === "text_gone") {
+          if (!args.text) throw new HarnessError("E_BAD_ARG", "text_gone mode needs text");
+          const expression = "(() => { const body = document.body ? document.body.innerText : ''; return !body.includes(" + JSON.stringify(String(args.text)) + "); })()";
+          await page.waitForFunction(expression, { timeoutMs });
+          return { mode, gone: true, text: args.text };
+        }
+        if (mode === "text_changed") {
+          if (!args.text) throw new HarnessError("E_BAD_ARG", "text_changed mode needs current text");
+          const before = String(args.text);
+          const expression = "(() => { const body = document.body ? document.body.innerText : ''; return body !== " + JSON.stringify(before) + "; })()";
+          await page.waitForFunction(expression, { timeoutMs });
+          return { mode, changed: true };
+        }
+        if (mode === "url") {
+          if (!args.url) throw new HarnessError("E_BAD_ARG", "url mode needs url");
+          const expression = "location.href.includes(" + JSON.stringify(String(args.url)) + ")";
+          await page.waitForFunction(expression, { timeoutMs });
+          return { mode, matched: true, url: args.url };
+        }
+        if (mode === "url_changed") {
+          if (!args.url) throw new HarnessError("E_BAD_ARG", "url_changed mode needs current url");
+          const before = String(args.url);
+          const expression = "location.href !== " + JSON.stringify(before);
+          await page.waitForFunction(expression, { timeoutMs });
+          return { mode, changed: true, url: await page.evaluate("location.href") };
+        }
+        if (mode === "response") {
+          if (!args.url) throw new HarnessError("E_BAD_ARG", "response mode needs url");
+          const response = await page.waitForResponse(String(args.url), { timeoutMs, includeBody: Boolean(args.includeBody) });
+          return { mode, matched: true, response };
         }
         if (mode === "network_idle") {
           const result = await page.waitForNetworkIdle({ timeoutMs, idleMs: Number(args.idleMs) || 500 });
@@ -229,26 +269,46 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         role: { type: "string", description: "only include this ARIA role (e.g. button)" },
         name: { type: "string", description: "only include nodes whose name contains this text (case-insensitive)" },
         frameId: { type: "string", description: "optional iframe frameId from browser_extract mode:'frames'" },
+        offset: { type: "number", description: "optional zero-based node offset for pagination" },
+        limit: { type: "number", description: "optional page size after filtering" },
       },
       output: jsonOutput,
       timeoutMs: 30_000,
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
         const page = await manager.pageFor(sessionId);
-        const snapshot = await page.snapshot({ maxNodes: Math.min(Number(args.maxNodes) || maxSnapshotNodes, 400), frameId: args.frameId, role: args.role, name: args.name });
+        const offset = Math.max(0, Number(args.offset) || 0);
+        const limit = Math.min(Math.max(Number(args.limit) || maxSnapshotNodes, 1), 400);
+        const requestedMax = Math.min(Math.max(offset + limit, Number(args.maxNodes) || maxSnapshotNodes), 400);
+        const snapshot = await page.snapshot({ maxNodes: requestedMax, frameId: args.frameId, role: args.role, name: args.name });
         let nodes = snapshot.nodes;
         if (args.role || args.name) nodes = findByRole(nodes, { role: args.role, name: args.name });
-        const rendered = formatSnapshot({ ...snapshot, nodes });
-        return { targetId: page.targetId, url: redactUrlForOutput((await page.info()).url), text: rendered.text, nodes: nodes.length, truncated: rendered.truncated };
+        const total = nodes.length;
+        nodes = nodes.slice(offset, offset + limit);
+        const truncated = Boolean(snapshot.truncated) || offset + nodes.length < total;
+        const rendered = formatSnapshot({ ...snapshot, nodes, truncated });
+        const snapshotVersion = snapshot.snapshotVersion;
+        return {
+          targetId: page.targetId,
+          snapshotId: page.targetId + ":" + snapshotVersion,
+          snapshotVersion,
+          url: redactUrlForOutput((await page.info()).url),
+          text: rendered.text,
+          nodes: nodes.length,
+          total,
+          offset,
+          limit,
+          truncated: rendered.truncated,
+        };
       }),
     }),
 
     tool({
       name: "browser_act",
       description:
-        "Perform one browser action: click a ref/selector/coordinate, hover or highlight an element, type into the focused element (or focus a ref/selector first), fill an input like a user, press a key, scroll, or accept/dismiss the current JavaScript dialog. Use refs from browser_navigate/browser_snapshot (including iframe snapshots); verify the result afterwards (snapshot or browser_extract). fill returns only length/verified, never the entered value.",
+        "Perform one browser action: click a ref/selector/coordinate, hover or highlight an element, type into the focused element (or focus a ref/selector first), fill an input like a user, select native options, check/uncheck a checkbox, press a key, scroll, or accept/dismiss the current JavaScript dialog. Use refs from browser_navigate/browser_snapshot (including iframe snapshots); verify the result afterwards (snapshot or browser_extract). fill returns only length/verified, never the entered value.",
       parameters: {
-        action: { type: "string", required: true, enum: ["click", "hover", "highlight", "type", "fill", "press", "scroll", "dialog"], description: "action to perform" },
+        action: { type: "string", required: true, enum: ["click", "hover", "highlight", "type", "fill", "selectOption", "check", "uncheck", "press", "scroll", "dialog"], description: "action to perform" },
         ref: { type: "string", description: "snapshot ref such as e3" },
         selector: { type: "string", description: "CSS selector (use instead of ref/coordinates)" },
         x: { type: "number", description: "viewport x for click" },
@@ -260,6 +320,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         dy: { type: "number", description: "scroll delta y" },
         button: { type: "string", enum: ["left", "right", "middle"], description: "mouse button for click" },
         clicks: { type: "number", description: "click count (default 1)" },
+        values: { type: "array", items: { type: "string" }, description: "selectOption: option values or labels" },
         force: { type: "boolean", description: "click despite an overlay hit-test failure; prefer fixing the overlay" },
         accept: { type: "boolean", description: "dialog: accept (true, default) or dismiss (false)" },
         promptText: { type: "string", description: "dialog: text for a prompt() dialog" },
@@ -294,6 +355,15 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         if (action === "fill") {
           if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "fill needs ref or selector");
           return { action, ...(await page.fill({ ref: args.ref, selector: args.selector, text: String(args.text ?? "") }, { verify: true })) };
+        }
+        if (action === "selectOption") {
+          if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "selectOption needs ref or selector");
+          if (!Array.isArray(args.values) || args.values.length === 0) throw new HarnessError("E_BAD_ARG", "selectOption needs values");
+          return { action, ...(await page.selectOption({ ref: args.ref, selector: args.selector }, args.values)) };
+        }
+        if (action === "check" || action === "uncheck") {
+          if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", action + " needs ref or selector");
+          return { action, ...(await page.setChecked({ ref: args.ref, selector: args.selector }, action === "check")) };
         }
         if (action === "press") {
           const modifiers = String(args.modifiers || "").split(",").map((part: any) => part.trim()).filter(Boolean);
@@ -418,6 +488,53 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       }),
     }),
 
+
+    tool({
+      name: "browser_diagnose",
+      description:
+        "Collect a failure-diagnosis bundle from the current tab: URL/title/readiness, pending dialog, active network requests, recent console/log events, failed or 4xx/5xx responses, and an optional screenshot.",
+      parameters: {
+        screenshot: { type: "boolean", description: "capture a screenshot (default true)" },
+        path: { type: "string", description: "optional relative screenshot path under screenshotDir" },
+        consoleLimit: { type: "number", description: "recent console events to include (default 100, max 500)" },
+      },
+      output: jsonOutput,
+      timeoutMs: 60_000,
+      isConcurrencySafe: () => false,
+      execute: wrap(async (args: any, sessionId: any) => {
+        const page = await manager.pageFor(sessionId);
+        let info = null;
+        try { info = await page.info(); } catch { info = null; }
+        let screenshot = null;
+        if (args.screenshot !== false) {
+          try {
+            screenshot = await page.screenshot(args.path ? { path: args.path } : {});
+          } catch (error: any) {
+            screenshot = { error: String((error && error.message) || error) };
+          }
+        }
+        const consoleLimit = Math.min(Math.max(Number(args.consoleLimit) || 100, 1), 500);
+        const consoleEvents = page.consoleEvents(consoleLimit).map((event: any) => ({
+          ...event,
+          text: redactTextForOutput(event.text),
+          ...(event.url ? { url: redactUrlForOutput(event.url) } : {}),
+        }));
+        const failures = page.networkEvents()
+          .filter((event: any) => event.error || Number(event.status) >= 400)
+          .slice(-20)
+          .map(redactEvent);
+        return {
+          url: info ? redactUrlForOutput(info.url) : null,
+          title: info ? info.title : null,
+          readyState: info ? info.readyState : null,
+          dialog: page.dialog(),
+          activeRequests: page.activeRequests.size,
+          console: consoleEvents,
+          networkFailures: failures,
+          screenshot,
+        };
+      }),
+    }),
 
     tool({
       name: "browser_upload",

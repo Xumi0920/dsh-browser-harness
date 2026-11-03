@@ -2,15 +2,15 @@
 
 ## 在 DSH 里
 
-插件装好后，**任意 DSH 会话/预设**都可以使用这些工具（不限于创造模式；创造模式只影响用 `plugin_manager` 安装这一步）。Agent 通过 11 个 `browser_*` 工具操作专用浏览器；插件同时内嵌 `browser-harness` 技能，给出完整工作流：
+插件装好后，**任意 DSH 会话/预设**都可以使用这些工具（不限于创造模式；创造模式只影响用 `plugin_manager` 安装这一步）。Agent 通过 12 个 `browser_*` 工具操作专用浏览器；插件同时内嵌 `browser-harness` 技能，给出完整工作流：
 
 1. `browser_status` — 确认端点、浏览器版本、当前标签页；
 2. `browser_navigate {url}` / `{action:"back"|"forward"|"reload"}` — 打开页面或浏览器历史导航，并拿到紧凑快照（`e1`、`e2`… 引用）；
-3. `browser_wait` — 等待 selector / text / network_idle，或固定 delay，避免反复快照盲等；
-4. `browser_act` — `{action:"click"|"hover"|"highlight", ref}` / `{action:"fill", selector, text}` / `{action:"type", ref, text}` / `{action:"press", key}` / `{action:"scroll", dy}` / `{action:"dialog", accept}`；
-5. `browser_extract` — `text` / `html` / `js` / `network`（最多最近 100 条请求，`includeBody` 较慢）/ `console`（最近 console/Log 事件）/ `frames`（iframe 树）；`text/html/js` 可传 `frameId`/`frameUrl` 进入 iframe；
-6. `browser_snapshot` / `browser_screenshot`（整页或 ref/selector 元素）复核；`browser_pdf` 导出 PDF；
-7. `browser_upload` 设置文件输入（路径限制在 `uploadDir`）；`browser_download` 点击触发下载并等待落盘（文件在 `downloadDir`）；`browser_tabs` 管理自建标签页。
+3. `browser_wait` — 等待出现/消失、URL/文本变化、response、network_idle 或 delay，避免反复快照盲等；
+4. `browser_act` — `{action:"click"|"hover"|"highlight", ref}` / `{action:"fill", selector, text}` / `{action:"type", ref, text}` / `{action:"selectOption", selector, values}` / `{action:"check"|"uncheck", ref}` / `{action:"press", key}` / `{action:"scroll", dy}` / `{action:"dialog", accept}`；
+5. `browser_extract` — `text` / `html` / `js` / `network` / `console` / `frames`；`text/html/js` 可传 `frameId`/`frameUrl`；
+6. `browser_snapshot`（支持 `offset`/`limit` 分页和 checked/selected/expanded 状态）/ `browser_screenshot` / `browser_pdf` 复核；`browser_diagnose` 生成失败诊断包；
+7. `browser_upload` / `browser_download` 处理文件；`browser_tabs` 管理自建标签页。
 
 > refs 属于产生它的快照：导航或 DOM 变化后重新 `browser_snapshot`。受控输入用 `fill`（真实聚焦键 + `Input.insertText` + `input`/`change`），`type` 只在需要逐键语义时使用。`fill` 只返回 `{ok, length, verified}`，**不回显输入值**。
 

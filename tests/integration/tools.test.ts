@@ -332,3 +332,16 @@ test("T35 click reports an intercepting overlay instead of succeeding", async (t
   });
   await run("browser_tabs", { action: "close", targetId: nav.targetId });
 });
+
+test("T36 form select and idempotent check/uncheck drive native controls", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/form.html", newTab: true });
+  await run("browser_act", { action: "selectOption", selector: "#color", values: ["green"] });
+  assert.equal(await run("browser_extract", { mode: "js", expression: "document.querySelector('#color').value" }).then((value) => value.value), "green");
+  await run("browser_act", { action: "check", selector: "#agree" });
+  await run("browser_act", { action: "check", selector: "#agree" });
+  assert.equal(await run("browser_extract", { mode: "js", expression: "document.querySelector('#agree').checked" }).then((value) => value.value), true);
+  await run("browser_act", { action: "uncheck", selector: "#agree" });
+  assert.equal(await run("browser_extract", { mode: "js", expression: "document.querySelector('#agree').checked" }).then((value) => value.value), false);
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});

@@ -129,6 +129,7 @@ export class Page {
   lastSnapshot: any;
   nextRef: number;
   snapshotChain: Promise<any>;
+  snapshotVersion: number;
   activeRequests: Map<string, any>;
   lastNetworkActivity: number;
   pendingDialog: any;
@@ -164,6 +165,7 @@ export class Page {
     this.nextRef = 0;
     /** Serializes snapshot generation so concurrent calls cannot share refStart. */
     this.snapshotChain = Promise.resolve();
+    this.snapshotVersion = 0;
     /** Requests currently in flight, independent of the capped networkLog. */
     this.activeRequests = new Map();
     this.lastNetworkActivity = Date.now();
@@ -405,6 +407,7 @@ export class Page {
     const raw = await this.send("Accessibility.getFullAXTree", params, { timeoutMs: 15_000 });
     const sourceNodes = filterAXNodes(raw.nodes || [], options.role, options.name);
     const refStart = this.nextRef;
+    this.snapshotVersion += 1;
     const first = buildSnapshot(sourceNodes, { maxNodes: options.maxNodes ?? 400, roles: options.roles, refStart });
     const withBoxes = options.includeBoxes !== false;
     if (withBoxes) {
@@ -424,11 +427,11 @@ export class Page {
       const second = buildSnapshot(sourceNodes, { maxNodes: first.nodes.length, roles: options.roles, boxes, refStart });
       this.lastSnapshot = second.nodes;
       this.nextRef = refStart + second.nodes.length;
-      return { ...second, targetId: this.targetId };
+      return { ...second, targetId: this.targetId, snapshotVersion: this.snapshotVersion };
     }
     this.lastSnapshot = first.nodes;
     this.nextRef = refStart + first.nodes.length;
-    return { ...first, targetId: this.targetId };
+    return { ...first, targetId: this.targetId, snapshotVersion: this.snapshotVersion };
   }
 
   /**
@@ -653,6 +656,38 @@ export class Page {
       verified = String(current ?? "") === value;
     }
     return { ok: true, length: value.length, ...(verified === undefined ? {} : { verified }) };
+  }
+
+  /** Select one or more options on a native <select> by value or label. */
+  async selectOption(target: any, values: any) {
+    const wanted = (Array.isArray(values) ? values : [values]).map((value: any) => String(value)).filter(Boolean);
+    if (!wanted.length) throw badArgument("selectOption needs values");
+    const handle = await this.#resolveTargetHandle(target);
+    if (!handle.objectId) throw elementNotFound("target", { kind: "select" });
+    const result = await this.send("Runtime.callFunctionOn", {
+      objectId: handle.objectId,
+      functionDeclaration: "function (values) { if (String(this.tagName).toLowerCase() !== 'select') return { ok: false, error: 'target is not a <select>' }; for (const option of Array.from(this.options)) { option.selected = values.includes(String(option.value)) || values.includes(String(option.text)); } this.dispatchEvent(new Event('input', { bubbles: true })); this.dispatchEvent(new Event('change', { bubbles: true })); return { ok: true, selected: Array.from(this.selectedOptions).map((option) => ({ value: option.value, text: option.text })) }; }",
+      arguments: [{ value: wanted }],
+      returnByValue: true,
+    }, { timeoutMs: 5_000 });
+    const value = result && result.result ? result.result.value : null;
+    if (!value || !value.ok) throw badArgument(value && value.error ? value.error : "selectOption failed");
+    return value;
+  }
+
+  /** Idempotently set a checkbox/radio to checked (true) or unchecked (false). */
+  async setChecked(target: any, checked: any) {
+    const handle = await this.#resolveTargetHandle(target);
+    if (!handle.objectId) throw elementNotFound("target", { kind: "checkbox" });
+    const result = await this.send("Runtime.callFunctionOn", {
+      objectId: handle.objectId,
+      functionDeclaration: "function (want) { const type = String(this.type || '').toLowerCase(); if (type !== 'checkbox' && type !== 'radio') return { ok: false, error: 'target is not a checkbox or radio' }; const before = Boolean(this.checked); if (before !== Boolean(want)) this.click(); return { ok: true, changed: before !== Boolean(this.checked), checked: Boolean(this.checked), before }; }",
+      arguments: [{ value: Boolean(checked) }],
+      returnByValue: true,
+    }, { timeoutMs: 5_000 });
+    const value = result && result.result ? result.result.value : null;
+    if (!value || !value.ok) throw badArgument(value && value.error ? value.error : "setChecked failed");
+    return value;
   }
 
   async #resolveTargetHandle(target: any) {

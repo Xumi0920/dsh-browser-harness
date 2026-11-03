@@ -108,6 +108,8 @@ export function buildSnapshot(nodes: any, options: any = {} as any) {
         for (const property of properties) {
           if (property && property.name === "disabled" && property.value && property.value.value === true) row.disabled = true;
           if (property && property.name === "checked" && property.value && typeof property.value.value === "string") row.checked = property.value.value;
+          if (property && property.name === "selected" && property.value && typeof property.value.value === "boolean") row.selected = property.value.value;
+          if (property && property.name === "expanded" && property.value && typeof property.value.value === "boolean") row.expanded = property.value.value;
         }
       }
     }
@@ -161,6 +163,9 @@ export function snapshotLine(node: any) {
   if (node.name) parts.push(JSON.stringify(node.name));
   if (node.value !== undefined && node.value !== null && node.value !== "") parts.push("value=" + JSON.stringify(node.value));
   if (node.disabled) parts.push("disabled");
+  if (node.checked) parts.push("checked=" + node.checked);
+  if (node.selected) parts.push("selected");
+  if (node.expanded !== undefined) parts.push("expanded=" + node.expanded);
   if (node.center) parts.push("@" + node.center.x + "," + node.center.y);
   return parts.join(" ");
 }

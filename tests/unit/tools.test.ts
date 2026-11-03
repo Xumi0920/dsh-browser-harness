@@ -4,6 +4,8 @@ import { realpath, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createTools } from "../../dist/lib/tools.js";
 import { HarnessError } from "../../dist/src/errors.js";
+import { Page } from "../../dist/src/page.js";
+import { FakeTransport, quad } from "./helpers/fake-transport.js";
 import { cleanupTempDirs, tempDir } from "../helpers/temp.js";
 
 after(cleanupTempDirs);
@@ -58,6 +60,7 @@ test("exposes the expected tool surface", () => {
     "browser_extract",
     "browser_screenshot",
     "browser_pdf",
+    "browser_diagnose",
     "browser_upload",
     "browser_download",
     "browser_tabs",
@@ -158,7 +161,7 @@ test("snapshot truncated flag is truthful when text is line-capped", async () =>
   manager.pageFor = async () => page;
   const tools = build(manager);
   const snapshotTool = tools.find((definition) => definition.name === "browser_snapshot");
-  const value = await snapshotTool.execute({}, {});
+  const value = await snapshotTool.execute({ limit: 250 }, {});
   assert.equal(value.nodes, 250);
   assert.equal(value.truncated, true, "200-line cap must be reported as truncated");
   assert.match(value.text, /snapshot truncated \(200 of 250 nodes\)/);
@@ -475,4 +478,97 @@ test("browser_snapshot frameId and browser_extract frames route to iframe APIs",
   assert.deepEqual(seen[0], ["snapshot", { maxNodes: 50, frameId: "f1", role: undefined, name: undefined }]);
   assert.deepEqual(seen[1], ["frames"]);
   assert.equal(frames.count, 1);
+});
+
+test("browser_wait supports hidden/change/url/response modes", async () => {
+  const seen = [];
+  const manager = fakeManager();
+  manager.pageFor = async () => ({
+    waitForFunction: async (expression) => { seen.push(["fn", String(expression)]); return true; },
+    waitForResponse: async (url, options) => { seen.push(["response", url, options]); return { status: 200, url }; },
+    waitForNetworkIdle: async (options) => { seen.push(["idle", options]); return { ok: true, activeRequests: 0 }; },
+    evaluate: async () => "https://example.com/new",
+  });
+  const wait = build(manager).find((definition) => definition.name === "browser_wait");
+  await wait.execute({ mode: "selector_hidden", selector: "#loading" }, {});
+  await wait.execute({ mode: "text_gone", text: "loading" }, {});
+  await wait.execute({ mode: "url", url: "/dashboard" }, {});
+  await wait.execute({ mode: "url_changed", url: "https://example.com/old" }, {});
+  await wait.execute({ mode: "response", url: "/api/items", includeBody: true }, {});
+  assert.match(seen[0][1], /#loading/);
+  assert.match(seen[1][1], /loading/);
+  assert.match(seen[2][1], /dashboard/);
+  assert.match(seen[3][1], /old/);
+  assert.deepEqual(seen[4], ["response", "/api/items", { timeoutMs: 30000, includeBody: true }]);
+});
+
+test("browser_act selectOption, check and uncheck route to form helpers", async () => {
+  const seen = [];
+  const manager = fakeManager();
+  manager.pageFor = async () => ({
+    selectOption: async (target, values) => { seen.push(["select", target, values]); return { ok: true, selected: [] }; },
+    setChecked: async (target, checked) => { seen.push(["checked", target, checked]); return { ok: true, checked }; },
+  });
+  const act = build(manager).find((definition) => definition.name === "browser_act");
+  await act.execute({ action: "selectOption", selector: "#color", values: ["blue"] }, {});
+  await act.execute({ action: "check", ref: "e1" }, {});
+  await act.execute({ action: "uncheck", ref: "e2" }, {});
+  assert.deepEqual(seen[0], ["select", { ref: undefined, selector: "#color" }, ["blue"]]);
+  assert.deepEqual(seen[1], ["checked", { ref: "e1", selector: undefined }, true]);
+  assert.deepEqual(seen[2], ["checked", { ref: "e2", selector: undefined }, false]);
+});
+
+test("browser_snapshot paginates without regenerating refs", async () => {
+  const nodes = Array.from({ length: 5 }, (_, index) => ({ ref: "e" + (index + 1), role: "button", name: "b" + index, backendDOMNodeId: 10 + index }));
+  const manager = fakeManager();
+  manager.pageFor = async () => ({
+    targetId: "T1",
+    snapshot: async () => ({ nodes, truncated: false, total: 5, snapshotVersion: 3 }),
+    info: async () => ({ url: "https://example.com" }),
+  });
+  const snapshot = build(manager).find((definition) => definition.name === "browser_snapshot");
+  const value = await snapshot.execute({ offset: 2, limit: 2 }, {});
+  assert.deepEqual(value.text.split("\n").slice(0, 2).map((line) => line.split(" ")[0]), ["e3", "e4"]);
+  assert.equal(value.total, 5);
+  assert.equal(value.offset, 2);
+  assert.equal(value.snapshotVersion, 3);
+  assert.equal(value.snapshotId, "T1:3");
+});
+
+test("browser_diagnose returns state, console, network failures and screenshot", async () => {
+  const manager = fakeManager();
+  const page = await manager.pageFor();
+  manager.pageFor = async () => ({
+    info: async () => ({ url: "https://example.com/app?token=secret", title: "App", readyState: "complete" }),
+    screenshot: async () => ({ path: "/tmp/diag.png", bytes: 10 }),
+    consoleEvents: () => [{ level: "error", text: "boom https://example.com/?token=secret" }],
+    networkEvents: () => [{ url: "https://example.com/fail", status: 500 }, { url: "https://example.com/ok", status: 200 }],
+    activeRequests: new Map([["r1", {}]]),
+    dialog: () => null,
+  });
+  const diagnose = build(manager).find((definition) => definition.name === "browser_diagnose");
+  const value = await diagnose.execute({}, {});
+  assert.equal(value.readyState, "complete");
+  assert.equal(value.activeRequests, 1);
+  assert.equal(value.console.length, 1);
+  assert.equal(value.networkFailures.length, 1);
+  assert.equal(value.screenshot.path, "/tmp/diag.png");
+  assert.ok(!value.url.includes("secret"));
+});
+
+test("browser_snapshot exposes checked/selected/expanded states", async () => {
+  const transport = new FakeTransport();
+  transport.on("Accessibility.getFullAXTree", () => ({
+    nodes: [
+      { role: { value: "checkbox" }, backendDOMNodeId: 10, name: { value: "remember" }, properties: [{ name: "checked", value: { value: "true" } }] },
+      { role: { value: "tab" }, backendDOMNodeId: 11, name: { value: "Tab" }, properties: [{ name: "selected", value: { value: true } }, { name: "expanded", value: { value: true } }] },
+    ],
+  }));
+  transport.on("DOM.getBoxModel", () => quad(0, 0, 10, 10));
+  const page = new Page({ transport, config: { dialogPolicy: "auto-dismiss", focusEmulation: false, stateDir: "/tmp/bh-unit" } }, { sessionId: "s1", targetId: "t1" });
+  const snapshot = await page.snapshot();
+  assert.equal(snapshot.nodes[0].checked, "true");
+  assert.equal(snapshot.nodes[1].selected, true);
+  assert.equal(snapshot.nodes[1].expanded, true);
+  assert.ok(snapshot.snapshotVersion >= 1);
 });
