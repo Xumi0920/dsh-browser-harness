@@ -6,6 +6,7 @@ import { shotCommand } from "./commands/shot.js";
 import { actCommand } from "./commands/act.js";
 import { extractCommand } from "./commands/extract.js";
 import { tabsCommand } from "./commands/tabs.js";
+import { snapshotCommand } from "./commands/snapshot.js";
 
 async function currentTarget(ctx: CliContext) {
   const status = await ctx.invoke("browser_status");
@@ -60,19 +61,7 @@ export const commands: CliCommand[] = [
       console.log(JSON.stringify({ ...browser.tabGroups.info(), groups }, null, 2));
     },
   },
-  {
-    name: "snapshot",
-    usage: "snapshot [--role r --name n --offset 0 --limit 50 --frame-id f --json]",
-    async run(ctx, _positional, flags) {
-      const args: any = {
-        offset: numberFlag(flags, "offset") || 0,
-        limit: numberFlag(flags, "limit") || numberFlag(flags, "max-nodes") || 400,
-        ...pick(flags, ["role", "name", "frame-id"]),
-      };
-      const result = await ctx.invoke("browser_snapshot", args);
-      console.log(flags.json === true ? JSON.stringify({ ...result, text: undefined }, null, 2) : result.text);
-    },
-  },
+  snapshotCommand,
   {
     name: "text",
     usage: "text [selector] — visible text",

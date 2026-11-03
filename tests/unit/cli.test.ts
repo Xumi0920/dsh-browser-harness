@@ -110,3 +110,24 @@ test("tabs subcommand validates action, target and URL", async () => {
   assert.throws(() => tabs(["close", "a", "b"]), /at most one targetId/);
   assert.throws(() => tabs(["list", "--bogus"]), /unknown option/);
 });
+
+test("snapshot subcommand validates pagination and filters", async () => {
+  const { parseSnapshotArgs } = await import("../../dist/bin/cli/commands/snapshot.js");
+  const snapshot = (tokens: string[]) => {
+    const parsed = parseCliArgs(tokens);
+    return parseSnapshotArgs(parsed.positional, parsed.flags);
+  };
+  assert.deepEqual(snapshot([]), { args: { offset: 0, limit: 400 }, json: false });
+  assert.deepEqual(snapshot(["--offset", "400", "--limit", "50", "--role", "button", "--name", "Save", "--frame-id", "f1", "--json"]), {
+    args: { offset: 400, limit: 50, role: "button", name: "Save", frameId: "f1" },
+    json: true,
+  });
+  assert.equal(snapshot(["--max-nodes", "10"]).args.limit, 10);
+  assert.throws(() => snapshot(["extra"]), /no positional/);
+  assert.throws(() => snapshot(["--offset", "-1"]), /zero or greater/);
+  assert.throws(() => snapshot(["--limit", "0"]), /between 1 and 400/);
+  assert.throws(() => snapshot(["--limit", "401"]), /between 1 and 400/);
+  assert.throws(() => snapshot(["--limit", "10", "--max-nodes", "20"]), /cannot use both/);
+  assert.throws(() => snapshot(["--bogus"]), /unknown option/);
+  assert.throws(() => snapshot(["--role", ""]), /must not be empty/);
+});

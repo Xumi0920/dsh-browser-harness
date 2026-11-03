@@ -638,3 +638,19 @@ test("T52 CLI validates act/extract/tabs before touching the browser", async () 
   await assert.rejects(exec(["tabs", "use"]), /exactly one targetId/);
   await assert.rejects(exec(["tabs", "new", "file:///etc/passwd"]), /refusing to open/);
 });
+
+test("T53 CLI validates snapshot pagination and accepts full filtered pages", async (t) => {
+  if (needChrome(t)) return;
+  const stateDir = await tempDir("bh-cli-snapshot-");
+  const env = { ...process.env, BH_CDP_URL: chrome.httpUrl, BH_STATE_DIR: stateDir };
+  const bh = join(ROOT, "dist", "bin", "bh.js");
+  const exec = (args) => runCli(process.execPath, [bh, ...args], { env, timeout: 30_000 });
+  await assert.rejects(exec(["snapshot", "--offset", "-1"]), /zero or greater/);
+  await assert.rejects(exec(["snapshot", "--limit", "401"]), /between 1 and 400/);
+  await assert.rejects(exec(["snapshot", "extra"]), /no positional/);
+  await exec(["navigate", server.url + "/many-buttons.html"]);
+  const page = JSON.parse((await exec(["snapshot", "--role", "button", "--offset", "400", "--limit", "50", "--json"])).stdout);
+  assert.equal(page.total, 450);
+  assert.equal(page.nodes, 50);
+  await exec(["close"]);
+});
