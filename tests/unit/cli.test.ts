@@ -141,3 +141,35 @@ test("snapshot renderer keeps text separate from JSON metadata", async () => {
   assert.equal(parsed.targetId, "T1");
   assert.equal(parsed.text, undefined);
 });
+
+test("upload/download subcommands validate targets and paths", async () => {
+  const { parseUploadArgs } = await import("../../dist/bin/cli/commands/upload.js");
+  const { parseDownloadArgs } = await import("../../dist/bin/cli/commands/download.js");
+  const upload = (tokens: string[]) => {
+    const parsed = parseCliArgs(tokens);
+    return parseUploadArgs(parsed.positional, parsed.flags);
+  };
+  const download = (tokens: string[]) => {
+    const parsed = parseCliArgs(tokens);
+    return parseDownloadArgs(parsed.positional, parsed.flags);
+  };
+  assert.deepEqual(upload(["--selector", "#file", "--path", "resume.txt"]), { ref: undefined, selector: "#file", paths: ["resume.txt"] });
+  assert.deepEqual(upload(["--ref", "e1", "--paths", "a.txt,b.txt"]), { ref: "e1", selector: undefined, paths: ["a.txt", "b.txt"] });
+  assert.throws(() => upload(["--selector", "#file"]), /needs a non-empty --path/);
+  assert.throws(() => upload(["--selector", "#file", "--ref", "e1", "--path", "a"]), /not both/);
+  assert.throws(() => upload(["extra"]), /no positional/);
+  assert.deepEqual(download(["--selector", "#dl"]), { ref: undefined, selector: "#dl", timeoutMs: undefined });
+  assert.throws(() => download([]), /needs --ref or --selector/);
+  assert.throws(() => download(["--selector", "#dl", "--timeout-ms", "0"]), /between 1 and 120000/);
+});
+
+test("snapshot pagination and filter modules validate independently", async () => {
+  const { parseSnapshotPagination } = await import("../../dist/bin/cli/commands/snapshot-pagination.js");
+  const { parseSnapshotFilters } = await import("../../dist/bin/cli/commands/snapshot-filters.js");
+  assert.deepEqual(parseSnapshotPagination({}), { offset: 0, limit: 400 });
+  assert.deepEqual(parseSnapshotPagination({ offset: "400", limit: "50" }), { offset: 400, limit: 50 });
+  assert.deepEqual(parseSnapshotFilters({ role: "button", name: "Save", "frame-id": "f1" }), { role: "button", name: "Save", frameId: "f1" });
+  assert.throws(() => parseSnapshotPagination({ offset: "100001" }), /at most 100000/);
+  assert.throws(() => parseSnapshotPagination({ limit: "0" }), /between 1 and 400/);
+  assert.throws(() => parseSnapshotFilters({ role: "" }), /must not be empty/);
+});

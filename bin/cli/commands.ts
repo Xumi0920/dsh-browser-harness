@@ -7,6 +7,8 @@ import { actCommand } from "./commands/act.js";
 import { extractCommand } from "./commands/extract.js";
 import { tabsCommand } from "./commands/tabs.js";
 import { snapshotCommand } from "./commands/snapshot.js";
+import { uploadCommand } from "./commands/upload.js";
+import { downloadCommand } from "./commands/download.js";
 
 async function currentTarget(ctx: CliContext) {
   const status = await ctx.invoke("browser_status");
@@ -106,21 +108,8 @@ export const commands: CliCommand[] = [
       console.log(JSON.stringify(await ctx.invoke("browser_diagnose", { screenshot: flags["no-screenshot"] !== true, path: positional[0] }), null, 2));
     },
   },
-  {
-    name: "upload",
-    usage: "upload --selector <sel> --path <file> | --paths a,b",
-    async run(ctx, _positional, flags) {
-      const paths = flags.paths ? String(flags.paths).split(",") : flags.path;
-      console.log(JSON.stringify(await ctx.invoke("browser_upload", { ref: flags.ref, selector: flags.selector, paths }), null, 2));
-    },
-  },
-  {
-    name: "download",
-    usage: "download --selector <sel> | --ref <ref>",
-    async run(ctx, _positional, flags) {
-      console.log(JSON.stringify(await ctx.invoke("browser_download", { ref: flags.ref, selector: flags.selector, timeoutMs: numberFlag(flags, "timeout-ms") }), null, 2));
-    },
-  },
+  uploadCommand,
+  downloadCommand,
   {
     name: "task",
     usage: "task <status|start|pause|resume|close> [--cleanup ...]",

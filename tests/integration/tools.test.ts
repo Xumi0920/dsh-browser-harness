@@ -672,3 +672,36 @@ test("T54 CLI subcommand help works before creating a browser", async () => {
   assert.match(all.stdout, /snapshot/);
   assert.match(all.stdout, /act/);
 });
+
+test("T55 CLI upload sets a file input from uploadDir", async (t) => {
+  if (needChrome(t)) return;
+  const cliState = await tempDir("bh-cli-upload-");
+  const uploadDir = join(cliState, "uploads");
+  await mkdir(uploadDir, { recursive: true });
+  await copyFile(fileURLToPath(new URL("../../tests/fixtures/upload-sample.txt", import.meta.url)), join(uploadDir, "resume.txt"));
+  const bh = join(ROOT, "dist", "bin", "bh.js");
+  const env = { ...process.env, BH_CDP_URL: chrome.httpUrl, BH_STATE_DIR: cliState };
+  const exec = (args) => runCli(process.execPath, [bh, ...args], { env, timeout: 30_000 });
+  await exec(["navigate", server.url + "/upload.html"]);
+  const uploaded = JSON.parse((await exec(["upload", "--selector", "#file", "--path", "resume.txt"])).stdout);
+  assert.equal(uploaded.ok, true);
+  assert.equal(uploaded.count, 1);
+  const waited = JSON.parse((await exec(["wait", "text", "--text", "visible:resume.txt"])).stdout);
+  assert.equal(waited.matched, true);
+  await exec(["close"]);
+});
+
+test("T56 CLI download clicks a link and returns the file", async (t) => {
+  if (needChrome(t)) return;
+  const cliState = await tempDir("bh-cli-download-");
+  const bh = join(ROOT, "dist", "bin", "bh.js");
+  const env = { ...process.env, BH_CDP_URL: chrome.httpUrl, BH_STATE_DIR: cliState };
+  const exec = (args) => runCli(process.execPath, [bh, ...args], { env, timeout: 30_000 });
+  await exec(["navigate", server.url + "/download.html"]);
+  const downloaded = JSON.parse((await exec(["download", "--selector", "#dl"])).stdout);
+  assert.equal(downloaded.ok, true);
+  assert.match(downloaded.filename, /report\.csv/);
+  assert.ok(downloaded.bytes > 0);
+  assert.match(await readFile(downloaded.path, "utf8"), /id,name|alpha/);
+  await exec(["close"]);
+});
