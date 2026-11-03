@@ -39,7 +39,7 @@ browser_tabs        list / use / new / close
 - **Reliable actions.** Snapshots are serialized per page, concurrent attaches share one session, clicks hit-test for overlays (`E_CLICK_INTERCEPTED`), `load` waits for complete, the first navigation is network-captured, and network idle uses active requests plus last-activity time.
 - **Read-only mode.** `readOnly: true` blocks click/fill/type, JS execution, upload/download, tab create/close and task mutations at the tool layer; navigation, snapshots, extraction and screenshots remain available for inspection.
 - **Task lifecycle and tab locks.** Each DSH session is a Task; page operations hold an exclusive target lease, cross-task conflicts return `E_TAB_LOCKED`/`E_LOCK_TIMEOUT`, and `browser_task` supports status/pause/resume/close. Since v1.8, leases also live under `<stateDir>/locks` with heartbeat and stale recovery for cross-manager mutual exclusion; optional `isolation: "context"` gives each task its own cookie/storage context (no shared login).
-- **Tested.** 179 unit tests (fake CDP) + 50 integration scenarios (real headless/headful Chromium) = 215, with CI on three platforms.
+- **Tested.** 193 unit tests (fake CDP) + 58 integration scenarios (real headless/headful Chromium) = 251, with CI on three platforms.
 - **Hardened boundaries.** `browser_tabs use` accepts only page targets with http(s)/about:blank URLs; non-owned tabs require explicit `{borrow:true}`, and tabs owned by another Task return `E_TAB_OWNER_CONFLICT`; screenshots/PDF stay inside `screenshotDir` and never overwrite; uploads are confined to `uploadDir`, downloads to `downloadDir`, with symlink-escape checks; `fill` never echoes the entered value; JS mode is marked non-concurrent; token-like URLs/headers are redacted in tool output; broad port fallback is explicit `auto` only; tab grouping no longer mutates page titles.
 
 ## Requirements
@@ -113,10 +113,10 @@ browser_extract {mode:"text" | "html" | "js" | "network" | "console" | "frames"}
 
 ```sh
 npm install                 # dev deps (TypeScript); runtime stays zero-dependency
-npm run test:all            # build + 179 unit + 50 integration = 229 tests
+npm run test:all            # build + 193 unit + 58 integration = 251 tests
 ```
 
-CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu + xvfb (27-scenario gate, S15/S16 must actually run). Tests and scripts are compiled by `tsc` too (`dist-tests/` / `dist-scripts/`), sharing the runtime NodeNext config.
+CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu + xvfb (58-scenario gate, S15/S16 must actually run). Tests and scripts are compiled by `tsc` too (`dist-tests/` / `dist-scripts/`), sharing the runtime NodeNext config.
 
 ## Safety
 
@@ -131,4 +131,4 @@ CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu
 
 ## License
 
-MIT (c) 2026 Xumi0920 · current version **v1.9.4** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog
+MIT (c) 2026 Xumi0920 · current version **v1.9.5** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog
