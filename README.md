@@ -71,7 +71,7 @@ npm config set "//npm.pkg.github.com/:_authToken" "<YOUR_GITHUB_TOKEN>"
 
 ```
 browser_status → browser_navigate {url} → browser_snapshot → browser_act {action:"click", ref}
-browser_extract {mode:"text" | "html" | "js" | "network"}
+browser_extract {mode:"text" | "html" | "js" | "network" | "console" | "frames"}
 ```
 
 首调 `connected:false`？确认专用浏览器已启动且 `http://127.0.0.1:9331/json/version` 可访问（见 [docs/configuration.md](docs/configuration.md)）。
@@ -126,4 +126,4 @@ CI：单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场�
 
 ## 许可
 
-MIT © 2026 Xumi0920 · 当前版本 **v1.5.0** · 全量 TypeScript（源码/测试/脚本/扩展）· 更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)
+MIT © 2026 Xumi0920 · 当前版本 **v1.5.1** · 全量 TypeScript（源码/测试/脚本/扩展）· 更新日志见 [Releases](https://github.com/Xumi0920/dsh-browser-harness/releases)

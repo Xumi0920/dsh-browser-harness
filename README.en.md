@@ -36,7 +36,7 @@ browser_tabs        list / use / new / close
 - **Text-first.** Accessibility-tree snapshots and refs beat screenshot-VLM loops; screenshots stay optional.
 - **Per-task tab groups.** Tabs the harness creates are grouped per DSH session; work tabs are never grouped, and headless browsers skip grouping.
 - **Reliable actions.** Snapshots are serialized per page, concurrent attaches share one session, clicks hit-test for overlays (`E_CLICK_INTERCEPTED`), `load` waits for complete, the first navigation is network-captured, and network idle uses active requests plus last-activity time.
-- **Tested.** 169 unit tests (fake CDP) + 36 integration scenarios (real headless/headful Chromium) = 199, with CI on three platforms.
+- **Tested.** 169 unit tests (fake CDP) + 36 integration scenarios (real headless/headful Chromium) = 205, with CI on three platforms.
 - **Hardened boundaries.** `browser_tabs use` accepts only page targets with http(s)/about:blank URLs (non-owned tabs need an exact targetId); screenshots/PDF stay inside `screenshotDir` and never overwrite; uploads are confined to `uploadDir`, downloads to `downloadDir`, with symlink-escape checks; `fill` never echoes the entered value; JS mode is marked non-concurrent; token-like URLs/headers are redacted in tool output; broad port fallback is explicit `auto` only; tab grouping no longer mutates page titles.
 
 ## Requirements
@@ -71,7 +71,7 @@ Once the install is live, start the dedicated Chromium browser (default 9331), t
 
 ```
 browser_status → browser_navigate {url} → browser_snapshot → browser_act {action:"click", ref}
-browser_extract {mode:"text" | "html" | "js" | "network"}
+browser_extract {mode:"text" | "html" | "js" | "network" | "console" | "frames"}
 ```
 
 `connected:false` on the first call? Make sure the dedicated browser is running and `http://127.0.0.1:9331/json/version` answers (see [docs/configuration.md](docs/configuration.md)).
@@ -128,4 +128,4 @@ CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu
 
 ## License
 
-MIT (c) 2026 Xumi0920 · current version **v1.5.0** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog
+MIT (c) 2026 Xumi0920 · current version **v1.5.1** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog
