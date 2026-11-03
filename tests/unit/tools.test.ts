@@ -53,8 +53,8 @@ function fakeManager(overrides = {}) {
   return manager;
 }
 
-function build(manager = fakeManager()) {
-  return createTools(makeCtx(), manager, { maxSnapshotNodes: 50 }, (definition) => definition);
+function build(manager = fakeManager(), overrides = {}) {
+  return createTools(makeCtx(), manager, { maxSnapshotNodes: 50, ...overrides }, (definition) => definition);
 }
 
 test("exposes the expected tool surface", () => {
@@ -611,4 +611,29 @@ test("browser_act reports E_EXPECTATION_FAILED when assertions fail", async () =
   });
   const act = build(manager).find((definition) => definition.name === "browser_act");
   await assert.rejects(act.execute({ action: "click", ref: "e1", expectText: "Saved" }, {}), /E_EXPECTATION_FAILED/);
+});
+
+test("read-only mode blocks mutations but allows read tools", async () => {
+  const tools = build(fakeManager(), { readOnly: true });
+  const byName = (name) => tools.find((definition) => definition.name === name);
+
+  await assert.rejects(byName("browser_act").execute({ action: "click", ref: "e1" }, {}), /E_READ_ONLY/);
+  await assert.rejects(byName("browser_extract").execute({ mode: "js", expression: "document.body.innerHTML = ''" }, {}), /E_READ_ONLY/);
+  await assert.rejects(byName("browser_upload").execute({ selector: "#file", path: "x.txt" }, {}), /E_READ_ONLY/);
+  await assert.rejects(byName("browser_download").execute({ selector: "#dl" }, {}), /E_READ_ONLY/);
+  await assert.rejects(byName("browser_tabs").execute({ action: "new" }, {}), /E_READ_ONLY/);
+  await assert.rejects(byName("browser_tabs").execute({ action: "close", targetId: "T1" }, {}), /E_READ_ONLY/);
+  await assert.rejects(byName("browser_task").execute({ action: "pause" }, {}), /E_READ_ONLY/);
+  await assert.rejects(byName("browser_task").execute({ action: "close" }, {}), /E_READ_ONLY/);
+
+  const snapshot = await byName("browser_snapshot").execute({}, {});
+  assert.ok(snapshot.nodes >= 1);
+  const text = await byName("browser_extract").execute({ mode: "text" }, {});
+  assert.equal(text.value, "hello");
+  const tabs = await byName("browser_tabs").execute({ action: "list" }, {});
+  assert.ok(tabs.tabs.length >= 1);
+  const status = await byName("browser_task").execute({ action: "status" }, {});
+  assert.equal(status.task.state, "active");
+  const nav = await byName("browser_navigate").execute({ url: "https://example.com" }, {});
+  assert.match(nav.url, /example\.com/);
 });

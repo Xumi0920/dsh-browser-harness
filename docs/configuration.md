@@ -117,6 +117,7 @@ open -na "Google Chrome" --args --remote-debugging-port=9331 "--user-data-dir=$H
 | `fileLeaseHeartbeatMs` | `5000` | 文件租约心跳间隔 |
 | `fileLeaseStaleMs` | `30000` | 心跳超过该时间视为 stale，可回收 |
 | `isolation` | `shared` | `shared` 共享登录态；`context` 每 Task 独立 browser context（L2） |
+| `readOnly` | `false` | 工具层只读：阻止 page mutation、JS、上传下载、tabs new/close、task 变更 |
 | `strictTabOwnership` | `true`（插件默认） | 非自建 tab 必须 borrow，其他 Task 自建 tab 返回 `E_TAB_OWNER_CONFLICT` |
 | `allowBorrowUserTabs` | `true` | 允许显式借用非自建用户 tab；关闭后一律拒绝 |
 

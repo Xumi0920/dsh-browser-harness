@@ -28,6 +28,7 @@ export function resolveConfig(config: any = {}) {
     fileLeaseHeartbeatMs: config.fileLeaseHeartbeatMs,
     fileLeaseStaleMs: config.fileLeaseStaleMs,
     isolation: config.isolation === "context" ? "context" : "shared",
+    readOnly: config.readOnly === true,
     strictTabOwnership: config.strictTabOwnership !== false,
     allowBorrowUserTabs: config.allowBorrowUserTabs !== false,
     dialogPolicy: config.dialogPolicy || "auto-dismiss",

@@ -521,3 +521,21 @@ test("T45 browser_act expectations assert page state and fail loudly", async (t)
   await assert.rejects(run("browser_act", { action: "click", selector: "#submit", expectText: "never", expectTimeoutMs: 200 }), /E_EXPECTATION_FAILED/);
   await run("browser_tabs", { action: "close", targetId: nav.targetId });
 });
+
+test("T46 read-only tools allow inspection but block mutations", async (t) => {
+  if (needChrome(t)) return;
+  const roTools = createTools(
+    { tools: { register() { throw new Error("createTools must not register by itself"); } }, effect() {}, get() { return undefined; } },
+    manager,
+    { maxSnapshotNodes: 250, readOnly: true },
+    (definition) => definition,
+  );
+  const ro = (name, args) => roTools.find((definition) => definition.name === name).execute(args, { agent: { session: { id: SESSION } } });
+  const nav = await run("browser_navigate", { url: server.url + "/form.html", newTab: true });
+  const snapshot = await ro("browser_snapshot", {});
+  assert.match(snapshot.text, /button/);
+  await assert.rejects(ro("browser_act", { action: "click", selector: "#submit" }), /E_READ_ONLY/);
+  await assert.rejects(ro("browser_extract", { mode: "js", expression: "document.cookie" }), /E_READ_ONLY/);
+  await assert.rejects(ro("browser_tabs", { action: "new", url: server.url + "/a.html" }), /E_READ_ONLY/);
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});

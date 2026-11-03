@@ -29,6 +29,7 @@ A plain public read needs no browser. If `web_fetch` can read it, use `web_fetch
 
 - **Refs expire.** A ref belongs to the snapshot that produced it. After navigation, dynamic rendering, or any DOM change, take a new snapshot before acting.
 - **Coordinates are CSS pixels; screenshots are device pixels.** Never copy coordinates measured in a screenshot.
+- **Read-only mode.** When `readOnly: true`, browser_act, JS extraction, upload/download, tab create/close and task mutations fail with `E_READ_ONLY`; use navigation, snapshot, extraction and screenshots for inspection. It does not make GET navigation side-effect-free.
 - **Form controls are stateful.** Use `selectOption` for native selects, and `check`/`uncheck` idempotently; do not blindly click a checkbox twice (that toggles it back). Read the resulting value with `browser_extract {mode:"js"}` when correctness matters.
 - **Controlled inputs need fill.** `browser_act {action:"fill"}` focuses the field, clears it with real Ctrl+A / Backspace key presses, writes the whole value once with `Input.insertText`, then dispatches `input`/`change`, so React/Vue controlled components stay in sync. It returns only `{ok, length, verified}` and never echoes the value. It is not per-character typing; use `type` only when keystroke semantics matter.
 - **JS mode has side effects.** `browser_extract {mode:"js"}` evaluates arbitrary page JavaScript with user-gesture semantics; it can mutate the DOM, submit forms or make requests and is marked non-concurrent. Use it only when a fixed read cannot answer the question.

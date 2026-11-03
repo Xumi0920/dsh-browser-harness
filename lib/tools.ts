@@ -218,6 +218,10 @@ function wrap(handler: any) {
 export function createTools(ctx: any, manager: any, config: any = {} as any, defineTool: any) {
   const tool = (definition: any) => defineTool(definition);
   const maxSnapshotNodes = Number(config.maxSnapshotNodes) || 250;
+  const readOnly = config.readOnly === true;
+  const assertWritable = (what: string) => {
+    if (readOnly) throw new HarnessError("E_READ_ONLY", "read-only mode blocks " + what);
+  };
 
   return [
     tool({
@@ -430,6 +434,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       timeoutMs: 65_000,
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
+        assertWritable("browser_act");
         return withPage(manager, sessionId, async (page: any) => {
         const result = await performAct(page, args);
         return applyActExpectations(page, args, result);
@@ -480,6 +485,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
           return { mode, value: typeof value === "string" && value.length > 200_000 ? value.slice(0, 200_000) : value, truncated: typeof value === "string" && value.length > 200_000 };
         }
         if (mode === "js") {
+          assertWritable("browser_extract js mode");
           if (!args.expression) throw new HarnessError("E_BAD_ARG", "js mode needs expression");
           const value = frameMatch
             ? await page.evaluateInFrame(frameMatch, String(args.expression))
@@ -618,6 +624,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       timeoutMs: 30_000,
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
+        assertWritable("browser_upload");
         if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "upload needs ref or selector");
         return withPage(manager, sessionId, async (page: any) => {
           const files = await validateUploadFiles(page, manager, args.paths || args.path);
@@ -639,6 +646,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       timeoutMs: 120_000,
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
+        assertWritable("browser_download");
         if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "download needs ref or selector");
         return withPage(manager, sessionId, async (page: any) => {
           const config = await browserConfig(page, manager);
@@ -664,6 +672,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
         const action = String(args.action);
+        if (action !== "status") assertWritable("browser_task " + action);
         if (action === "status") return manager.taskStatus(sessionId);
         if (action === "pause") return manager.pauseTask(sessionId);
         if (action === "resume") return manager.resumeTask(sessionId);
@@ -688,6 +697,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
         const action = String(args.action);
+        if (action === "new" || action === "close") assertWritable("browser_tabs " + action);
         if (action === "list") {
           const result = await manager.listTabs(sessionId);
           return {

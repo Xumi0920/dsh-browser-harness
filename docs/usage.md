@@ -17,6 +17,7 @@
 > refs 属于产生它的快照：导航或 DOM 变化后重新 `browser_snapshot`。受控输入用 `fill`（真实聚焦键 + `Input.insertText` + `input`/`change`），`type` 只在需要逐键语义时使用。`fill` 只返回 `{ok, length, verified}`，**不回显输入值**。
 
 - `browser_extract {mode:"js"}` 可以执行任意页面 JavaScript（`userGesture:true`），能修改 DOM/发请求，工具已标为非并发；只在你确实需要脚本时使用。
+- `readOnly: true` 在工具层阻止 `browser_act`、`browser_extract js`、上传/下载、`browser_tabs new/close`、`browser_task` 变更；导航、快照、文本/HTML/network/console/frames、截图和诊断仍可用。它是页面写操作边界，不保证 GET 导航没有服务端副作用。
 - `browser_tabs {action:"use"}` 只接受 page target + `http(s)`/`about:blank`；非自建页必须精确 `targetId`，URL 子串只匹配自建页。
 - `browser_extract {mode:"network"}` 会对 token 类 query/headers 做尽力脱敏；正文、HTML、截图仍可能含敏感数据，别把它们当作完整脱敏。
 - `browser_screenshot` / `browser_pdf` 的 `path` 是相对 `screenshotDir`（默认 `<stateDir>/screenshots`）的路径，拒绝 `..`/symlink 逃逸和覆盖已有文件。
