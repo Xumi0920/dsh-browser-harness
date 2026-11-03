@@ -38,6 +38,7 @@ A plain public read needs no browser. If `web_fetch` can read it, use `web_fetch
 - **Files have fixed roots.** `browser_upload` reads only `uploadDir`; `browser_download` writes only `downloadDir`; screenshots/PDFs write only `screenshotDir`. Ask the user to place files in the relevant directory instead of bypassing the confinement.
 - **Login walls:** stop and ask the user. Never enter credentials you were not given.
 - **No secrets:** do not print cookies, tokens, or passwords. Tool output redacts token-like URL query values and response headers, but page text/HTML/screenshots are not DLP-protected; avoid operating on sensitive pages you were not asked to use.
+- **Non-owned tabs need explicit borrow.** `browser_tabs {action:"use", targetId, borrow:true}` after confirming with the user; tabs owned by another Task return `E_TAB_OWNER_CONFLICT`. Never close a borrowed user tab.
 - **One active task per tab.** Page operations hold an exclusive target lease. Do not retry a busy tab in a tight loop; inspect `browser_task status` / `browser_tabs list`, wait, or use a different tab. Pausing a task releases its leases; closing it closes its owned tabs by default.
 - **One browser lane:** serialize browser actions; two workflows fighting over the tab pointer race.
 

@@ -54,7 +54,7 @@ CDP 没有标签组 API，因此随包带一个极小 MV3 扩展（仅 `tabs` / 
 
 ## 错误模型
 
-所有核心错误是带稳定 `code` 的 `HarnessError`（`src/errors.ts`），工具层统一渲染为 `E_*: message`：`E_NO_BROWSER`、`E_NO_TAB`、`E_ELEMENT_NOT_FOUND`、`E_CLICK_INTERCEPTED`、`E_TAB_LOCKED`、`E_LOCK_TIMEOUT`、`E_TASK_PAUSED`、`E_TASK_CLOSING`、`E_TASK_CLOSED`、`E_SELECTOR_TIMEOUT`、`E_DIALOG_OPEN`、`E_POLICY_DENIED`、`E_TIMEOUT` 等。
+所有核心错误是带稳定 `code` 的 `HarnessError`（`src/errors.ts`），工具层统一渲染为 `E_*: message`：`E_NO_BROWSER`、`E_NO_TAB`、`E_ELEMENT_NOT_FOUND`、`E_CLICK_INTERCEPTED`、`E_TAB_LOCKED`、`E_LOCK_TIMEOUT`、`E_TAB_OWNER_CONFLICT`、`E_TAB_BORROW_REQUIRED`、`E_TASK_PAUSED`、`E_TASK_CLOSING`、`E_TASK_CLOSED`、`E_SELECTOR_TIMEOUT`、`E_DIALOG_OPEN`、`E_POLICY_DENIED`、`E_TIMEOUT` 等。
 
 ## 安全边界
 

@@ -112,6 +112,8 @@ open -na "Google Chrome" --args --remote-debugging-port=9331 "--user-data-dir=$H
 | `tabGroupTitle` | `DSH · {session}` | 组名模板，支持 `{session}` / `{lane}` |
 | `tabGroupColor` | 按会话分配 | 组颜色 |
 | `taskLockTimeoutMs` | `5000` | 等标签页 lease 的超时；超时返回 `E_LOCK_TIMEOUT` |
+| `strictTabOwnership` | `true`（插件默认） | 非自建 tab 必须 borrow，其他 Task 自建 tab 返回 `E_TAB_OWNER_CONFLICT` |
+| `allowBorrowUserTabs` | `true` | 允许显式借用非自建用户 tab；关闭后一律拒绝 |
 
 ## 5. registry.json 高级用法
 

@@ -6,7 +6,7 @@
  * atomic (tmp + rename) and guarded by a short-lived lock file.
  */
 
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -64,6 +64,23 @@ export async function readState(lane: any = "default", dir: any = defaultStateDi
   } catch {
     return emptyState();
   }
+}
+
+/**
+ * Read every lane state in one directory. Used by strict tab ownership checks.
+ * @param {string} [dir]
+ */
+export async function listStates(dir: any = defaultStateDir()) {
+  const names = await readdir(dir).catch(() => []);
+  const out = [];
+  for (const name of names) {
+    const match = /^state-(.+)\.json$/.exec(name);
+    if (!match) continue;
+    const lane = match[1];
+    const state = await readState(lane, dir);
+    out.push({ lane: state.task && state.task.id ? state.task.id : lane, state });
+  }
+  return out;
 }
 
 /**

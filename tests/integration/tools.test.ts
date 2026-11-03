@@ -418,3 +418,22 @@ test("T40 advanced wait handles response and url_changed", async (t) => {
   assert.equal(changed.changed, true);
   await run("browser_tabs", { action: "close", targetId: nav.targetId });
 });
+
+test("T41 strict ownership requires borrow and rejects other-task tabs", async (t) => {
+  if (needChrome(t)) return;
+  const strict = new BrowserManager({ cdpUrl: chrome.httpUrl, stateDir, strictTabOwnership: true });
+  const created = await manager.connection.transport.send("Target.createTarget", { url: "about:blank", background: true });
+  const userTarget = created.targetId;
+  const owned = await run("browser_navigate", { url: server.url + "/a.html", newTab: true });
+  try {
+    await assert.rejects(strict.useTab("strict-a", owned.targetId), (error) => { assert.equal(error.code, "E_TAB_OWNER_CONFLICT"); return true; });
+    await assert.rejects(strict.useTab("strict-a", userTarget), (error) => { assert.equal(error.code, "E_TAB_BORROW_REQUIRED"); return true; });
+    const borrowed = await strict.useTab("strict-a", userTarget, { borrow: true });
+    assert.equal(borrowed.targetId, userTarget);
+    await assert.rejects(strict.useTab("strict-b", userTarget, { borrow: true }), (error) => { assert.equal(error.code, "E_TAB_LOCKED"); return true; });
+  } finally {
+    await strict.close();
+    await manager.connection.transport.send("Target.closeTarget", { targetId: userTarget }).catch(() => {});
+    await run("browser_tabs", { action: "close", targetId: owned.targetId });
+  }
+});

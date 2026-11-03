@@ -23,6 +23,8 @@ export function resolveConfig(config: any = {}) {
     screenshotDir: config.screenshotDir,
     uploadDir: config.uploadDir,
     taskLockTimeoutMs: config.taskLockTimeoutMs,
+    strictTabOwnership: config.strictTabOwnership !== false,
+    allowBorrowUserTabs: config.allowBorrowUserTabs !== false,
     dialogPolicy: config.dialogPolicy || "auto-dismiss",
     endpointCacheMs: config.endpointCacheMs === undefined ? 1_500 : Number(config.endpointCacheMs),
     maxSnapshotNodes: Number(config.maxSnapshotNodes) || 250,

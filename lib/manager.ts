@@ -13,7 +13,7 @@ import { noTab, HarnessError, codes } from "../src/errors.js";
 import { listEndpoints } from "../src/cdp/endpoint.js";
 import { redactTextForOutput } from "../src/redact.js";
 import { TabLockManager, normalizeTask } from "../src/tasks.js";
-import { readState, setTask, updateState } from "../src/state.js";
+import { listStates, readState, setTask, updateState } from "../src/state.js";
 
 export class BrowserManager {
   config: any;
@@ -22,6 +22,7 @@ export class BrowserManager {
   endpointsCache: { at: number; value: any[] | null };
   locks: TabLockManager;
   laneGates: Map<string, Promise<void>>;
+  borrowedTabs: Map<string, Set<string>>;
   constructor(config: any = {} as any) {
     this.config = {
       browser: undefined,
@@ -32,6 +33,8 @@ export class BrowserManager {
       dialogPolicy: "auto-dismiss",
       endpointCacheMs: 1_500,
       browserFactory: undefined,
+      strictTabOwnership: config.strictTabOwnership === true,
+      allowBorrowUserTabs: config.allowBorrowUserTabs !== false,
       ...config,
     };
     this.connection = null;
@@ -39,6 +42,7 @@ export class BrowserManager {
     this.endpointsCache = { at: 0, value: null };
     this.locks = new TabLockManager({ timeoutMs: Number(config.taskLockTimeoutMs) || 5_000 });
     this.laneGates = new Map();
+    this.borrowedTabs = new Map();
   }
 
   /** Connect once and reuse; concurrent callers share the same promise. */
@@ -46,7 +50,10 @@ export class BrowserManager {
     if (this.connection && !this.connection.transport.closed) return this.connection;
     if (this.connecting) return this.connecting;
     // A new connection invalidates all in-memory leases from the old session.
-    if (!this.connection) this.locks.clear();
+    if (!this.connection) {
+      this.locks.clear();
+      this.borrowedTabs.clear();
+    }
     this.connecting = (async () => {
       try {
         const connect = typeof this.config.browserFactory === "function" ? this.config.browserFactory : Browser.connect;
@@ -150,9 +157,10 @@ export class BrowserManager {
   async withPage(sessionId: any, fn: any, { timeoutMs = this.locks.timeoutMs }: any = {} as any) {
     const lane = this.laneFor(sessionId);
     return this.#withLaneGate(lane, async () => {
-      const { task } = await this.#taskFor(sessionId);
+      const { task, dir, state } = await this.#taskFor(sessionId);
       this.#assertTaskActive(task);
       const page = await this.pageFor(sessionId);
+      await this.#assertTargetOperable(lane, task, page.targetId, dir, state);
       const lease = await this.locks.acquire(page.targetId, task.id, { timeoutMs });
       try {
         return await fn(page, lease);
@@ -178,6 +186,8 @@ export class BrowserManager {
           lane,
           beforeNavigate: async (targetPage: any) => {
             await this.#ensureNetworkCapture(targetPage);
+            const current = await readState(lane, this.#stateDir(await this.ensure()));
+            await this.#assertTargetOperable(lane, task, targetPage.targetId, this.#stateDir(await this.ensure()), current);
             lease = await this.locks.acquire(targetPage.targetId, task.id, { timeoutMs: options.timeoutMs || this.locks.timeoutMs });
           },
         });
@@ -281,6 +291,7 @@ export class BrowserManager {
         task: { ...closing, state: "closed" },
       }), dir);
       await this.locks.releaseTask(task.id);
+      this.borrowedTabs.delete(task.id);
       return { ok: true, task: { ...closing, state: "closed" }, closedTabs, cleanupPolicy: policy };
     });
   }
@@ -329,14 +340,79 @@ export class BrowserManager {
     return { tabs: await browser.listTabs({ lane }), current: await browser.current(lane) };
   }
 
+
+  #borrowedFor(taskId: any) {
+    const key = String(taskId);
+    if (!this.borrowedTabs.has(key)) this.borrowedTabs.set(key, new Set());
+    return this.borrowedTabs.get(key)!;
+  }
+
+  async #targetOwner(targetId: any, dir: any, lane: any) {
+    for (const item of await listStates(dir)) {
+      if (item.lane === lane) continue;
+      if (Array.isArray(item.state.ownedTabs) && item.state.ownedTabs.some((tab: any) => tab.targetId === targetId)) {
+        return item.lane;
+      }
+    }
+    return null;
+  }
+
+  #borrowedByOther(targetId: any, lane: any) {
+    for (const [taskId, targets] of this.borrowedTabs) {
+      if (taskId !== String(lane) && targets.has(String(targetId))) return taskId;
+    }
+    return null;
+  }
+
+  async #assertTargetOperable(lane: any, task: any, targetId: any, dir: any, state: any) {
+    if (this.config.strictTabOwnership !== true) return;
+    const owned = Array.isArray(state.ownedTabs) && state.ownedTabs.some((tab: any) => tab.targetId === targetId);
+    if (owned) return;
+    if (this.#borrowedFor(task.id).has(String(targetId))) return;
+    const owner = await this.#targetOwner(targetId, dir, task.id);
+    if (owner) {
+      throw new HarnessError(codes.E_TAB_OWNER_CONFLICT, "tab " + targetId + " is owned by task " + owner, {
+        details: { targetId, ownerTaskId: owner },
+      });
+    }
+    const borrowedBy = this.#borrowedByOther(targetId, task.id);
+    if (borrowedBy) {
+      throw new HarnessError(codes.E_TAB_LOCKED, "tab " + targetId + " is borrowed by task " + borrowedBy, {
+        details: { targetId, ownerTaskId: borrowedBy },
+      });
+    }
+    throw new HarnessError(codes.E_TAB_BORROW_REQUIRED, "tab " + targetId + " is not owned by this task; use browser_tabs use {borrow:true} after confirming with the user", {
+      details: { targetId },
+    });
+  }
+
   /** Attach the session to an existing tab by id or URL substring. */
-  async useTab(sessionId: any, targetId: any) {
+  async useTab(sessionId: any, targetId: any, { borrow = false }: any = {} as any) {
     const lane = this.laneFor(sessionId);
     return this.#withLaneGate(lane, async () => {
-      const { task } = await this.#taskFor(sessionId);
+      const { task, state, dir } = await this.#taskFor(sessionId);
       this.#assertTaskActive(task);
       const browser = await this.ensure();
-      return browser.use(targetId, { lane });
+      if (this.config.strictTabOwnership === true && browser.transport && typeof browser.transport.send === "function") {
+        const targets = await browser.transport.send("Target.getTargets", {}, { timeoutMs: 5_000 });
+        const exact = (targets.targetInfos || []).find((target: any) => target.targetId === String(targetId) && target.type === "page");
+        if (exact) {
+          const owned = Array.isArray(state.ownedTabs) && state.ownedTabs.some((tab: any) => tab.targetId === exact.targetId);
+          if (!owned) {
+            const owner = await this.#targetOwner(exact.targetId, dir, task.id);
+            if (owner) throw new HarnessError(codes.E_TAB_OWNER_CONFLICT, "tab " + exact.targetId + " is owned by task " + owner, { details: { targetId: exact.targetId, ownerTaskId: owner } });
+            const borrowedBy = this.#borrowedByOther(exact.targetId, task.id);
+            if (borrowedBy) throw new HarnessError(codes.E_TAB_LOCKED, "tab " + exact.targetId + " is borrowed by task " + borrowedBy, { details: { targetId: exact.targetId, ownerTaskId: borrowedBy } });
+            if (!borrow) throw new HarnessError(codes.E_TAB_BORROW_REQUIRED, "tab " + exact.targetId + " is not owned by this task; use browser_tabs use {borrow:true} after confirming with the user", { details: { targetId: exact.targetId } });
+            if (this.config.allowBorrowUserTabs === false) throw new HarnessError(codes.E_POLICY_DENIED, "borrowing user tabs is disabled by configuration", { details: { targetId: exact.targetId } });
+            this.#borrowedFor(task.id).add(exact.targetId);
+          }
+        }
+      }
+      const page = await browser.use(targetId, { lane });
+      const previous = state.current && state.current.targetId;
+      if (previous && previous !== page.targetId) this.#borrowedFor(task.id).delete(previous);
+      return page;
     });
   }
 

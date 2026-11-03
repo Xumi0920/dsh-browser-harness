@@ -1,6 +1,6 @@
 # 任务生命周期与标签页锁模型
 
-> 状态：Phase A 已随 v1.6.1 实现；严格借用/跨进程锁/context 隔离仍属后续阶段  
+> 状态：Phase A（v1.6.x）+ Phase B 严格借用（v1.7.0）已实现；跨进程锁/context 隔离仍属后续阶段  
 > 目标读者：维护者、DSH 插件集成方  
 > 适用范围：共享同一浏览器 profile 的多 DSH 会话/任务
 
@@ -172,9 +172,9 @@ held(taskA) --acquire(taskB)--> wait / E_LOCK_TIMEOUT
 
 ## 8. 所有权与借用（分阶段）
 
-v1.6 先保证**锁互斥**，暂不改变现有 `use` 的非自建 tab 精确 targetId 行为；锁会覆盖所有页面操作。
+v1.6 先保证**锁互斥**；v1.7 起插件默认启用严格所有权：非自建 tab 必须显式 `borrow:true`，其他 Task 自建 tab 返回 `E_TAB_OWNER_CONFLICT`。锁覆盖所有页面操作。
 
-后续严格策略：
+严格策略：
 
 | 场景 | 行为 |
 |---|---|
@@ -266,8 +266,11 @@ v1.6 先保证**锁互斥**，暂不改变现有 `use` 的非自建 tab 精确 t
 - `browser_task` status/pause/resume/close/start。
 - 单 manager 进程内锁；严格借用策略暂不启用。
 
-### Phase B（后续）
-- 严格所有权/借用、`borrow:true`。
+### Phase B（v1.7.0 已实现）
+- 严格所有权/借用、`borrow:true`、`E_TAB_OWNER_CONFLICT`、`E_TAB_BORROW_REQUIRED`。
+- 借用 tab 归属、借用中其他 Task 拒绝、close 不清除用户 tab。
+
+### Phase C（后续）
 - 跨进程锁（state 文件租约 + pid/heartbeat）。
 - Task context/profile 隔离（L2/L3）。
 
@@ -282,9 +285,15 @@ v1.6 先保证**锁互斥**，暂不改变现有 `use` 的非自建 tab 精确 t
 - pause 释放 lease；close 默认关闭 owned tabs 并写 `closed` tombstone；
 - 单测覆盖锁互斥/重入/超时、任务状态、集成覆盖跨 session 锁与 pause/resume/close。
 
-尚未实现（保留为 Phase B/C）：
+v1.7.0 Phase B 实现：
 
-- 非自建 tab 的严格 `borrow:true` 策略与 `E_TAB_OWNER_CONFLICT`；
+- 严格 `borrow:true` 与 `E_TAB_OWNER_CONFLICT` / `E_TAB_BORROW_REQUIRED`；
+- 借用 tab 记录、其他 Task 借用冲突、close 不关闭用户 tab；
+- T41 集成测试覆盖 strict manager；
+- Plugin 默认 `strictTabOwnership: true`，可通过配置关闭。
+
+尚未实现（保留为 Phase C）：
+
 - 跨 manager 进程的文件租约/心跳；
 - L2 browser context / L3 独立 profile 隔离；
 - 浏览器重启后的 target 级自动恢复测试（当前仅清理锁、按 state 重新解析）。

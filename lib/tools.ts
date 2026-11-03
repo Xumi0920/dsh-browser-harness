@@ -638,6 +638,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       parameters: {
         action: { type: "string", required: true, enum: ["list", "use", "new", "close"], description: "tab operation" },
         targetId: { type: "string", description: "exact target id for use/close; use also accepts a URL substring of a harness-owned tab" },
+        borrow: { type: "boolean", description: "use: explicitly borrow a non-owned user tab after confirming with the user" },
         url: { type: "string", description: "optional URL for new" },
       },
       output: jsonOutput,
@@ -655,7 +656,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         }
         if (action === "use") {
           if (!args.targetId) throw new HarnessError("E_BAD_ARG", "use needs targetId");
-          const page = await manager.useTab(sessionId, args.targetId);
+          const page = await manager.useTab(sessionId, args.targetId, { borrow: args.borrow === true });
           return { used: page.targetId, ...(await summarizePage(page, await page.info())) };
         }
         if (action === "new") {
