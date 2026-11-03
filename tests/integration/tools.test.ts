@@ -8,7 +8,7 @@ import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,10 +28,11 @@ let server;
 let chrome;
 let manager;
 let tools;
+let stateDir;
 
 before(async () => {
   server = await startFixtureServer();
-  const stateDir = await tempDir("bh-tools-");
+  stateDir = await tempDir("bh-tools-");
   chrome = await launchChrome();
   if (chrome) {
     manager = new BrowserManager({ cdpUrl: chrome.httpUrl, stateDir });
@@ -268,5 +269,29 @@ test("T30 browser_screenshot element clip and browser_pdf write files", async (t
   const pdf = await run("browser_pdf", { path: "page.pdf" });
   const document = await readFile(pdf.path);
   assert.equal(document.subarray(0, 4).toString(), "%PDF");
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});
+
+test("T31 browser_upload sets a file input from uploadDir", async (t) => {
+  if (needChrome(t)) return;
+  const uploadDir = join(stateDir, "uploads");
+  await mkdir(uploadDir, { recursive: true });
+  await copyFile(fileURLToPath(new URL("../../tests/fixtures/upload-sample.txt", import.meta.url)), join(uploadDir, "resume.txt"));
+  const nav = await run("browser_navigate", { url: server.url + "/upload.html", newTab: true });
+  const uploaded = await run("browser_upload", { selector: "#file", path: "resume.txt" });
+  assert.equal(uploaded.ok, true);
+  assert.equal(uploaded.count, 1);
+  await run("browser_wait", { mode: "text", text: "visible:resume.txt" });
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});
+
+test("T32 browser_download clicks a link and returns the downloaded file", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/download.html", newTab: true });
+  const downloaded = await run("browser_download", { selector: "#dl" });
+  assert.equal(downloaded.ok, true);
+  assert.match(downloaded.filename, /report\.csv/);
+  assert.ok(downloaded.bytes > 0);
+  assert.match(await readFile(downloaded.path, "utf8"), /id,name|alpha/);
   await run("browser_tabs", { action: "close", targetId: nav.targetId });
 });

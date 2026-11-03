@@ -14,9 +14,9 @@ cd C:\path\to\dsh-browser-harness
 npm install                                   # 开发依赖：typescript / @types/node / @types/chrome / semver
 npm run build                                 # tsc → dist/ + extension/sw.js（发布产物）
 
-npm test                                      # 构建源码与测试，跑 154 单测（fake CDP 替身）
-npm run test:integration                      # 构建 + 30 场景（真实 headless/headful Chromium）
-npm run test:all                              # 构建 + 共 184 条
+npm test                                      # 构建源码与测试，跑 156 单测（fake CDP 替身）
+npm run test:integration                      # 构建 + 32 场景（真实 headless/headful Chromium）
+npm run test:all                              # 构建 + 共 188 条
 npm run verify -- --browser chrome            # 对 live 实例冒烟（需先 build）
 ```
 
@@ -106,7 +106,7 @@ dsh plugin --profile desktop add "@xumi0920/dsh-browser-harness"
 
 1. `plugin_manager { action: "list_plugins" }` → `@xumi0920/dsh-browser-harness` 存在且 enabled。
 2. 确认 `~/.dsh/profiles/desktop/package.json` 的 `dependencies` 与 `dsh.profile.bundles` 含该包；注册行在**插件包自身**的 `cordis.patch.yml`，profile patch 不必出现。
-3. 创造模式里 `cordis_inspect_query` → Tool provider 能看到 9 个 `browser_*` 工具与 schema。
+3. 创造模式里 `cordis_inspect_query` → Tool provider 能看到 11 个 `browser_*` 工具与 schema。
 4. 实际调用：`browser_status` → `browser_navigate` 打开 `https://example.com` → `browser_snapshot` → `browser_tabs {action:"close"}`。
 5. 确认 `browser_status.tabs` 里只有专用实例的页；需要时用 `bh groups` 检查标签组。
 

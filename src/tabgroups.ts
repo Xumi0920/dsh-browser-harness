@@ -6,9 +6,10 @@
  * the dedicated automation profile through the CDP Extensions domain, attaches
  * to its service-worker target and evaluates the grouping calls there.
  *
- * Only tabs this harness created are grouped: the extension is asked to group
- * the one tab whose title currently carries a short-lived nonce. Work tabs are
- * never listed, moved or grouped.
+ * Only tabs this harness created are grouped: the extension is asked to pick
+ * the newest ungrouped tab matching the just-created page URL (falling back to
+ * the newest ungrouped tab), so no temporary document.title mutation is needed.
+ * Work tabs are never moved or grouped.
  */
 
 import { resolve as resolvePath } from "node:path";
@@ -242,37 +243,32 @@ export class TabGroupBridge {
   /**
    * Put one harness-created page into its task group.
    *
-   * The page is briefly retitled with a nonce so the extension can find exactly
-   * this tab; the original title is restored afterwards.
+   * No page state is mutated: the extension queries tabs and picks the newest
+   * ungrouped tab matching the page URL (or the newest ungrouped tab when the
+   * URL is not visible yet). A short retry absorbs worker wake-up latency.
    *
    * @param {import("./page.js").Page} page
-   * @param {{ title: string, color?: string, groupId?: number | null }} options
+   * @param {{ title: string, color?: string, groupId?: number | null, url?: string }} options
    */
-  async groupTab(page: any, { title, color = "blue", groupId = null }: any = {} as any) {
+  async groupTab(page: any, { title, color = "blue", groupId = null, url = null }: any = {} as any) {
     if (!this.enabled) return { ok: false, reason: "disabled" };
     return this.run(async () => {
       const ready = await this.ensure();
       if (!ready) return { ok: false, reason: "extension-unavailable", error: this.error };
-      let originalTitle = "";
-      try {
-        originalTitle = String((await page.evaluate("document.title")) ?? "");
-      } catch {
-        originalTitle = "";
+      let pageUrl = url;
+      if (!pageUrl) {
+        try { pageUrl = String((await page.info()).url || ""); } catch { pageUrl = null; }
       }
-      const nonce = "DSH-TMP-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
       try {
         for (let attempt = 0; attempt < 3; attempt += 1) {
-          await page.evaluate((value: any) => { document.title = value; }, { args: [nonce] }).catch(() => {});
           const wantedGroupId = Number.isFinite(groupId) ? Number(groupId) : null;
-          const result = await this.evaluate(groupExpression({ nonce, title, color, groupId: wantedGroupId }));
+          const result = await this.evaluate(groupExpression({ url: pageUrl, title, color, groupId: wantedGroupId }));
           if (result && result.ok) return { ...result, tabId: result.tabId, groupId: result.groupId };
           await delay(100);
         }
         return { ok: false, reason: "tab-not-found" };
       } catch (error: any) {
         return { ok: false, reason: "group-failed", error: String((error && error.message) || error) };
-      } finally {
-        await page.evaluate((value: any) => { document.title = value; }, { args: [originalTitle] }).catch(() => {});
       }
     });
   }
@@ -297,11 +293,16 @@ export class TabGroupBridge {
   }
 }
 
-function groupExpression({ nonce, title, color, groupId }: any) {
+function groupExpression({ url, title, color, groupId }: any) {
   return "(async () => {" +
-    "const tabs = await chrome.tabs.query({ title: " + JSON.stringify(nonce) + " });" +
-    "if (!tabs.length) return { ok: false, error: 'tab-not-found' };" +
-    "const tab = tabs[0];" +
+    "const tabs = await chrome.tabs.query({});" +
+    "const ungrouped = tabs.filter((tab) => tab.groupId === undefined || tab.groupId === -1);" +
+    "const wantedUrl = " + JSON.stringify(String(url || "")) + ";" +
+    "const matched = wantedUrl ? ungrouped.filter((tab) => tab.url === wantedUrl || tab.pendingUrl === wantedUrl) : [];" +
+    "const pool = matched.length ? matched : ungrouped;" +
+    "pool.sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));" +
+    "const tab = pool[0];" +
+    "if (!tab) return { ok: false, error: 'tab-not-found' };" +
     "let id = " + (groupId === null ? "null" : String(Number(groupId))) + ";" +
     "let created = false;" +
     "if (typeof id === 'number') {" +

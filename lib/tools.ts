@@ -6,6 +6,8 @@
  * `defineTool` from @deepseek-ai/dsh-tools, tests pass an identity stub.
  */
 
+import { mkdir, realpath, stat } from "node:fs/promises";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { HarnessError } from "../src/errors.js";
 import { findByRole, formatSnapshot } from "../src/ax.js";
 import { redactHeadersForOutput, redactTextForOutput, redactUrlForOutput } from "../src/redact.js";
@@ -54,6 +56,46 @@ function redactStatus(status: any) {
   return out;
 }
 
+
+
+
+async function browserConfig(page: any, manager: any) {
+  if (page && page.browser && page.browser.config) return page.browser.config;
+  const browser = await manager.ensure();
+  return (browser && browser.config) || {};
+}
+
+async function validateUploadFiles(page: any, manager: any, requested: any) {
+  const config = await browserConfig(page, manager);
+  const directory = config.uploadDir || (config.stateDir ? join(config.stateDir, "uploads") : null);
+  if (!directory) throw new HarnessError("E_BAD_ARG", "uploadDir is not configured");
+  const base = resolve(directory);
+  await mkdir(base, { recursive: true, mode: 0o700 });
+  const realBase = await realpath(base).catch(() => {
+    throw new HarnessError("E_POLICY_DENIED", "cannot resolve uploadDir", { uploadDir: base });
+  });
+  const entries = (Array.isArray(requested) ? requested : [requested]).map((value: any) => String(value)).filter(Boolean);
+  if (!entries.length) throw new HarnessError("E_BAD_ARG", "upload needs path or paths");
+  const files = [];
+  for (const entry of entries) {
+    const target = resolve(base, entry);
+    const lexical = relative(resolve(directory), target);
+    if (lexical === ".." || lexical.startsWith(".." + sep) || isAbsolute(lexical)) {
+      throw new HarnessError("E_POLICY_DENIED", "upload path must stay inside uploadDir", { path: target, uploadDir: base });
+    }
+    const real = await realpath(target).catch(() => {
+      throw new HarnessError("E_BAD_ARG", "upload file does not exist", { path: target });
+    });
+    const inside = relative(realBase, real);
+    if (inside === ".." || inside.startsWith(".." + sep) || isAbsolute(inside)) {
+      throw new HarnessError("E_POLICY_DENIED", "upload path escapes uploadDir through a link", { path: target });
+    }
+    const info = await stat(real).catch(() => null);
+    if (!info || !info.isFile()) throw new HarnessError("E_BAD_ARG", "upload path is not a regular file", { path: target });
+    files.push(real);
+  }
+  return files;
+}
 
 function summarizePage(page: any, info: any) {
   return {
@@ -353,6 +395,51 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       execute: wrap(async (args: any, sessionId: any) => {
         const page = await manager.pageFor(sessionId);
         return page.pdf({ path: args.path, printBackground: args.printBackground !== false });
+      }),
+    }),
+
+
+    tool({
+      name: "browser_upload",
+      description:
+        "Set files on a file input (visible or hidden). Paths are confined to the configured uploadDir (default <stateDir>/uploads); symlinks and paths escaping that directory are rejected. Copy the desired files into uploadDir first.",
+      parameters: {
+        ref: { type: "string", description: "snapshot ref of the file input" },
+        selector: { type: "string", description: "CSS selector of the file input" },
+        path: { type: "string", description: "one relative path under uploadDir" },
+        paths: { type: "array", items: { type: "string" }, description: "multiple relative paths under uploadDir" },
+      },
+      output: jsonOutput,
+      timeoutMs: 30_000,
+      isConcurrencySafe: () => false,
+      execute: wrap(async (args: any, sessionId: any) => {
+        if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "upload needs ref or selector");
+        const page = await manager.pageFor(sessionId);
+        const files = await validateUploadFiles(page, manager, args.paths || args.path);
+        return { ...(await page.upload({ ref: args.ref, selector: args.selector }, files)), count: files.length };
+      }),
+    }),
+
+    tool({
+      name: "browser_download",
+      description:
+        "Click a link/button and wait for its download to finish. Files land in the configured downloadDir (default <stateDir>/downloads) and the returned path/bytes can be processed by the caller.",
+      parameters: {
+        ref: { type: "string", description: "snapshot ref to click" },
+        selector: { type: "string", description: "CSS selector to click" },
+        timeoutMs: { type: "number", description: "maximum download wait (default 30000)" },
+      },
+      output: jsonOutput,
+      timeoutMs: 120_000,
+      isConcurrencySafe: () => false,
+      execute: wrap(async (args: any, sessionId: any) => {
+        if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "download needs ref or selector");
+        const page = await manager.pageFor(sessionId);
+        const config = await browserConfig(page, manager);
+        const directory = config.downloadDir || (config.stateDir ? join(config.stateDir, "downloads") : null);
+        if (!directory) throw new HarnessError("E_BAD_ARG", "downloadDir is not configured");
+        const timeoutMs = Math.min(Math.max(Number(args.timeoutMs) || 30_000, 100), 120_000);
+        return page.download({ dir: directory, timeoutMs, trigger: () => page.click({ ref: args.ref, selector: args.selector }) });
       }),
     }),
 

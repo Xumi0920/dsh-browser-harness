@@ -1,7 +1,12 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { createTools } from "../../dist/lib/tools.js";
 import { HarnessError } from "../../dist/src/errors.js";
+import { cleanupTempDirs, tempDir } from "../helpers/temp.js";
+
+after(cleanupTempDirs);
 
 function makeCtx() {
   return {
@@ -53,6 +58,8 @@ test("exposes the expected tool surface", () => {
     "browser_extract",
     "browser_screenshot",
     "browser_pdf",
+    "browser_upload",
+    "browser_download",
     "browser_tabs",
   ]);
   for (const definition of tools) {
@@ -412,4 +419,43 @@ test("browser_screenshot and browser_pdf route element clip and PDF", async () =
   assert.deepEqual(seen[0], ["box", { ref: "e1", selector: undefined }]);
   assert.deepEqual(seen[1], ["screenshot", { fullPage: false, path: undefined, clip: { x: 1, y: 2, width: 3, height: 4 } }]);
   assert.deepEqual(seen[2], ["pdf", { path: "page.pdf", printBackground: true }]);
+});
+
+test("browser_upload confines files to uploadDir and sets the file input", async () => {
+  const dir = await tempDir("bh-upload-unit-");
+  await writeFile(join(dir, "resume.txt"), "synthetic");
+  const seen = [];
+  const manager = fakeManager({
+    ensure: async () => ({ config: { stateDir: dir, uploadDir: dir } }),
+    pageFor: async () => ({
+      upload: async (target, files) => { seen.push([target, files]); return { ok: true, files }; },
+    }),
+  });
+  const upload = build(manager).find((definition) => definition.name === "browser_upload");
+  const value = await upload.execute({ selector: "#file", path: "resume.txt" }, {});
+  assert.equal(value.ok, true);
+  assert.deepEqual(seen[0][0], { ref: undefined, selector: "#file" });
+  assert.deepEqual(seen[0][1], [join(dir, "resume.txt")]);
+  await assert.rejects(upload.execute({ selector: "#file", path: "../escape.txt" }, {}), /E_POLICY_DENIED|E_BAD_ARG/);
+});
+
+test("browser_download clicks the trigger and returns the downloaded file", async () => {
+  const dir = await tempDir("bh-download-unit-");
+  const seen = [];
+  const manager = fakeManager({
+    ensure: async () => ({ config: { stateDir: dir, downloadDir: dir } }),
+    pageFor: async () => ({
+      click: async (target) => { seen.push(["click", target]); return { ok: true }; },
+      download: async (options) => {
+        seen.push(["download", options.dir]);
+        await options.trigger();
+        return { ok: true, path: join(dir, "report.pdf"), bytes: 3, filename: "report.pdf" };
+      },
+    }),
+  });
+  const download = build(manager).find((definition) => definition.name === "browser_download");
+  const value = await download.execute({ selector: "#download" }, {});
+  assert.equal(value.ok, true);
+  assert.deepEqual(seen[0], ["download", dir]);
+  assert.deepEqual(seen[1], ["click", { ref: undefined, selector: "#download" }]);
 });

@@ -9,7 +9,7 @@ DSH 会话 / Creator 模式
         │  browser_* 工具调用
 ┌───────▼────────────────────────────────────────────┐
 │ lib/  DSH 插件层                                    │
-│  index.js   注册 9 个工具 + 内嵌 skill（读 skills/） │
+│  index.js   注册 11 个工具 + 内嵌 skill（读 skills/） │
 │  tools.js   参数/输出/错误适配                       │
 │  manager.js 会话 lane、连接复用、tab 委派            │
 │  skill.js   从 skills/browser-harness/SKILL.md 读技能│
@@ -47,8 +47,8 @@ CDP 没有标签组 API，因此随包带一个极小 MV3 扩展（仅 `tabs` / 
 
 1. 首次使用时通过 CDP `Extensions.loadUnpacked` 把 `extension/` 装进专用浏览器 profile；
 2. 打开新标签页会唤醒扩展的 service worker，harness 附着该 worker 会话；
-3. 给**刚创建的标签页**临时设置一个 nonce 标题，让 worker 用 `chrome.tabs.query({title})` 精确定位这一页；
-4. 调 `chrome.tabs.group` / `chrome.tabGroups.update` 建组或加组，然后恢复原标题。
+3. worker 用 `chrome.tabs.query({})` 选择**最新创建的未分组标签页**，优先匹配刚创建的页面 URL（`url`/`pendingUrl`），不再修改 `document.title`；
+4. 调 `chrome.tabs.group` / `chrome.tabGroups.update` 建组或加组，页面状态不被改写。
 
 边界：只操作 harness 自己新建的标签页；工作标签页不动、不入组；空组由 Chrome 自动移除；headless 浏览器没有标签组 → 自动跳过；扩展不可用时 60s 冷却，不影响开标签页。
 

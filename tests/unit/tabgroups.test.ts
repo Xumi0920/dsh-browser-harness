@@ -15,22 +15,12 @@ import { FakeTransport } from "./helpers/fake-transport.js";
 const EXTENSION_PATH = join(tmpdir(), "bh-package", "extension");
 const EXTENSION_URL = "chrome-extension://ext-1/sw.js";
 
-function fakePage(title = "Original title") {
-  const page = {
+function fakePage(url = "https://example.com/page", title = "Original title") {
+  return {
     targetId: "t-page",
     title,
-    titles: [title],
-    async evaluate(expressionOrFn, options = {}) {
-      if (typeof expressionOrFn === "function") {
-        page.title = options.args ? options.args[0] : "";
-        page.titles.push(page.title);
-        return undefined;
-      }
-      if (expressionOrFn === "document.title") return page.title;
-      return null;
-    },
+    async info() { return { url, title }; },
   };
-  return page;
 }
 
 function bridgeTransport({ extensions = [{ id: "ext-1", name: TAB_GROUP_EXTENSION_NAME, path: EXTENSION_PATH }], workerUrl = EXTENSION_URL } = {}) {
@@ -67,18 +57,18 @@ test("tab group titles and colors are stable per lane", () => {
   assert.equal(tabGroupColorFor("dsh-abc123"), tabGroupColorFor("dsh-abc123"));
 });
 
-test("groupTab finds the tab by title nonce and restores the title", async () => {
+test("groupTab matches the newest ungrouped tab by URL without mutating the page", async () => {
   const transport = bridgeTransport();
   const bridge = bridgeFor(transport);
-  const page = fakePage("Original title");
+  const page = fakePage("https://example.com/task");
   const result = await bridge.groupTab(page, { title: "DSH · task", color: "blue", groupId: null });
   assert.equal(result.ok, true);
   assert.equal(result.groupId, 42);
-  assert.equal(page.title, "Original title", "page title is restored after grouping");
   const groupEval = transport.calls.filter((call) => call.method === "Runtime.evaluate" && String(call.params.expression).includes("chrome.tabs.query"));
   assert.equal(groupEval.length, 1);
-  assert.match(groupEval[0].params.expression, /DSH-TMP-[a-z0-9]+/);
-  assert.match(groupEval[0].params.expression, /DSH · task/);
+  assert.match(groupEval[0].params.expression, /chrome\.tabs\.query\(\{\}\)/);
+  assert.match(groupEval[0].params.expression, /https:\/\/example\.com\/task/);
+  assert.doesNotMatch(groupEval[0].params.expression, /DSH-TMP-/);
   assert.equal(bridge.info().available, true);
 });
 

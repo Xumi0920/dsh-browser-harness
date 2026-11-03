@@ -91,6 +91,7 @@ export class Browser {
     this.config.stateDir = this.config.stateDir || stateStore.defaultStateDir();
     this.config.downloadDir = this.config.downloadDir || join(this.config.stateDir, "downloads");
     this.config.screenshotDir = this.config.screenshotDir || join(this.config.stateDir, "screenshots");
+    this.config.uploadDir = this.config.uploadDir || join(this.config.stateDir, "uploads");
     this.version = null;
     /** @type {Map<string, Page>} one reused Page per target (CDP session) */
     this.pages = new Map();
@@ -125,6 +126,7 @@ export class Browser {
         stateDir: options.stateDir,
         downloadDir: options.downloadDir,
         screenshotDir: options.screenshotDir,
+        uploadDir: options.uploadDir,
         dialogPolicy: options.dialogPolicy,
         focusEmulation: options.focusEmulation,
         marker: options.marker,
@@ -246,7 +248,9 @@ export class Browser {
       const groupId = remembered !== null && (await this.tabGroups.groupExists(remembered)) ? remembered : null;
       const title = tabGroupTitleFor(lane, this.config.tabGroupTitle);
       const color = this.config.tabGroupColor || tabGroupColorFor(lane);
-      const result = await this.tabGroups.groupTab(page, { title, color, groupId });
+      let pageUrl = null;
+      try { pageUrl = String((await page.info()).url || ""); } catch { pageUrl = null; }
+      const result = await this.tabGroups.groupTab(page, { title, color, groupId, url: pageUrl });
       if (result && result.ok && Number.isFinite(result.groupId) && result.groupId !== remembered) {
         await stateStore.setGroup(lane, { id: result.groupId, title, color }, this.config.stateDir);
       }

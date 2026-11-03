@@ -41,7 +41,7 @@ CDP 本身没有标签组 API，因此随包内置一个极小的 MV3 扩展（�
 
 1. 首次使用时通过 CDP `Extensions.loadUnpacked` 把 `extension/` 装进专用浏览器 profile；
 2. 打开新标签页会唤醒扩展的 service worker，harness 附着该 worker 会话；
-3. 给**刚创建的标签页**临时设置一个 nonce 标题，让 worker 用 `chrome.tabs.query({title})` 精确定位这一页；
-4. 调 `chrome.tabs.group` / `chrome.tabGroups.update` 建组或加组，随后恢复原标题。
+3. worker 通过 `chrome.tabs.query({})` 选中**最新创建的未分组标签页**，优先匹配刚创建的页面 URL（`url`/`pendingUrl`），不再修改页面标题；
+4. 调 `chrome.tabs.group` / `chrome.tabGroups.update` 建组或加组；页面标题/URL 不会被篡改。
 
 扩展不可用或 headless 时只做降级（不建组），失败一次后 60 秒冷却，不影响开标签页。

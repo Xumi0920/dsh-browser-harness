@@ -21,7 +21,8 @@ A plain public read needs no browser. If `web_fetch` can read it, use `web_fetch
 5. `browser_act` — `{action:"click"|"hover", ref}`, `{action:"fill", selector, text}`, `{action:"type", ref, text}`, `{action:"press", key:"Enter"}`, `{action:"scroll", dy:400}`, `{action:"dialog", accept}`.
 6. Verify: `browser_snapshot` again, or `browser_extract {mode:"text"}` / `{mode:"js", expression}` / `{mode:"console"}`.
 7. Screenshot with `browser_screenshot` (optionally `ref`/`selector` for an element) when layout or visual state matters; `browser_pdf` exports PDF. Files stay in `screenshotDir` and existing files are never overwritten.
-8. Close tabs you created with `browser_tabs {action:"close", targetId}`.
+8. Upload with `browser_upload {ref|selector, path|paths}`; paths must be inside `uploadDir`. Download with `browser_download {ref|selector}`; files land in `downloadDir`.
+9. Close tabs you created with `browser_tabs {action:"close", targetId}`.
 
 ## Rules
 
@@ -30,7 +31,8 @@ A plain public read needs no browser. If `web_fetch` can read it, use `web_fetch
 - **Controlled inputs need fill.** `browser_act {action:"fill"}` focuses the field, clears it with real Ctrl+A / Backspace key presses, writes the whole value once with `Input.insertText`, then dispatches `input`/`change`, so React/Vue controlled components stay in sync. It returns only `{ok, length, verified}` and never echoes the value. It is not per-character typing; use `type` only when keystroke semantics matter.
 - **JS mode has side effects.** `browser_extract {mode:"js"}` evaluates arbitrary page JavaScript with user-gesture semantics; it can mutate the DOM, submit forms or make requests and is marked non-concurrent. Use it only when a fixed read cannot answer the question.
 - **Stay in the background.** Do not ask to bring the browser to the foreground; the harness works behind the scenes.
-- **Touch only tabs you created.** Closing is restricted to harness-owned tabs; a non-owned tab fails with `E_POLICY_DENIED`. Never force-close a user tab. `browser_tabs {action:"use"}` accepts only page targets with http(s)/about:blank URLs; a non-owned tab requires its exact `targetId`, and URL substrings match only harness-owned tabs.
+- **Touch only tabs you created.** Closing is restricted to harness-owned tabs; a non-owned tab fails with `E_POLICY_DENIED`. Never force-close a user tab. `browser_tabs {action:"use"}` accepts only page targets with http(s)/about:blank URLs; a non-owned tab requires its exact `targetId`, and URL substrings match only harness-owned tabs. Tab grouping now matches the newest ungrouped tab by URL and never mutates `document.title`.
+- **Files have fixed roots.** `browser_upload` reads only `uploadDir`; `browser_download` writes only `downloadDir`; screenshots/PDFs write only `screenshotDir`. Ask the user to place files in the relevant directory instead of bypassing the confinement.
 - **Login walls:** stop and ask the user. Never enter credentials you were not given.
 - **No secrets:** do not print cookies, tokens, or passwords. Tool output redacts token-like URL query values and response headers, but page text/HTML/screenshots are not DLP-protected; avoid operating on sensitive pages you were not asked to use.
 - **One browser lane:** serialize browser actions; two workflows fighting over the tab pointer race.

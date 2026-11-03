@@ -85,6 +85,7 @@ open -na "Google Chrome" --args --remote-debugging-port=9331 "--user-data-dir=$H
     # stateDir: ~/.dsh/browser-harness
     # downloadDir: ~/.dsh/browser-harness/downloads
     # screenshotDir: ~/.dsh/browser-harness/screenshots
+    # uploadDir: ~/.dsh/browser-harness/uploads
     # endpointCacheMs: 1500             # browser_status endpoint probe cache (0 disables)
     # dialogPolicy: auto-dismiss
     tabGroups: true                 # 按任务给自建标签页分组（默认开）
@@ -103,7 +104,8 @@ open -na "Google Chrome" --args --remote-debugging-port=9331 "--user-data-dir=$H
 | `maxSnapshotNodes` | 250 | 快照节点上限（`browser_snapshot` 可单独指定，最多 400） |
 | `stateDir` | `~/.dsh/browser-harness` | 状态文件目录（per-lane JSON） |
 | `downloadDir` | `<stateDir>/downloads` | 下载目录 |
-| `screenshotDir` | `<stateDir>/screenshots` | 截图输出目录：只允许写这里，拒绝覆盖已有文件 |
+| `screenshotDir` | `<stateDir>/screenshots` | 截图/PDF 输出目录：只允许写这里，拒绝覆盖已有文件 |
+| `uploadDir` | `<stateDir>/uploads` | 上传文件来源目录：只允许读取这里，拒绝 `..`/symlink 逃逸 |
 | `endpointCacheMs` | `1500` | `browser_status` 端点探测缓存 TTL；`0` 关闭缓存 |
 | `dialogPolicy` | `auto-dismiss` | 对话框策略 |
 | `tabGroups` | `true` | 按任务标签页分组，见 [tab-groups.md](tab-groups.md) |
