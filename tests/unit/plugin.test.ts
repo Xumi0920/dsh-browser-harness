@@ -16,7 +16,7 @@ function fakeCtx() {
   };
 }
 
-test("createApply registers all twelve tools, the skill and teardown", async () => {
+test("createApply registers all thirteen tools, the skill and teardown", async () => {
   const ctx = fakeCtx();
   let closed = false;
   const apply = createApply({
@@ -24,15 +24,15 @@ test("createApply registers all twelve tools, the skill and teardown", async () 
     managerFactory: () => ({ close: async () => { closed = true; } }),
   });
   const result = apply(ctx, { tabGroups: false, tabGroupTitle: "任务 {session}" });
-  assert.equal(ctx.registered.length, 12);
+  assert.equal(ctx.registered.length, 13);
   assert.deepEqual(
     ctx.registered.map((definition) => definition.name).sort(),
-    ["browser_act", "browser_diagnose", "browser_download", "browser_extract", "browser_navigate", "browser_pdf", "browser_screenshot", "browser_snapshot", "browser_status", "browser_tabs", "browser_upload", "browser_wait"],
+    ["browser_act", "browser_diagnose", "browser_download", "browser_extract", "browser_navigate", "browser_pdf", "browser_screenshot", "browser_snapshot", "browser_status", "browser_tabs", "browser_task", "browser_upload", "browser_wait"],
   );
   assert.ok(ctx.registered.every((definition) => definition.defined === true));
   assert.equal(ctx.skill.name, "browser-harness");
   assert.equal(result.name, "browser-harness");
-  assert.equal(result.tools.length, 12);
+  assert.equal(result.tools.length, 13);
   for (const effect of ctx.effects) {
     const cleanup = effect();
     if (typeof cleanup === "function") cleanup();

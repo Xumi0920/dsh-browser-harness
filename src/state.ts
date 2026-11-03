@@ -10,7 +10,7 @@ import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-export const STATE_VERSION = 1;
+export const STATE_VERSION = 2;
 export const DEFAULT_MARKER = "🐴";
 
 export function defaultStateDir() {
@@ -32,6 +32,7 @@ export function emptyState() {
     endpoint: null,
     current: null,
     ownedTabs: [],
+    task: null,
     marker: DEFAULT_MARKER,
     updatedAt: new Date().toISOString(),
   };
@@ -47,6 +48,7 @@ function normalizeState(value: any) {
     ownedTabs: Array.isArray(value.ownedTabs) ? value.ownedTabs.filter((tab: any) => tab && typeof tab.targetId === "string") : [],
     current: value.current && typeof value.current.targetId === "string" ? value.current : null,
     group: value.group && Number.isFinite(value.group.id) ? value.group : null,
+    task: value.task && typeof value.task === "object" ? value.task : null,
   };
 }
 
@@ -138,6 +140,14 @@ export async function updateState(lane: any, mutate: any, dir: any = defaultStat
     const next = await mutate(state);
     return writeState(next, lane, dir);
   }, dir);
+}
+
+/** Persist the current task lifecycle record for a lane. */
+export async function setTask(lane: any, task: any, dir: any = defaultStateDir()) {
+  return updateState(lane, (state: any) => ({
+    ...state,
+    task: task ? { ...task, updatedAt: new Date().toISOString() } : null,
+  }), dir);
 }
 
 /** Remember a tab this harness created. */

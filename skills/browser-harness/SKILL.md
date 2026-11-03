@@ -23,6 +23,7 @@ A plain public read needs no browser. If `web_fetch` can read it, use `web_fetch
 7. Screenshot with `browser_screenshot` (optionally `ref`/`selector` for an element) when layout or visual state matters; `browser_pdf` exports PDF. Files stay in `screenshotDir` and existing files are never overwritten.
 8. Upload with `browser_upload {ref|selector, path|paths}`; paths must be inside `uploadDir`. Download with `browser_download {ref|selector}`; files land in `downloadDir`.
 9. On failure or ambiguity, call `browser_diagnose` for a screenshot, console errors, failed responses and active requests; then close tabs you created with `browser_tabs {action:"close", targetId}`.
+10. Use `browser_task` to inspect or control the current task: status, pause, resume, close. Page operations hold an exclusive tab lease; another task on the same tab gets `E_TAB_LOCKED` or `E_LOCK_TIMEOUT`.
 
 ## Rules
 
@@ -37,6 +38,7 @@ A plain public read needs no browser. If `web_fetch` can read it, use `web_fetch
 - **Files have fixed roots.** `browser_upload` reads only `uploadDir`; `browser_download` writes only `downloadDir`; screenshots/PDFs write only `screenshotDir`. Ask the user to place files in the relevant directory instead of bypassing the confinement.
 - **Login walls:** stop and ask the user. Never enter credentials you were not given.
 - **No secrets:** do not print cookies, tokens, or passwords. Tool output redacts token-like URL query values and response headers, but page text/HTML/screenshots are not DLP-protected; avoid operating on sensitive pages you were not asked to use.
+- **One active task per tab.** Page operations hold an exclusive target lease. Do not retry a busy tab in a tight loop; inspect `browser_task status` / `browser_tabs list`, wait, or use a different tab. Pausing a task releases its leases; closing it closes its owned tabs by default.
 - **One browser lane:** serialize browser actions; two workflows fighting over the tab pointer race.
 
 ## Failure handling

@@ -69,6 +69,10 @@ function run(name, args) {
   return tool(name).execute(args, { agent: { session: { id: SESSION } } });
 }
 
+function runAs(name, args, sessionId) {
+  return tool(name).execute(args, { agent: { session: { id: sessionId } } });
+}
+
 async function waitForText(expected, timeoutMs = 5_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -344,4 +348,36 @@ test("T36 form select and idempotent check/uncheck drive native controls", async
   await run("browser_act", { action: "uncheck", selector: "#agree" });
   assert.equal(await run("browser_extract", { mode: "js", expression: "document.querySelector('#agree').checked" }).then((value) => value.value), false);
   await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});
+
+test("T37 tab locks reject a second task on the same target", async (t) => {
+  if (needChrome(t)) return;
+  const other = "it-tools-other";
+  const nav = await run("browser_navigate", { url: server.url + "/form.html", newTab: true });
+  await manager.useTab(other, nav.targetId);
+  let blocked = null;
+  await manager.withPage(SESSION, async () => {
+    blocked = await manager.withPage(other, async () => null, { timeoutMs: 100 }).then(() => null, (error) => error);
+  });
+  assert.ok(blocked, "second task must be blocked");
+  assert.equal(blocked.code, "E_LOCK_TIMEOUT");
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});
+
+test("T38 browser_task pause/resume/close controls page operations", async (t) => {
+  if (needChrome(t)) return;
+  const session = "it-tools-task";
+  const nav = await runAs("browser_navigate", { url: server.url + "/form.html", newTab: true }, session);
+  const active = await runAs("browser_task", { action: "status" }, session);
+  assert.equal(active.task.state, "active");
+  const paused = await runAs("browser_task", { action: "pause" }, session);
+  assert.equal(paused.task.state, "paused");
+  await assert.rejects(runAs("browser_act", { action: "click", ref: "e1" }, session), /E_TASK_PAUSED/);
+  await runAs("browser_task", { action: "resume" }, session);
+  const resumed = await runAs("browser_task", { action: "status" }, session);
+  assert.equal(resumed.task.state, "active");
+  const closed = await runAs("browser_task", { action: "close", cleanup: "close-owned" }, session);
+  assert.equal(closed.task.state, "closed");
+  assert.ok(closed.closedTabs.includes(nav.targetId));
+  await assert.rejects(runAs("browser_navigate", { url: server.url + "/a.html" }, session), /E_TASK_CLOSED/);
 });

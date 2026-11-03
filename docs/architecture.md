@@ -9,7 +9,7 @@ DSH 会话 / Creator 模式
         │  browser_* 工具调用
 ┌───────▼────────────────────────────────────────────┐
 │ lib/  DSH 插件层                                    │
-│  index.js   注册 12 个工具 + 内嵌 skill（读 skills/） │
+│  index.js   注册 13 个工具 + 内嵌 skill（读 skills/） │
 │  tools.js   参数/输出/错误适配                       │
 │  manager.js 会话 lane、连接复用、tab 委派            │
 │  skill.js   从 skills/browser-harness/SKILL.md 读技能│
@@ -54,7 +54,7 @@ CDP 没有标签组 API，因此随包带一个极小 MV3 扩展（仅 `tabs` / 
 
 ## 错误模型
 
-所有核心错误是带稳定 `code` 的 `HarnessError`（`src/errors.ts`），工具层统一渲染为 `E_*: message`：`E_NO_BROWSER`、`E_NO_TAB`、`E_ELEMENT_NOT_FOUND`、`E_CLICK_INTERCEPTED`、`E_SELECTOR_TIMEOUT`、`E_DIALOG_OPEN`、`E_POLICY_DENIED`、`E_TIMEOUT` 等。
+所有核心错误是带稳定 `code` 的 `HarnessError`（`src/errors.ts`），工具层统一渲染为 `E_*: message`：`E_NO_BROWSER`、`E_NO_TAB`、`E_ELEMENT_NOT_FOUND`、`E_CLICK_INTERCEPTED`、`E_TAB_LOCKED`、`E_LOCK_TIMEOUT`、`E_TASK_PAUSED`、`E_TASK_CLOSING`、`E_TASK_CLOSED`、`E_SELECTOR_TIMEOUT`、`E_DIALOG_OPEN`、`E_POLICY_DENIED`、`E_TIMEOUT` 等。
 
 ## 安全边界
 
@@ -74,6 +74,7 @@ CDP 没有标签组 API，因此随包带一个极小 MV3 扩展（仅 `tabs` / 
 - 下载优先消费 `Browser.downloadWillBegin` / `Browser.downloadProgress` 事件，保留文件系统轮询作为不支持事件时的回退；
 - 宽泛 CDP 端口回退（含 9222/9223）只在显式 `browser: "auto"` / `BH_ALLOW_FALLBACK=1` 时启用；
 - 全部后台操作，不抢前台；遇登录墙停手问人；
+- Task 状态与锁模型见 [task-lifecycle.md](task-lifecycle.md)：页面操作持有 target 独占 lease，跨任务冲突返回 `E_TAB_LOCKED`/`E_LOCK_TIMEOUT`；pause/close 通过 lane gate 等待 in-flight 操作，close 默认只关闭自建 tabs；
 - 标签组扩展权限最小化，只存在于专用浏览器 profile。
 
 ## 测试策略

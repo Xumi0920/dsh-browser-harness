@@ -33,7 +33,7 @@ function fakeManager(overrides = {}) {
     networkEvents: () => [{ url: "https://example.com/api" }],
     screenshot: async () => ({ path: "C:/tmp/shot.png", width: 100, height: 50, bytes: 10 }),
   };
-  return {
+  const manager: any = {
     status: async () => ({ connected: true, version: { product: "Chrome/156" }, tabs: [], current: null, endpoints: [] }),
     navigate: async () => page,
     pageFor: async () => page,
@@ -41,8 +41,15 @@ function fakeManager(overrides = {}) {
     useTab: async (sessionId, id) => ({ targetId: id, info: async () => ({ url: "https://example.com" }) }),
     openTab: async (sessionId, url) => ({ targetId: "T2", info: async () => ({ url: url || "about:blank" }) }),
     closeTab: async (sessionId, targetId) => ({ ok: true, closed: targetId }),
+    taskStatus: async () => ({ task: { id: "dsh", state: "active" }, current: null, ownedTabs: [], locks: [] }),
+    pauseTask: async () => ({ ok: true, task: { state: "paused" } }),
+    resumeTask: async () => ({ ok: true, task: { state: "active" } }),
+    closeTask: async () => ({ ok: true, task: { state: "closed" }, closedTabs: [] }),
     ...overrides,
   };
+  manager.withPage = async (sessionId, fn) => fn(await manager.pageFor(sessionId), { release: async () => {} });
+  manager.withNavigatedPage = async (sessionId, url, options, fn) => fn(await manager.navigate(sessionId, url, options), { release: async () => {} });
+  return manager;
 }
 
 function build(manager = fakeManager()) {
@@ -63,6 +70,7 @@ test("exposes the expected tool surface", () => {
     "browser_diagnose",
     "browser_upload",
     "browser_download",
+    "browser_task",
     "browser_tabs",
   ]);
   for (const definition of tools) {

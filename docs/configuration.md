@@ -111,6 +111,7 @@ open -na "Google Chrome" --args --remote-debugging-port=9331 "--user-data-dir=$H
 | `tabGroups` | `true` | 按任务标签页分组，见 [tab-groups.md](tab-groups.md) |
 | `tabGroupTitle` | `DSH · {session}` | 组名模板，支持 `{session}` / `{lane}` |
 | `tabGroupColor` | 按会话分配 | 组颜色 |
+| `taskLockTimeoutMs` | `5000` | 等标签页 lease 的超时；超时返回 `E_LOCK_TIMEOUT` |
 
 ## 5. registry.json 高级用法
 

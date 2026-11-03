@@ -27,7 +27,7 @@ after(cleanupTempDirs);
 test("missing state reads as empty", async () => {
   const dir = await freshDir();
   const state = await readState("default", dir);
-  assert.equal(state.version, 1);
+  assert.equal(state.version, 2);
   assert.equal(state.current, null);
   assert.deepEqual(state.ownedTabs, []);
   assert.equal(state.marker, DEFAULT_MARKER);

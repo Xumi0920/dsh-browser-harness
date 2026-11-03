@@ -59,6 +59,17 @@ function redactStatus(status: any) {
 
 
 
+
+function withPage(manager: any, sessionId: any, fn: any) {
+  if (typeof manager.withPage === "function") return manager.withPage(sessionId, fn);
+  return manager.pageFor(sessionId).then((page: any) => fn(page));
+}
+
+function withNavigatedPage(manager: any, sessionId: any, url: any, options: any, fn: any) {
+  if (typeof manager.withNavigatedPage === "function") return manager.withNavigatedPage(sessionId, url, options, fn);
+  return manager.navigate(sessionId, url, options).then((page: any) => fn(page));
+}
+
 async function browserConfig(page: any, manager: any) {
   if (page && page.browser && page.browser.config) return page.browser.config;
   const browser = await manager.ensure();
@@ -140,7 +151,12 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       output: jsonOutput,
       timeoutMs: 20_000,
       isConcurrencySafe: () => true,
-      execute: wrap(async (args: any, sessionId: any) => redactStatus(await manager.status(sessionId))),
+      execute: wrap(async (args: any, sessionId: any) => {
+        const status = await manager.status(sessionId);
+        let task = null;
+        try { task = await manager.taskStatus(sessionId); } catch { task = null; }
+        return redactStatus({ ...status, task });
+      }),
     }),
 
 
@@ -171,7 +187,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
           await new Promise((resolve) => setTimeout(resolve, delayMs));
           return { mode, waitedMs: delayMs };
         }
-        const page = await manager.pageFor(sessionId);
+        return withPage(manager, sessionId, async (page: any) => {
         if (mode === "selector") {
           if (!args.selector) throw new HarnessError("E_BAD_ARG", "selector mode needs selector");
           const found = await page.waitForSelector(String(args.selector), { timeoutMs, visible: Boolean(args.visible) });
@@ -226,6 +242,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
           return { mode, ...result };
         }
         throw new HarnessError("E_BAD_ARG", "unknown wait mode: " + mode);
+        });
       }),
     }),
 
@@ -244,19 +261,21 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
         const action = String(args.action || "open");
-        let page;
+        const buildResult = async (page: any) => {
+          const info = await page.info();
+          const snapshot = await page.snapshot({ maxNodes: maxSnapshotNodes });
+          const rendered = formatSnapshot(snapshot);
+          return { action, ...summarizePage(page, info), snapshot: rendered.text, nodes: snapshot.nodes.length, truncated: rendered.truncated };
+        };
         if (action === "open") {
           if (!args.url) throw new HarnessError("E_BAD_ARG", "open needs url");
-          page = await manager.navigate(sessionId, String(args.url), { newTab: Boolean(args.newTab), waitUntil: args.waitUntil });
-        } else {
-          if (action !== "back" && action !== "forward" && action !== "reload") throw new HarnessError("E_BAD_ARG", "unknown navigation action: " + action);
-          page = await manager.pageFor(sessionId);
-          await page.history(action, { waitUntil: args.waitUntil });
+          return withNavigatedPage(manager, sessionId, String(args.url), { newTab: Boolean(args.newTab), waitUntil: args.waitUntil }, buildResult);
         }
-        const info = await page.info();
-        const snapshot = await page.snapshot({ maxNodes: maxSnapshotNodes });
-        const rendered = formatSnapshot(snapshot);
-        return { action, ...summarizePage(page, info), snapshot: rendered.text, nodes: snapshot.nodes.length, truncated: rendered.truncated };
+        if (action !== "back" && action !== "forward" && action !== "reload") throw new HarnessError("E_BAD_ARG", "unknown navigation action: " + action);
+        return withPage(manager, sessionId, async (page: any) => {
+          await page.history(action, { waitUntil: args.waitUntil });
+          return buildResult(page);
+        });
       }),
     }),
 
@@ -276,7 +295,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       timeoutMs: 30_000,
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
-        const page = await manager.pageFor(sessionId);
+        return withPage(manager, sessionId, async (page: any) => {
         const offset = Math.max(0, Number(args.offset) || 0);
         const limit = Math.min(Math.max(Number(args.limit) || maxSnapshotNodes, 1), 400);
         const requestedMax = Math.min(Math.max(offset + limit, Number(args.maxNodes) || maxSnapshotNodes), 400);
@@ -300,6 +319,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
           limit,
           truncated: rendered.truncated,
         };
+        });
       }),
     }),
 
@@ -329,7 +349,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       timeoutMs: 30_000,
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
-        const page = await manager.pageFor(sessionId);
+        return withPage(manager, sessionId, async (page: any) => {
         const action = String(args.action);
         if (action === "click") {
           const target = args.ref || args.selector ? { ref: args.ref, selector: args.selector } : args.x !== undefined && args.y !== undefined ? { at: { x: args.x, y: args.y } } : null;
@@ -371,6 +391,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         }
         if (action === "scroll") return { action, ...(await page.scroll({ dx: Number(args.dx) || 0, dy: Number(args.dy) || 0 })) };
         throw new HarnessError("E_BAD_ARG", "unknown action: " + action);
+        });
       }),
     }),
 
@@ -391,7 +412,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       timeoutMs: 30_000,
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
-        const page = await manager.pageFor(sessionId);
+        return withPage(manager, sessionId, async (page: any) => {
         const mode = String(args.mode);
         const frameMatch = args.frameId || args.frameUrl ? { frameId: args.frameId, urlContains: args.frameUrl } : null;
         if (mode === "frames") {
@@ -450,6 +471,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
           return { mode, events, count: events.length, capturing };
         }
         throw new HarnessError("E_BAD_ARG", "unknown mode: " + mode);
+        });
       }),
     }),
 
@@ -466,9 +488,10 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       timeoutMs: 60_000,
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
-        const page = await manager.pageFor(sessionId);
-        const clip = args.ref || args.selector ? await page.boxFor({ ref: args.ref, selector: args.selector }) : null;
-        return page.screenshot({ fullPage: Boolean(args.fullPage), path: args.path, clip });
+        return withPage(manager, sessionId, async (page: any) => {
+          const clip = args.ref || args.selector ? await page.boxFor({ ref: args.ref, selector: args.selector }) : null;
+          return page.screenshot({ fullPage: Boolean(args.fullPage), path: args.path, clip });
+        });
       }),
     }),
 
@@ -483,8 +506,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       timeoutMs: 60_000,
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
-        const page = await manager.pageFor(sessionId);
-        return page.pdf({ path: args.path, printBackground: args.printBackground !== false });
+        return withPage(manager, sessionId, async (page: any) => page.pdf({ path: args.path, printBackground: args.printBackground !== false }));
       }),
     }),
 
@@ -502,7 +524,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       timeoutMs: 60_000,
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
-        const page = await manager.pageFor(sessionId);
+        return withPage(manager, sessionId, async (page: any) => {
         let info = null;
         try { info = await page.info(); } catch { info = null; }
         let screenshot = null;
@@ -533,6 +555,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
           networkFailures: failures,
           screenshot,
         };
+        });
       }),
     }),
 
@@ -551,9 +574,10 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
         if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "upload needs ref or selector");
-        const page = await manager.pageFor(sessionId);
-        const files = await validateUploadFiles(page, manager, args.paths || args.path);
-        return { ...(await page.upload({ ref: args.ref, selector: args.selector }, files)), count: files.length };
+        return withPage(manager, sessionId, async (page: any) => {
+          const files = await validateUploadFiles(page, manager, args.paths || args.path);
+          return { ...(await page.upload({ ref: args.ref, selector: args.selector }, files)), count: files.length };
+        });
       }),
     }),
 
@@ -571,12 +595,35 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
         if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "download needs ref or selector");
-        const page = await manager.pageFor(sessionId);
-        const config = await browserConfig(page, manager);
-        const directory = config.downloadDir || (config.stateDir ? join(config.stateDir, "downloads") : null);
-        if (!directory) throw new HarnessError("E_BAD_ARG", "downloadDir is not configured");
-        const timeoutMs = Math.min(Math.max(Number(args.timeoutMs) || 30_000, 100), 120_000);
-        return page.download({ dir: directory, timeoutMs, trigger: () => page.click({ ref: args.ref, selector: args.selector }) });
+        return withPage(manager, sessionId, async (page: any) => {
+          const config = await browserConfig(page, manager);
+          const directory = config.downloadDir || (config.stateDir ? join(config.stateDir, "downloads") : null);
+          if (!directory) throw new HarnessError("E_BAD_ARG", "downloadDir is not configured");
+          const timeoutMs = Math.min(Math.max(Number(args.timeoutMs) || 30_000, 100), 120_000);
+          return page.download({ dir: directory, timeoutMs, trigger: () => page.click({ ref: args.ref, selector: args.selector }) });
+        });
+      }),
+    }),
+
+
+    tool({
+      name: "browser_task",
+      description:
+        "Inspect or control this session's task lifecycle. status returns task state, owned tabs and locks; pause stops new page operations and releases leases; resume re-enables; close optionally closes owned tabs and marks the task closed.",
+      parameters: {
+        action: { type: "string", required: true, enum: ["status", "pause", "resume", "close"], description: "task operation" },
+        cleanup: { type: "string", enum: ["close-owned", "leave"], description: "close: close owned tabs (default) or leave them open" },
+      },
+      output: jsonOutput,
+      timeoutMs: 60_000,
+      isConcurrencySafe: () => false,
+      execute: wrap(async (args: any, sessionId: any) => {
+        const action = String(args.action);
+        if (action === "status") return manager.taskStatus(sessionId);
+        if (action === "pause") return manager.pauseTask(sessionId);
+        if (action === "resume") return manager.resumeTask(sessionId);
+        if (action === "close") return manager.closeTask(sessionId, { cleanup: args.cleanup });
+        throw new HarnessError("E_BAD_ARG", "unknown task action: " + action);
       }),
     }),
 
