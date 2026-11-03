@@ -625,3 +625,16 @@ test("T51 CLI validates navigate and shot arguments before touching the browser"
   await assert.rejects(exec(["shot", "a.png", "b.png"]), /at most one path/);
   await assert.rejects(exec(["shot", "--bogus"]), /unknown option for shot/);
 });
+
+test("T52 CLI validates act/extract/tabs before touching the browser", async () => {
+  const stateDir = await tempDir("bh-cli-validate-actions-");
+  const bh = join(ROOT, "dist", "bin", "bh.js");
+  const env = { ...process.env, BH_STATE_DIR: stateDir };
+  const exec = (args) => runCli(process.execPath, [bh, ...args], { env, timeout: 15_000 });
+  await assert.rejects(exec(["act"]), /act needs one of/);
+  await assert.rejects(exec(["act", "click"]), /needs ref\/selector or x and y/);
+  await assert.rejects(exec(["extract", "js"]), /needs an expression/);
+  await assert.rejects(exec(["extract", "network", "--selector", "#x"]), /only valid for text\/html/);
+  await assert.rejects(exec(["tabs", "use"]), /exactly one targetId/);
+  await assert.rejects(exec(["tabs", "new", "file:///etc/passwd"]), /refusing to open/);
+});

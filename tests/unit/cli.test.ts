@@ -56,3 +56,54 @@ test("shot subcommand validates path and flags", async () => {
   assert.throws(() => shot(["a.png", "--nope"]), /unknown option/);
   assert.throws(() => shot(["--full=maybe"]), /expects a boolean/);
 });
+
+test("act subcommand validates action-specific targets and values", async () => {
+  const { parseActArgs } = await import("../../dist/bin/cli/commands/act.js");
+  const act = (tokens: string[]) => {
+    const parsed = parseCliArgs(tokens);
+    return parseActArgs(parsed.positional, parsed.flags);
+  };
+  assert.deepEqual(act(["click", "--selector", "#submit"]).action, "click");
+  assert.deepEqual(act(["fill", "--selector", "#name", "--text", "Ada"]).text, "Ada");
+  assert.deepEqual(act(["drag", "--selector", "#a", "--to-selector", "#b", "--steps", "4"]).steps, 4);
+  assert.deepEqual(act(["selectOption", "--selector", "#color", "--values", "red,blue"]).values, ["red", "blue"]);
+  assert.equal(act(["press", "Enter"]).key, "Enter");
+  assert.throws(() => act([]), /needs one of/);
+  assert.throws(() => act(["click"]), /needs ref\/selector or x and y/);
+  assert.throws(() => act(["drag", "--selector", "#a"]), /needs --to-ref or --to-selector/);
+  assert.throws(() => act(["fill", "--selector", "#name", "--bogus"]), /unknown option/);
+  assert.throws(() => act(["scroll", "--dx", "wat"]), /expects a number/);
+});
+
+test("extract subcommand validates mode, selector and expression", async () => {
+  const { parseExtractArgs } = await import("../../dist/bin/cli/commands/extract.js");
+  const extract = (tokens: string[]) => {
+    const parsed = parseCliArgs(tokens);
+    return parseExtractArgs(parsed.positional, parsed.flags);
+  };
+  assert.deepEqual(extract(["text", "#result"]).selector, "#result");
+  assert.equal(extract(["js", "document.title"]).expression, "document.title");
+  assert.equal(extract(["network", "--include-body"]).includeBody, true);
+  assert.equal(extract([]).mode, "text");
+  assert.throws(() => extract(["bogus"]), /one of/);
+  assert.throws(() => extract(["js"]), /needs an expression/);
+  assert.throws(() => extract(["text", "#a", "#b"]), /at most one selector/);
+  assert.throws(() => extract(["network", "#a"]), /does not accept positional/);
+  assert.throws(() => extract(["network", "--selector", "#a"]), /only valid for text\/html/);
+});
+
+test("tabs subcommand validates action, target and URL", async () => {
+  const { parseTabsArgs } = await import("../../dist/bin/cli/commands/tabs.js");
+  const tabs = (tokens: string[]) => {
+    const parsed = parseCliArgs(tokens);
+    return parseTabsArgs(parsed.positional, parsed.flags);
+  };
+  assert.deepEqual(tabs([]), { action: "list", tab: null, url: null, borrow: false, force: false });
+  assert.equal(tabs(["new", "https://example.com"]).url, "https://example.com");
+  assert.deepEqual(tabs(["use", "T1", "--borrow"]), { action: "use", tab: "T1", url: null, borrow: true, force: false });
+  assert.equal(tabs(["close", "T1", "--force"]).force, true);
+  assert.throws(() => tabs(["new", "file:///etc/passwd"]), /refusing to open/);
+  assert.throws(() => tabs(["use"]), /exactly one targetId/);
+  assert.throws(() => tabs(["close", "a", "b"]), /at most one targetId/);
+  assert.throws(() => tabs(["list", "--bogus"]), /unknown option/);
+});

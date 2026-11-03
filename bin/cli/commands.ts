@@ -3,6 +3,9 @@ import { numberFlag, pick } from "./args.js";
 import { listEndpoints } from "../../src/cdp/endpoint.js";
 import { navigateCommand } from "./commands/navigate.js";
 import { shotCommand } from "./commands/shot.js";
+import { actCommand } from "./commands/act.js";
+import { extractCommand } from "./commands/extract.js";
+import { tabsCommand } from "./commands/tabs.js";
 
 async function currentTarget(ctx: CliContext) {
   const status = await ctx.invoke("browser_status");
@@ -37,34 +40,7 @@ export const commands: CliCommand[] = [
       console.log(JSON.stringify(await page.info(), null, 2));
     },
   },
-  {
-    name: "tabs",
-    usage: "tabs [list|new <url>|use <targetId> [--borrow]|close [targetId] [--force]]",
-    async run(ctx, positional, flags) {
-      const action = positional[0] || "list";
-      if (action === "list") {
-        const result = await ctx.invoke("browser_tabs", { action: "list" });
-        for (const tab of result.tabs) console.log(tab.targetId + "\t" + tab.title + "\t" + tab.url);
-        return;
-      }
-      if (action === "new") {
-        console.log(JSON.stringify(await ctx.invoke("browser_tabs", { action: "new", url: positional[1] || "about:blank" }), null, 2));
-        return;
-      }
-      if (action === "use") {
-        if (!positional[1]) throw new Error("tabs use needs a targetId");
-        console.log(JSON.stringify(await ctx.invoke("browser_tabs", { action: "use", targetId: positional[1], borrow: flags.borrow === true }), null, 2));
-        return;
-      }
-      if (action === "close") {
-        const targetId = positional[1] || await currentTarget(ctx);
-        if (!targetId) throw new Error("no current tab");
-        console.log(JSON.stringify(await ctx.invoke("browser_tabs", { action: "close", targetId, force: flags.force === true }), null, 2));
-        return;
-      }
-      throw new Error("unknown tabs action: " + action);
-    },
-  },
+  tabsCommand,
   {
     name: "close",
     usage: "close [targetId] [--force] — close current/owned tab",
@@ -113,19 +89,7 @@ export const commands: CliCommand[] = [
       console.log(JSON.stringify(result.value, null, 2));
     },
   },
-  {
-    name: "extract",
-    usage: "extract <text|html|js|network|console|frames> [selector] [flags]",
-    async run(ctx, positional, flags) {
-      const mode = positional[0] || "text";
-      const args: any = { mode, ...pick(flags, ["selector", "expression", "include-body", "url-contains", "frame-id", "frame-url"]) };
-      if (!args.selector && positional[1] && (mode === "text" || mode === "html")) args.selector = positional[1];
-      if (!args.expression && positional.length > 1) args.expression = positional.slice(1).join(" ");
-      const result = await ctx.invoke("browser_extract", args);
-      if (mode === "text" || mode === "html") console.log(result.value === undefined ? result.text : result.value);
-      else console.log(JSON.stringify(result, null, 2));
-    },
-  },
+  extractCommand,
   {
     name: "wait",
     usage: "wait <mode> [--selector ...|--text ...|--url ...|--timeout-ms ...]",
@@ -137,30 +101,7 @@ export const commands: CliCommand[] = [
       console.log(JSON.stringify(await ctx.invoke("browser_wait", args), null, 2));
     },
   },
-  {
-    name: "act",
-    usage: "act <click|hover|highlight|drag|type|fill|selectOption|check|uncheck|press|scroll|dialog> [flags]",
-    async run(ctx, positional, flags) {
-      const action = positional[0];
-      if (!action) throw new Error("act needs an action");
-      const args: any = { action, ...pick(flags, ["ref", "selector", "x", "y", "text", "key", "modifiers", "dx", "dy", "button", "clicks", "values", "force", "prompt-text", "to-ref", "to-selector", "steps", "expect-url", "expect-text", "expect-selector", "expect-timeout-ms"]) };
-      if (args.x !== undefined) args.x = Number(args.x);
-      if (args.y !== undefined) args.y = Number(args.y);
-      if (args.clicks !== undefined) args.clicks = Number(args.clicks);
-      if (args.steps !== undefined) args.steps = Number(args.steps);
-      if (args.expectTimeoutMs !== undefined) args.expectTimeoutMs = Number(args.expectTimeoutMs);
-      if (args.values !== undefined) args.values = String(args.values).split(",").filter(Boolean);
-      if (args.text === undefined && positional[1] && (action === "type" || action === "fill")) args.text = positional.slice(1).join(" ");
-      if (args.key === undefined && positional[1] && action === "press") args.key = positional[1];
-      if (args.force !== undefined) args.force = args.force === true || args.force === "true";
-      if (action === "dialog") {
-        if (flags.dismiss === true) args.accept = false;
-        else args.accept = flags.accept !== "false";
-        if (flags["prompt-text"] !== undefined) args.promptText = flags["prompt-text"];
-      }
-      console.log(JSON.stringify(await ctx.invoke("browser_act", args), null, 2));
-    },
-  },
+  actCommand,
   shotCommand,
   {
     name: "pdf",
