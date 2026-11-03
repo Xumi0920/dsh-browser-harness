@@ -173,3 +173,35 @@ test("snapshot pagination and filter modules validate independently", async () =
   assert.throws(() => parseSnapshotPagination({ limit: "0" }), /between 1 and 400/);
   assert.throws(() => parseSnapshotFilters({ role: "" }), /must not be empty/);
 });
+
+test("wait subcommand validates per-mode flags and timeouts", async () => {
+  const { parseWaitArgs } = await import("../../dist/bin/cli/commands/wait.js");
+  const wait = (tokens: string[]) => {
+    const parsed = parseCliArgs(tokens);
+    return parseWaitArgs(parsed.positional, parsed.flags);
+  };
+  assert.deepEqual(wait(["selector", "--selector", "#name", "--visible", "--timeout-ms", "5000"]), { mode: "selector", selector: "#name", visible: true, timeoutMs: 5000 });
+  assert.equal(wait(["text", "--text", "Saved"]).text, "Saved");
+  assert.equal(wait(["response", "--url", "/api", "--include-body"]).includeBody, true);
+  assert.equal(wait(["delay", "--delay-ms", "10"]).delayMs, 10);
+  assert.throws(() => wait([]), /needs one of/);
+  assert.throws(() => wait(["selector"]), /needs --selector/);
+  assert.throws(() => wait(["text"]), /needs --text/);
+  assert.throws(() => wait(["selector_hidden", "--selector", "#x", "--visible"]), /unknown option/);
+  assert.throws(() => wait(["delay", "--timeout-ms", "99"]), /between 100 and 120000/);
+  assert.throws(() => wait(["text", "--text", "x", "extra"]), /mode and flags only/);
+});
+
+test("task subcommand validates action and cleanup policy", async () => {
+  const { parseTaskArgs } = await import("../../dist/bin/cli/commands/task.js");
+  const task = (tokens: string[]) => {
+    const parsed = parseCliArgs(tokens);
+    return parseTaskArgs(parsed.positional, parsed.flags);
+  };
+  assert.deepEqual(task([]), { action: "status" });
+  assert.deepEqual(task(["close", "--cleanup", "leave"]), { action: "close", cleanup: "leave" });
+  assert.throws(() => task(["bogus"]), /needs one of/);
+  assert.throws(() => task(["status", "--cleanup", "leave"]), /unknown option/);
+  assert.throws(() => task(["close", "--cleanup", "wat"]), /close-owned or leave/);
+  assert.throws(() => task(["status", "extra"]), /one action only/);
+});

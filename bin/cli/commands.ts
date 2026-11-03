@@ -1,5 +1,4 @@
 import type { CliCommand, CliContext } from "./registry.js";
-import { numberFlag, pick } from "./args.js";
 import { listEndpoints } from "../../src/cdp/endpoint.js";
 import { navigateCommand } from "./commands/navigate.js";
 import { shotCommand } from "./commands/shot.js";
@@ -9,6 +8,8 @@ import { tabsCommand } from "./commands/tabs.js";
 import { snapshotCommand } from "./commands/snapshot.js";
 import { uploadCommand } from "./commands/upload.js";
 import { downloadCommand } from "./commands/download.js";
+import { waitCommand } from "./commands/wait.js";
+import { taskCommand } from "./commands/task.js";
 
 async function currentTarget(ctx: CliContext) {
   const status = await ctx.invoke("browser_status");
@@ -81,17 +82,7 @@ export const commands: CliCommand[] = [
     },
   },
   extractCommand,
-  {
-    name: "wait",
-    usage: "wait <mode> [--selector ...|--text ...|--url ...|--timeout-ms ...]",
-    async run(ctx, positional, flags) {
-      const mode = positional[0];
-      if (!mode) throw new Error("wait needs a mode");
-      const args: any = { mode, ...pick(flags, ["selector", "text", "url", "include-body"]), timeoutMs: numberFlag(flags, "timeout-ms"), idleMs: numberFlag(flags, "idle-ms"), delayMs: numberFlag(flags, "delay-ms") };
-      if (flags.visible === true) args.visible = true;
-      console.log(JSON.stringify(await ctx.invoke("browser_wait", args), null, 2));
-    },
-  },
+  waitCommand,
   actCommand,
   shotCommand,
   {
@@ -110,14 +101,5 @@ export const commands: CliCommand[] = [
   },
   uploadCommand,
   downloadCommand,
-  {
-    name: "task",
-    usage: "task <status|start|pause|resume|close> [--cleanup ...]",
-    async run(ctx, positional, flags) {
-      const action = positional[0] || "status";
-      const args: any = { action };
-      if (flags.cleanup !== undefined) args.cleanup = flags.cleanup;
-      console.log(JSON.stringify(await ctx.invoke("browser_task", args), null, 2));
-    },
-  },
+  taskCommand,
 ];

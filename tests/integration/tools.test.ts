@@ -705,3 +705,15 @@ test("T56 CLI download clicks a link and returns the file", async (t) => {
   assert.match(await readFile(downloaded.path, "utf8"), /id,name|alpha/);
   await exec(["close"]);
 });
+
+test("T57 CLI validates wait/task arguments before touching the browser", async () => {
+  const stateDir = await tempDir("bh-cli-wait-task-");
+  const bh = join(ROOT, "dist", "bin", "bh.js");
+  const env = { ...process.env, BH_STATE_DIR: stateDir };
+  const exec = (args) => runCli(process.execPath, [bh, ...args], { env, timeout: 15_000 });
+  await assert.rejects(exec(["wait"]), /wait needs one of/);
+  await assert.rejects(exec(["wait", "selector"]), /needs --selector/);
+  await assert.rejects(exec(["wait", "text"]), /needs --text/);
+  await assert.rejects(exec(["task", "bogus"]), /task needs one of/);
+  await assert.rejects(exec(["task", "status", "--cleanup", "leave"]), /unknown option/);
+});
