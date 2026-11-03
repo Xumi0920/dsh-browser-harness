@@ -46,11 +46,13 @@ test("exposes the expected tool surface", () => {
   const tools = build();
   assert.deepEqual(tools.map((definition) => definition.name), [
     "browser_status",
+    "browser_wait",
     "browser_navigate",
     "browser_snapshot",
     "browser_act",
     "browser_extract",
     "browser_screenshot",
+    "browser_pdf",
     "browser_tabs",
   ]);
   for (const definition of tools) {
@@ -63,9 +65,12 @@ test("exposes the expected tool surface", () => {
 test("parameters expose required fields", () => {
   const tools = build();
   const navigate = tools.find((definition) => definition.name === "browser_navigate");
-  assert.equal(navigate.parameters.url.required, true);
+  assert.equal(navigate.parameters.url.required, undefined, "url is optional when action=back/forward/reload");
+  assert.deepEqual(navigate.parameters.action.enum, ["open", "back", "forward", "reload"]);
   const act = tools.find((definition) => definition.name === "browser_act");
   assert.equal(act.parameters.action.required, true);
+  assert.ok(act.parameters.action.enum.includes("hover"));
+  assert.ok(act.parameters.action.enum.includes("dialog"));
 });
 
 test("browser_navigate returns info plus snapshot text", async () => {
@@ -310,4 +315,101 @@ test("status and network outputs redact token-like URLs and headers", async () =
   assert.match(network.events[0].url, /redacted/i);
   assert.equal(network.events[0].headers.authorization, "[redacted]");
   assert.equal(network.events[0].headers["content-type"], "application/json");
+});
+
+test("browser_act type focuses an explicit ref/selector before typing", async () => {
+  const seen = [];
+  const manager = fakeManager();
+  manager.pageFor = async () => ({
+    focus: async (target) => { seen.push(["focus", target]); return { ok: true }; },
+    type: async (text) => { seen.push(["type", text]); return { ok: true }; },
+  });
+  const act = build(manager).find((definition) => definition.name === "browser_act");
+  await act.execute({ action: "type", ref: "e1", text: "yo" }, {});
+  await act.execute({ action: "type", selector: "#name", text: "hi" }, {});
+  assert.deepEqual(seen, [
+    ["focus", { ref: "e1", selector: undefined }],
+    ["type", "yo"],
+    ["focus", { ref: undefined, selector: "#name" }],
+    ["type", "hi"],
+  ]);
+});
+
+test("browser_wait routes selector, text, network_idle and delay modes", async () => {
+  const seen = [];
+  const manager = fakeManager();
+  manager.pageFor = async () => ({
+    waitForSelector: async (selector, options) => { seen.push(["selector", selector, options]); return { tag: "input" }; },
+    waitForFunction: async (expression, options) => { seen.push(["text", expression, options]); return true; },
+    waitForNetworkIdle: async (options) => { seen.push(["network", options]); return { ok: true, events: 0 }; },
+  });
+  const wait = build(manager).find((definition) => definition.name === "browser_wait");
+  await wait.execute({ mode: "selector", selector: "#name", visible: true }, {});
+  await wait.execute({ mode: "text", text: "ready" }, {});
+  await wait.execute({ mode: "network_idle", idleMs: 100 }, {});
+  await wait.execute({ mode: "delay", delayMs: 10 }, {});
+  assert.deepEqual(seen[0], ["selector", "#name", { timeoutMs: 30000, visible: true }]);
+  assert.match(seen[1][1], /ready/);
+  assert.deepEqual(seen[2], ["network", { timeoutMs: 30000, idleMs: 100 }]);
+});
+
+test("browser_act hover and dialog route to the page", async () => {
+  const seen = [];
+  const manager = fakeManager();
+  manager.pageFor = async () => ({
+    hover: async (target) => { seen.push(["hover", target]); return { ok: true, x: 1, y: 2 }; },
+    dialog: () => ({ type: "confirm", message: "ok?" }),
+    handleDialog: async (options) => { seen.push(["dialog", options]); return { ok: true, accepted: true }; },
+  });
+  const act = build(manager).find((definition) => definition.name === "browser_act");
+  await act.execute({ action: "hover", ref: "e1" }, {});
+  await act.execute({ action: "dialog", accept: true, promptText: "yes" }, {});
+  assert.deepEqual(seen[0], ["hover", { ref: "e1", selector: undefined }]);
+  assert.deepEqual(seen[1], ["dialog", { accept: true, promptText: "yes" }]);
+});
+
+test("browser_extract console mode returns redacted console events", async () => {
+  const manager = fakeManager();
+  manager.pageFor = async () => ({
+    consoleEvents: () => [{ source: "console", level: "error", text: "failed https://example.com/?access_token=secret" }],
+  });
+  const extract = build(manager).find((definition) => definition.name === "browser_extract");
+  const value = await extract.execute({ mode: "console" }, {});
+  assert.equal(value.events.length, 1);
+  assert.ok(!value.events[0].text.includes("secret"));
+});
+
+test("browser_navigate routes history actions to page.history", async () => {
+  const seen = [];
+  const manager = fakeManager();
+  const page = {
+    targetId: "T1",
+    info: async () => ({ url: "https://example.com", title: "Example", readyState: "complete" }),
+    snapshot: async () => ({ nodes: [], truncated: false }),
+    history: async (action, options) => { seen.push([action, options]); return { ok: true }; },
+  };
+  manager.pageFor = async () => page;
+  const navigate = build(manager).find((definition) => definition.name === "browser_navigate");
+  await navigate.execute({ action: "back" }, {});
+  await navigate.execute({ action: "reload" }, {});
+  assert.deepEqual(seen[0], ["back", { waitUntil: undefined }]);
+  assert.deepEqual(seen[1], ["reload", { waitUntil: undefined }]);
+});
+
+test("browser_screenshot and browser_pdf route element clip and PDF", async () => {
+  const seen = [];
+  const manager = fakeManager();
+  const page = {
+    targetId: "T1",
+    boxFor: async (target) => { seen.push(["box", target]); return { x: 1, y: 2, width: 3, height: 4 }; },
+    screenshot: async (options) => { seen.push(["screenshot", options]); return { path: "shot.png", bytes: 1 }; },
+    pdf: async (options) => { seen.push(["pdf", options]); return { path: "page.pdf", bytes: 1 }; },
+  };
+  manager.pageFor = async () => page;
+  const tools = build(manager);
+  await tools.find((definition) => definition.name === "browser_screenshot").execute({ ref: "e1" }, {});
+  await tools.find((definition) => definition.name === "browser_pdf").execute({ path: "page.pdf" }, {});
+  assert.deepEqual(seen[0], ["box", { ref: "e1", selector: undefined }]);
+  assert.deepEqual(seen[1], ["screenshot", { fullPage: false, path: undefined, clip: { x: 1, y: 2, width: 3, height: 4 } }]);
+  assert.deepEqual(seen[2], ["pdf", { path: "page.pdf", printBackground: true }]);
 });

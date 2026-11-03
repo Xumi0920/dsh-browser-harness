@@ -9,7 +9,7 @@ DSH 会话 / Creator 模式
         │  browser_* 工具调用
 ┌───────▼────────────────────────────────────────────┐
 │ lib/  DSH 插件层                                    │
-│  index.js   注册 7 个工具 + 内嵌 skill（读 skills/） │
+│  index.js   注册 9 个工具 + 内嵌 skill（读 skills/） │
 │  tools.js   参数/输出/错误适配                       │
 │  manager.js 会话 lane、连接复用、tab 委派            │
 │  skill.js   从 skills/browser-harness/SKILL.md 读技能│
@@ -60,12 +60,13 @@ CDP 没有标签组 API，因此随包带一个极小 MV3 扩展（仅 `tabs` / 
 
 - 只关闭 harness 自建标签页（`E_POLICY_DENIED` 兜底）；
 - 只允许 `http(s)` / `about:blank` 导航与 attach；`file://`、`data:`、`javascript:`、`chrome://` 一律 `E_POLICY_DENIED`（防止绕过 DSH 文件策略）；`browser_tabs use` 非自建页必须精确 targetId，URL 子串只匹配自建页；
-- 截图只写 `screenshotDir`（默认 `<stateDir>/screenshots`）：mkdir 前校验最近已存在祖先、拒绝 symlink/junction 路径，realpath 失败即拒绝，并拒绝覆盖已有文件；
+- 截图/PDF 只写 `screenshotDir`（默认 `<stateDir>/screenshots`）：mkdir 前校验最近已存在祖先、拒绝 symlink/junction 路径，realpath 失败即拒绝，并拒绝覆盖已有文件；元素截图使用 ref/selector 的 box-model clip；
 - `browser_act fill` 只返回长度/校验状态，不回显输入值；
 - Cookie API 默认脱敏；network/status/tabs 的 URL 与响应 headers 对 token 类字段尽力脱敏：参数名归一化（accessToken/access-token/ACCESS_TOKEN…）、`Location`/`Content-Location` 整值隐藏、URL userinfo 清除；
 - `browser_status` 端点诊断使用字段白名单（不返回完整 `httpUrl`/`wsUrl`）；连接错误只保留稳定错误码和安全提示，不拼接原始 CDP URL/cause；页面正文/HTML/截图仍可能敏感；
 - 状态文件只保存去掉 userinfo/query/fragment 的 URL（POSIX 0600）；
-- `browser_extract` 的 `network` / `js` 只在显式请求时返回；JS 模式可产生副作用，工具标记为非并发；
+- `browser_extract` 的 `network` / `js` / `console` 只在显式请求时返回；JS 模式可产生副作用，工具标记为非并发；console 文本只做 URL 级尽力脱敏；
+- `browser_wait` 是轮询工具；`browser_act` 的 hover/dialog 与 `browser_navigate` 历史导航都走同一 Page，不引入额外后台进程；
 - 宽泛 CDP 端口回退（含 9222/9223）只在显式 `browser: "auto"` / `BH_ALLOW_FALLBACK=1` 时启用；
 - 全部后台操作，不抢前台；遇登录墙停手问人；
 - 标签组扩展权限最小化，只存在于专用浏览器 profile。

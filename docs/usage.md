@@ -2,20 +2,23 @@
 
 ## 在 DSH 里
 
-插件装好后，**任意 DSH 会话/预设**都可以使用这些工具（不限于创造模式；创造模式只影响用 `plugin_manager` 安装这一步）。Agent 通过 7 个 `browser_*` 工具操作专用浏览器；插件同时内嵌 `browser-harness` 技能，给出完整工作流：
+插件装好后，**任意 DSH 会话/预设**都可以使用这些工具（不限于创造模式；创造模式只影响用 `plugin_manager` 安装这一步）。Agent 通过 9 个 `browser_*` 工具操作专用浏览器；插件同时内嵌 `browser-harness` 技能，给出完整工作流：
 
 1. `browser_status` — 确认端点、浏览器版本、当前标签页；
-2. `browser_navigate {url}` — 打开页面并拿到紧凑快照（`e1`、`e2`… 引用）；
-3. `browser_act` — `{action:"click", ref}` / `{action:"fill", selector, text}` / `{action:"press", key}` / `{action:"scroll", dy}`；
-4. `browser_extract` — `text` / `html` / `js` / `network`（最多最近 100 条请求，`includeBody` 较慢）；
-5. `browser_snapshot` / `browser_screenshot` 复核；`browser_tabs` 管理自建标签页。
+2. `browser_navigate {url}` / `{action:"back"|"forward"|"reload"}` — 打开页面或浏览器历史导航，并拿到紧凑快照（`e1`、`e2`… 引用）；
+3. `browser_wait` — 等待 selector / text / network_idle，或固定 delay，避免反复快照盲等；
+4. `browser_act` — `{action:"click"|"hover", ref}` / `{action:"fill", selector, text}` / `{action:"type", ref, text}` / `{action:"press", key}` / `{action:"scroll", dy}` / `{action:"dialog", accept}`；
+5. `browser_extract` — `text` / `html` / `js` / `network`（最多最近 100 条请求，`includeBody` 较慢）/ `console`（最近 console/Log 事件）；
+6. `browser_snapshot` / `browser_screenshot`（整页或 ref/selector 元素）复核；`browser_pdf` 导出 PDF；`browser_tabs` 管理自建标签页。
 
 > refs 属于产生它的快照：导航或 DOM 变化后重新 `browser_snapshot`。受控输入用 `fill`（真实聚焦键 + `Input.insertText` + `input`/`change`），`type` 只在需要逐键语义时使用。`fill` 只返回 `{ok, length, verified}`，**不回显输入值**。
 
 - `browser_extract {mode:"js"}` 可以执行任意页面 JavaScript（`userGesture:true`），能修改 DOM/发请求，工具已标为非并发；只在你确实需要脚本时使用。
 - `browser_tabs {action:"use"}` 只接受 page target + `http(s)`/`about:blank`；非自建页必须精确 `targetId`，URL 子串只匹配自建页。
 - `browser_extract {mode:"network"}` 会对 token 类 query/headers 做尽力脱敏；正文、HTML、截图仍可能含敏感数据，别把它们当作完整脱敏。
-- `browser_screenshot` 的 `path` 是相对 `screenshotDir`（默认 `<stateDir>/screenshots`）的路径，拒绝 `..`/symlink 逃逸和覆盖已有文件。
+- `browser_screenshot` / `browser_pdf` 的 `path` 是相对 `screenshotDir`（默认 `<stateDir>/screenshots`）的路径，拒绝 `..`/symlink 逃逸和覆盖已有文件。
+- `browser_extract {mode:"console"}` 返回最近 console/Log 事件（URL/文本尽力脱敏）；页面控制台内容本身仍可能包含敏感信息。
+- `browser_act {action:"dialog"}` 仅在使用 `dialogPolicy: "manual"` 且当前有弹窗时可用；默认 `auto-dismiss` 会自动取消 confirm。
 
 ## 独立库（不装 DSH）
 

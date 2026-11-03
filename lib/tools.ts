@@ -101,12 +101,59 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       execute: wrap(async (args: any, sessionId: any) => redactStatus(await manager.status(sessionId))),
     }),
 
+
+
+    tool({
+      name: "browser_wait",
+      description:
+        "Wait for the page to reach a state before the next action: a selector appears, text appears, network activity becomes idle, or a fixed delay. Prefer this over repeatedly calling browser_snapshot.",
+      parameters: {
+        mode: { type: "string", required: true, enum: ["selector", "text", "network_idle", "delay"], description: "what to wait for" },
+        selector: { type: "string", description: "selector mode: CSS selector to wait for" },
+        text: { type: "string", description: "text mode: visible page text to wait for" },
+        visible: { type: "boolean", description: "selector mode: require the element to be visible too" },
+        timeoutMs: { type: "number", description: "maximum wait in milliseconds (default 30000, capped at 120000)" },
+        delayMs: { type: "number", description: "delay mode: milliseconds to wait (default 1000)" },
+        idleMs: { type: "number", description: "network_idle mode: quiet window in milliseconds (default 500)" },
+      },
+      output: jsonOutput,
+      timeoutMs: 120_000,
+      isConcurrencySafe: () => false,
+      execute: wrap(async (args: any, sessionId: any) => {
+        const mode = String(args.mode);
+        const timeoutMs = Math.min(Math.max(Number(args.timeoutMs) || 30_000, 100), 120_000);
+        if (mode === "delay") {
+          const delayMs = Math.min(Math.max(Number(args.delayMs) || 1_000, 0), timeoutMs);
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          return { mode, waitedMs: delayMs };
+        }
+        const page = await manager.pageFor(sessionId);
+        if (mode === "selector") {
+          if (!args.selector) throw new HarnessError("E_BAD_ARG", "selector mode needs selector");
+          const found = await page.waitForSelector(String(args.selector), { timeoutMs, visible: Boolean(args.visible) });
+          return { mode, matched: true, selector: args.selector, found };
+        }
+        if (mode === "text") {
+          if (!args.text) throw new HarnessError("E_BAD_ARG", "text mode needs text");
+          const expression = "(() => { const body = document.body ? document.body.innerText : ''; return body.includes(" + JSON.stringify(String(args.text)) + "); })()";
+          await page.waitForFunction(expression, { timeoutMs });
+          return { mode, matched: true, text: args.text };
+        }
+        if (mode === "network_idle") {
+          const result = await page.waitForNetworkIdle({ timeoutMs, idleMs: Number(args.idleMs) || 500 });
+          return { mode, ...result };
+        }
+        throw new HarnessError("E_BAD_ARG", "unknown wait mode: " + mode);
+      }),
+    }),
+
     tool({
       name: "browser_navigate",
       description:
-        "Open a URL in the dedicated Chromium-based automation browser (Chrome, Edge, Brave, Chromium, ...) and return the page info plus a compact accessibility snapshot with clickable refs (e1, e2, ...). Reuses the session's current tab; pass newTab=true to keep the previous page.",
+        "Open a URL in the dedicated Chromium-based automation browser (Chrome, Edge, Brave, Chromium, ...) and return the page info plus a compact accessibility snapshot with clickable refs (e1, e2, ...). Reuses the session's current tab; pass newTab=true to keep the previous page. Use action back/forward/reload for browser history instead of a URL.",
       parameters: {
-        url: { type: "string", required: true, description: "http(s) URL to open" },
+        action: { type: "string", enum: ["open", "back", "forward", "reload"], description: "navigation action (default open)" },
+        url: { type: "string", description: "http(s) URL to open (required when action is open)" },
         newTab: { type: "boolean", description: "open in a new background tab instead of the current one" },
         waitUntil: { type: "string", enum: ["load", "domcontentloaded", "none"], description: "navigation wait strategy (default load)" },
       },
@@ -114,11 +161,20 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       timeoutMs: 60_000,
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
-        const page = await manager.navigate(sessionId, String(args.url), { newTab: Boolean(args.newTab), waitUntil: args.waitUntil });
+        const action = String(args.action || "open");
+        let page;
+        if (action === "open") {
+          if (!args.url) throw new HarnessError("E_BAD_ARG", "open needs url");
+          page = await manager.navigate(sessionId, String(args.url), { newTab: Boolean(args.newTab), waitUntil: args.waitUntil });
+        } else {
+          if (action !== "back" && action !== "forward" && action !== "reload") throw new HarnessError("E_BAD_ARG", "unknown navigation action: " + action);
+          page = await manager.pageFor(sessionId);
+          await page.history(action, { waitUntil: args.waitUntil });
+        }
         const info = await page.info();
         const snapshot = await page.snapshot({ maxNodes: maxSnapshotNodes });
         const rendered = formatSnapshot(snapshot);
-        return { ...summarizePage(page, info), snapshot: rendered.text, nodes: snapshot.nodes.length, truncated: rendered.truncated };
+        return { action, ...summarizePage(page, info), snapshot: rendered.text, nodes: snapshot.nodes.length, truncated: rendered.truncated };
       }),
     }),
 
@@ -147,9 +203,9 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
     tool({
       name: "browser_act",
       description:
-        "Perform one browser action: click a ref/selector/coordinate, type into the focused element, fill an input like a user, press a key, or scroll. Use refs from browser_navigate/browser_snapshot; verify the result afterwards (snapshot or browser_extract). fill returns only length/verified, never the entered value.",
+        "Perform one browser action: click a ref/selector/coordinate, hover an element, type into the focused element (or focus a ref/selector first), fill an input like a user, press a key, scroll, or accept/dismiss the current JavaScript dialog. Use refs from browser_navigate/browser_snapshot; verify the result afterwards (snapshot or browser_extract). fill returns only length/verified, never the entered value.",
       parameters: {
-        action: { type: "string", required: true, enum: ["click", "type", "fill", "press", "scroll"], description: "action to perform" },
+        action: { type: "string", required: true, enum: ["click", "hover", "type", "fill", "press", "scroll", "dialog"], description: "action to perform" },
         ref: { type: "string", description: "snapshot ref such as e3" },
         selector: { type: "string", description: "CSS selector (use instead of ref/coordinates)" },
         x: { type: "number", description: "viewport x for click" },
@@ -161,6 +217,8 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         dy: { type: "number", description: "scroll delta y" },
         button: { type: "string", enum: ["left", "right", "middle"], description: "mouse button for click" },
         clicks: { type: "number", description: "click count (default 1)" },
+        accept: { type: "boolean", description: "dialog: accept (true, default) or dismiss (false)" },
+        promptText: { type: "string", description: "dialog: text for a prompt() dialog" },
       },
       output: jsonOutput,
       timeoutMs: 30_000,
@@ -173,7 +231,18 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
           if (!target) throw new HarnessError("E_BAD_ARG", "click needs ref, selector, or x+y");
           return { action, ...(await page.click(target, { button: args.button, clicks: Number(args.clicks) || 1 })) };
         }
-        if (action === "type") return { action, ...(await page.type(String(args.text ?? ""))) };
+        if (action === "hover") {
+          if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "hover needs ref or selector");
+          return { action, ...(await page.hover({ ref: args.ref, selector: args.selector })) };
+        }
+        if (action === "type") {
+          if (args.ref || args.selector) await page.focus({ ref: args.ref, selector: args.selector });
+          return { action, ...(await page.type(String(args.text ?? ""))) };
+        }
+        if (action === "dialog") {
+          if (!page.dialog()) throw new HarnessError("E_NO_DIALOG", "no JavaScript dialog is open");
+          return { action, ...(await page.handleDialog({ accept: args.accept !== false, promptText: args.promptText })) };
+        }
         if (action === "fill") {
           if (!args.ref && !args.selector) throw new HarnessError("E_BAD_ARG", "fill needs ref or selector");
           return { action, ...(await page.fill({ ref: args.ref, selector: args.selector, text: String(args.text ?? "") }, { verify: true })) };
@@ -190,9 +259,9 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
     tool({
       name: "browser_extract",
       description:
-        "Read from the current page: visible text (text), raw HTML (html), a JavaScript expression result (js), or captured network responses (network). Prefer browser_snapshot for interaction targets and this tool for content/data. js mode executes arbitrary page JavaScript with user-gesture semantics: it can change page state and is treated as non-concurrent; URLs/headers with token-like values are redacted in output, page content itself is not.",
+        "Read from the current page: visible text (text), raw HTML (html), a JavaScript expression result (js), captured network responses (network), or recent console/log events (console). Prefer browser_snapshot for interaction targets and this tool for content/data. js mode executes arbitrary page JavaScript with user-gesture semantics: it can change page state and is treated as non-concurrent; URLs/headers with token-like values are redacted in output, page content itself is not.",
       parameters: {
-        mode: { type: "string", required: true, enum: ["text", "html", "js", "network"], description: "what to read" },
+        mode: { type: "string", required: true, enum: ["text", "html", "js", "network", "console"], description: "what to read" },
         selector: { type: "string", description: "CSS selector for text/html modes (defaults to body)" },
         expression: { type: "string", description: "JavaScript expression for js mode; string/serialized results are capped at 200k chars with truncated:true" },
         includeBody: { type: "boolean", description: "network mode: include response bodies (slower)" },
@@ -230,6 +299,14 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
           }
           return { mode, value };
         }
+        if (mode === "console") {
+          const events = page.consoleEvents().map((event: any) => ({
+            ...event,
+            text: redactTextForOutput(event.text),
+            ...(event.url ? { url: redactUrlForOutput(event.url) } : {}),
+          }));
+          return { mode, events, count: events.length };
+        }
         if (mode === "network") {
           const matched = page.networkEvents().filter((event: any) => !args.urlContains || String(event.url || "").includes(String(args.urlContains)));
           const events = matched.slice(-100).map(redactEvent);
@@ -246,9 +323,11 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
 
     tool({
       name: "browser_screenshot",
-      description: "Capture a PNG screenshot of the current page and return its file path (open it with an image reader). Use when layout or visual state matters. The file is written inside the configured screenshotDir (default <stateDir>/screenshots); existing files are never overwritten.",
+      description: "Capture a PNG screenshot of the current page (or a ref/selector element) and return its file path (open it with an image reader). Use when layout or visual state matters. The file is written inside the configured screenshotDir (default <stateDir>/screenshots); existing files are never overwritten.",
       parameters: {
         fullPage: { type: "boolean", description: "capture beyond the viewport (default false)" },
+        ref: { type: "string", description: "optional snapshot ref for an element-level screenshot" },
+        selector: { type: "string", description: "optional CSS selector for an element-level screenshot" },
         path: { type: "string", description: "optional relative file name under screenshotDir (default: bh-shot-<timestamp>.png)" },
       },
       output: jsonOutput,
@@ -256,7 +335,24 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
       isConcurrencySafe: () => false,
       execute: wrap(async (args: any, sessionId: any) => {
         const page = await manager.pageFor(sessionId);
-        return page.screenshot({ fullPage: Boolean(args.fullPage), path: args.path });
+        const clip = args.ref || args.selector ? await page.boxFor({ ref: args.ref, selector: args.selector }) : null;
+        return page.screenshot({ fullPage: Boolean(args.fullPage), path: args.path, clip });
+      }),
+    }),
+
+    tool({
+      name: "browser_pdf",
+      description: "Export the current page as PDF and return its file path. The file is written inside the configured screenshotDir; existing files are never overwritten.",
+      parameters: {
+        path: { type: "string", description: "optional relative file name under screenshotDir (default: bh-print-<timestamp>.pdf)" },
+        printBackground: { type: "boolean", description: "include CSS backgrounds (default true)" },
+      },
+      output: jsonOutput,
+      timeoutMs: 60_000,
+      isConcurrencySafe: () => false,
+      execute: wrap(async (args: any, sessionId: any) => {
+        const page = await manager.pageFor(sessionId);
+        return page.pdf({ path: args.path, printBackground: args.printBackground !== false });
       }),
     }),
 

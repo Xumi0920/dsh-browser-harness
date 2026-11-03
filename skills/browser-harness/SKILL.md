@@ -15,12 +15,13 @@ A plain public read needs no browser. If `web_fetch` can read it, use `web_fetch
 ## Workflow
 
 1. `browser_status` — confirm the CDP endpoint, browser version, current tab.
-2. `browser_navigate {url}` — opens the URL, returns page info plus a compact snapshot.
+2. `browser_navigate {url}` — opens the URL, returns page info plus a compact snapshot. Use `action:"back"|"forward"|"reload"` for history navigation.
 3. Choose a ref (`e1`, `e2`, ...) from the snapshot.
-4. `browser_act` — `{action:"click", ref}`, `{action:"fill", selector, text}`, `{action:"press", key:"Enter"}`, `{action:"scroll", dy:400}`.
-5. Verify: `browser_snapshot` again, or `browser_extract {mode:"text"}` / `{mode:"js", expression}`.
-6. Screenshot with `browser_screenshot` when layout or visual state matters; `path` is relative to `screenshotDir` and existing files are never overwritten.
-7. Close tabs you created: `browser_tabs {action:"close", targetId}`.
+4. `browser_wait` — wait for a selector/text/network-idle/delay instead of re-snapshotting in a loop.
+5. `browser_act` — `{action:"click"|"hover", ref}`, `{action:"fill", selector, text}`, `{action:"type", ref, text}`, `{action:"press", key:"Enter"}`, `{action:"scroll", dy:400}`, `{action:"dialog", accept}`.
+6. Verify: `browser_snapshot` again, or `browser_extract {mode:"text"}` / `{mode:"js", expression}` / `{mode:"console"}`.
+7. Screenshot with `browser_screenshot` (optionally `ref`/`selector` for an element) when layout or visual state matters; `browser_pdf` exports PDF. Files stay in `screenshotDir` and existing files are never overwritten.
+8. Close tabs you created with `browser_tabs {action:"close", targetId}`.
 
 ## Rules
 
@@ -42,6 +43,7 @@ A plain public read needs no browser. If `web_fetch` can read it, use `web_fetch
 | `E_NO_TAB` | no current tab | call `browser_navigate` first |
 | `E_SELECTOR_TIMEOUT` / `E_ELEMENT_NOT_FOUND` | element missing or ref stale | re-snapshot, use a fresh ref or a CSS selector |
 | `E_POLICY_DENIED` | unsafe target (file/internal page, non-owned URL match), screenshot path outside `screenshotDir`, or closing a tab the harness did not create | ask the user; force-close only after they explicitly agree |
+| `E_NO_DIALOG` | `dialog` action was called with no open dialog (for example under auto-dismiss) | re-check the page state; use `dialogPolicy:"manual"` when confirmations need a decision |
 | `E_DIALOG_OPEN` | JS dialog blocking | dialogs auto-dismiss by default; retry once |
 | `E_TIMEOUT` | operation exceeded its budget | check `browser_status`, reduce scope, retry |
 

@@ -10,17 +10,19 @@
 [![typescript](https://img.shields.io/badge/typescript-7.0.2-3178C6)](https://www.typescriptlang.org/)
 [![chromium](https://img.shields.io/badge/chromium-any-4285F4)](docs/configuration.md)
 
-**Native browser tools for DeepSeek Harness (DSH).** A zero-dependency CDP core exposes seven `browser_*` tools that drive a *dedicated, already-logged-in* Chromium-based browser, return compact e1/e2 ref snapshots, and group harness-created tabs per task.
+**Native browser tools for DeepSeek Harness (DSH).** A zero-dependency CDP core exposes nine `browser_*` tools that drive a *dedicated, already-logged-in* Chromium-based browser, return compact e1/e2 ref snapshots, and group harness-created tabs per task.
 
 ## Tools
 
 ```
 browser_status      endpoint / browser version / tabs / current tab
-browser_navigate    open a URL, return page info + snapshot
+browser_wait        selector / text / network_idle / delay
+browser_navigate    open a URL, or back / forward / reload
 browser_snapshot    compact refs (e1 ...) with role, name and viewport center
-browser_act         click / type / fill / press / scroll
-browser_extract     text / html / JS / network
-browser_screenshot  PNG path
+browser_act         click / hover / type / fill / press / scroll / dialog
+browser_extract     text / html / JS / network / console
+browser_screenshot  full-page or element PNG path
+browser_pdf         page PDF path
 browser_tabs        list / use / new / close
 ```
 
@@ -30,7 +32,7 @@ browser_tabs        list / use / new / close
 - **Your real login state.** Point it at a dedicated Chromium instance; sign in once and it persists. Your daily browser is never touched.
 - **Text-first.** Accessibility-tree snapshots and refs beat screenshot-VLM loops; screenshots stay optional.
 - **Per-task tab groups.** Tabs the harness creates are grouped per DSH session; work tabs are never grouped, and headless browsers skip grouping.
-- **Tested.** 141 unit tests (fake CDP) + 27 integration scenarios (real headless/headful Chromium) = 168, with CI on three platforms.
+- **Tested.** 154 unit tests (fake CDP) + 30 integration scenarios (real headless/headful Chromium) = 184, with CI on three platforms.
 - **Hardened boundaries.** `browser_tabs use` accepts only page targets with http(s)/about:blank URLs (non-owned tabs need an exact targetId); screenshots stay inside `screenshotDir` and never overwrite; `fill` never echoes the entered value; JS mode is marked non-concurrent; token-like URLs/headers are redacted in tool output; broad port fallback is explicit `auto` only.
 
 ## Requirements
@@ -104,7 +106,7 @@ browser_extract {mode:"text" | "html" | "js" | "network"}
 
 ```sh
 npm install                 # dev deps (TypeScript); runtime stays zero-dependency
-npm run test:all            # build + 141 unit + 27 integration = 168 tests
+npm run test:all            # build + 154 unit + 30 integration = 184 tests
 ```
 
 CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu + xvfb (27-scenario gate, S15/S16 must actually run). Tests and scripts are compiled by `tsc` too (`dist-tests/` / `dist-scripts/`), sharing the runtime NodeNext config.
@@ -122,4 +124,4 @@ CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu
 
 ## License
 
-MIT (c) 2026 Xumi0920 · current version **v1.0.5** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog
+MIT (c) 2026 Xumi0920 · current version **v1.1.0** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog

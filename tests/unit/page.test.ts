@@ -10,7 +10,7 @@ const AX_NODES = [
   { role: { value: "link" }, backendDOMNodeId: 11, name: { value: "Docs" } },
 ];
 
-function setupPage({ ax = AX_NODES } = {}) {
+function setupPage({ ax = AX_NODES, platform, dialogPolicy = "auto-dismiss" }: any = {}) {
   const transport = new FakeTransport();
   transport.on("Accessibility.getFullAXTree", () => ({ nodes: ax }));
   transport.on("DOM.getBoxModel", () => quad(10, 20, 40, 20));
@@ -23,7 +23,7 @@ function setupPage({ ax = AX_NODES } = {}) {
   transport.on("Network.getResponseBody", () => ({ body: JSON.stringify({ value: 42 }) }));
   const browser = {
     transport,
-    config: { dialogPolicy: "auto-dismiss", focusEmulation: false, stateDir: "/tmp/bh-unit", downloadDir: "/tmp/bh-unit/downloads" },
+    config: { dialogPolicy, focusEmulation: false, stateDir: "/tmp/bh-unit", downloadDir: "/tmp/bh-unit/downloads", platform },
   };
   const page = new Page(browser, { sessionId: "s1", targetId: "t1" });
   return { page, transport };
@@ -152,4 +152,105 @@ test("screenshots stay inside screenshotDir and never overwrite", async () => {
     assert.equal(error.code, "E_POLICY_DENIED");
     return true;
   });
+});
+
+test("fill uses Command+A on macOS and Control+A elsewhere", async () => {
+  for (const [platform, expected] of [["darwin", 4], ["win32", 2], ["linux", 2]] as const) {
+    const { page, transport } = setupPage({ platform });
+    await page.fill({ selector: "#name", text: "mac" });
+    const selectAll = transport.calls.find((call) => call.method === "Input.dispatchKeyEvent" && call.params.key === "a");
+    assert.equal(selectAll.params.modifiers, expected, platform + " select-all modifier");
+  }
+});
+
+test("hover moves the mouse over a selector", async () => {
+  const { page, transport } = setupPage();
+  const result = await page.hover({ selector: "#name" });
+  assert.deepEqual(result, { ok: true, x: 30, y: 30 });
+  const moved = transport.calls.filter((call) => call.method === "Input.dispatchMouseEvent" && call.params.type === "mouseMoved");
+  assert.equal(moved.length, 1);
+});
+
+test("manual dialogs can be read and handled; auto-dismiss is recorded", async () => {
+  const manual = setupPage({ dialogPolicy: "manual" });
+  await manual.page.enableDomains();
+  manual.transport.emit("Page.javascriptDialogOpening", { type: "confirm", message: "sure?" });
+  assert.equal(manual.page.dialog().type, "confirm");
+  await manual.page.handleDialog({ accept: true });
+  assert.equal(manual.transport.count("Page.handleJavaScriptDialog"), 1);
+  assert.equal(manual.transport.calls.find((call) => call.method === "Page.handleJavaScriptDialog").params.accept, true);
+  await assert.rejects(manual.page.handleDialog(), (error: any) => {
+    assert.equal(error.code, "E_BAD_ARG");
+    return true;
+  });
+
+  const auto = setupPage();
+  await auto.page.enableDomains();
+  auto.transport.emit("Page.javascriptDialogOpening", { type: "alert", message: "hi" });
+  assert.equal(auto.page.dialog(), null);
+  assert.equal(auto.page.dialogHistory.length, 1);
+});
+
+test("console and Log events are captured for browser_extract", async () => {
+  const { page, transport } = setupPage();
+  await page.enableDomains();
+  transport.emit("Runtime.consoleAPICalled", { type: "error", args: [{ value: "boom" }, { description: { x: 1 } }] });
+  transport.emit("Log.entryAdded", { entry: { level: "warning", text: "careful", url: "https://example.com/app" } });
+  const events = page.consoleEvents();
+  assert.equal(events.length, 2);
+  assert.equal(events[0].level, "error");
+  assert.match(events[0].text, /boom/);
+  assert.equal(events[1].level, "warning");
+  assert.equal(events[1].text, "careful");
+});
+
+test("boxFor and element screenshots use the element clip", async () => {
+  const { page, transport } = setupPage();
+  const box = await page.boxFor({ selector: "#name" });
+  assert.deepEqual(box, { x: 10, y: 20, width: 40, height: 20 });
+
+  const dir = await tempDir("bh-page-element-shot-");
+  const png = Buffer.alloc(32);
+  Buffer.from("89504e470d0a1a0a", "hex").copy(png, 0);
+  png.writeUInt32BE(1, 16);
+  png.writeUInt32BE(1, 20);
+  transport.on("Page.captureScreenshot", () => ({ data: png.toString("base64") }));
+  const elementPage = new Page({
+    transport,
+    config: { dialogPolicy: "auto-dismiss", focusEmulation: false, stateDir: dir, screenshotDir: dir },
+  }, { sessionId: "s1", targetId: "t1" });
+  const shot = await elementPage.screenshot({ path: "element.png", clip: box });
+  assert.ok(shot.path.endsWith("element.png"));
+  const capture = transport.calls.filter((call) => call.method === "Page.captureScreenshot").at(-1);
+  assert.deepEqual(capture.params.clip, { x: 10, y: 20, width: 40, height: 20, scale: 1 });
+});
+
+test("pdf exports to screenshotDir without overwriting", async () => {
+  const dir = await tempDir("bh-page-pdf-");
+  const transport = new FakeTransport();
+  transport.on("Page.printToPDF", () => ({ data: Buffer.from("%PDF-1.4 test").toString("base64") }));
+  const page = new Page({
+    transport,
+    config: { dialogPolicy: "auto-dismiss", focusEmulation: false, stateDir: dir, screenshotDir: dir },
+  }, { sessionId: "s1", targetId: "t1" });
+  const result = await page.pdf({ path: "page.pdf" });
+  assert.ok(result.path.endsWith("page.pdf"));
+  assert.ok(result.bytes > 0);
+  await assert.rejects(page.pdf({ path: "page.pdf" }), (error: any) => {
+    assert.equal(error.code, "E_POLICY_DENIED");
+    return true;
+  });
+});
+
+test("history back/forward/reload navigate through CDP history", async () => {
+  const { page, transport } = setupPage();
+  transport.on("Page.getNavigationHistory", () => ({
+    currentIndex: 1,
+    entries: [{ id: 1, url: "https://example.com/a" }, { id: 2, url: "https://example.com/b" }],
+  }));
+  transport.on("Runtime.evaluate", () => ({ result: { value: "complete" } }));
+  await page.history("back");
+  assert.equal(transport.calls.find((call) => call.method === "Page.navigateToHistoryEntry").params.entryId, 1);
+  await page.history("reload");
+  assert.equal(transport.count("Page.reload"), 1);
 });

@@ -8,7 +8,7 @@ import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -231,4 +231,42 @@ test("T10 CLI open/snapshot/info/close drive a real tab", async (t) => {
 
   const doctor = await runCli(process.execPath, [bh, "doctor"], { env, timeout: 30_000 });
   assert.match(doctor.stdout, /chrome/);
+});
+
+test("T28 browser_wait supports selector, text, delay and network-idle modes", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/form.html", newTab: true });
+  const selected = await run("browser_wait", { mode: "selector", selector: "#name", visible: true });
+  assert.equal(selected.matched, true);
+  const text = await run("browser_wait", { mode: "text", text: "Submit" });
+  assert.equal(text.matched, true);
+  const delayed = await run("browser_wait", { mode: "delay", delayMs: 10 });
+  assert.equal(delayed.waitedMs, 10);
+  const idle = await run("browser_wait", { mode: "network_idle", timeoutMs: 5_000, idleMs: 100 });
+  assert.equal(idle.ok, true);
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});
+
+test("T29 browser_act hover and browser_extract console work on a real page", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/form.html", newTab: true });
+  const hovered = await run("browser_act", { action: "hover", selector: "#submit" });
+  assert.equal(hovered.ok, true);
+  await run("browser_extract", { mode: "js", expression: "console.error('console-probe')" });
+  await run("browser_wait", { mode: "delay", delayMs: 30 });
+  const consoleResult = await run("browser_extract", { mode: "console" });
+  assert.ok(consoleResult.events.some((event) => event.text.includes("console-probe")), "console event is captured");
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});
+
+test("T30 browser_screenshot element clip and browser_pdf write files", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/form.html", newTab: true });
+  const shot = await run("browser_screenshot", { selector: "#name", path: "element.png" });
+  const image = await readFile(shot.path);
+  assert.equal(image.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  const pdf = await run("browser_pdf", { path: "page.pdf" });
+  const document = await readFile(pdf.path);
+  assert.equal(document.subarray(0, 4).toString(), "%PDF");
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
 });

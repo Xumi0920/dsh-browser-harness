@@ -115,11 +115,15 @@ export class Page {
   networkLog: any[];
   networkEnabled: boolean;
   networkStarting: any;
+  consoleLog: any[];
+  consoleListening: boolean;
+  maxConsoleEvents: number = 500;
   closed: boolean;
   dialogPolicy: string;
   focusEmulation: boolean;
   downloadDir: string;
   screenshotDir: string;
+  platform: string;
   executionContexts: any[];
   runtimeEnabled: boolean;
   ownedListeners: any[];
@@ -146,12 +150,15 @@ export class Page {
     this.networkEnabled = false;
     /** @type {any | null} */
     this.networkStarting = null;
+    this.consoleLog = [];
+    this.consoleListening = false;
     /** Cached page instances are detached after use; a closed page refuses work. */
     this.closed = false;
     this.dialogPolicy = browser.config.dialogPolicy ?? "auto-dismiss";
     this.focusEmulation = browser.config.focusEmulation !== false;
     this.downloadDir = browser.config.downloadDir;
     this.screenshotDir = browser.config.screenshotDir || join(browser.config.stateDir || "", "screenshots");
+    this.platform = browser.config.platform || process.platform;
     /** @type {any[]} */
     this.executionContexts = [];
     this.runtimeEnabled = false;
@@ -192,6 +199,18 @@ export class Page {
     this.on("Page.javascriptDialogClosed", () => {
       this.pendingDialog = null;
     });
+    this.send("Log.enable", {}, { timeoutMs: 5_000 }).catch(() => null);
+    if (!this.consoleListening) {
+      this.consoleListening = true;
+      this.on("Runtime.consoleAPICalled", (params: any) => {
+        const text = (params.args || []).map((arg: any) => arg && arg.value !== undefined ? String(arg.value) : String((arg && (arg.description || arg.type)) || "")).join(" ");
+        this.#pushConsole({ source: "console", level: params.type || "log", text, at: new Date().toISOString() });
+      });
+      this.on("Log.entryAdded", (params: any) => {
+        const entry = params.entry || {};
+        this.#pushConsole({ source: "log", level: entry.level || "info", text: String(entry.text || ""), at: new Date().toISOString(), url: entry.url, lineNumber: entry.lineNumber });
+      });
+    }
     await Promise.all(domains);
     if (this.focusEmulation) await this.setFocusEmulation(true).catch(() => {});
     return this;
@@ -205,6 +224,16 @@ export class Page {
     await this.send("Emulation.setFocusEmulationEnabled", { enabled: Boolean(enabled) }, { timeoutMs: 5_000 });
     this.focusEmulation = Boolean(enabled);
     return { ok: true, focusEmulation: this.focusEmulation };
+  }
+
+  #pushConsole(event: any) {
+    this.consoleLog.push(event);
+    if (this.consoleLog.length > this.maxConsoleEvents) this.consoleLog.shift();
+  }
+
+  /** Recent console/Log events captured by Runtime.enable / Log.enable. */
+  consoleEvents(limit: any = 100) {
+    return this.consoleLog.slice(-Math.max(1, Math.min(Number(limit) || 100, 500)));
   }
 
   #onDialogOpening(params: any) {
@@ -225,6 +254,7 @@ export class Page {
 
   /** Handle the currently open dialog. */
   async handleDialog({ accept = true, promptText }: any = {} as any) {
+    if (!this.pendingDialog) throw badArgument("no JavaScript dialog is open");
     const params: any = { accept };
     if (typeof promptText === "string") params.promptText = promptText;
     await this.send("Page.handleJavaScriptDialog", params, { timeoutMs: 5_000 });
@@ -279,6 +309,25 @@ export class Page {
     const result = await this.send("Page.navigate", { url }, { timeoutMs });
     if (result.errorText && !/^net::ERR_ABORTED/.test(result.errorText)) {
       throw new Error("navigation failed: " + result.errorText);
+    }
+    if (waitUntil !== "none") await this.waitForLoad({ timeoutMs });
+    this.lastSnapshot = null;
+    return this.info();
+  }
+
+  /** Go back/forward, or reload the page, then wait for the new document. */
+  async history(action: any, { waitUntil = "load", timeoutMs = DEFAULT_LOAD_TIMEOUT_MS }: any = {} as any) {
+    const verb = String(action);
+    if (verb === "reload") {
+      await this.send("Page.reload", { ignoreCache: false }, { timeoutMs: 10_000 });
+    } else if (verb === "back" || verb === "forward") {
+      const history = await this.send("Page.getNavigationHistory", {}, { timeoutMs: 5_000 });
+      const entries = Array.isArray(history.entries) ? history.entries : [];
+      const index = Number(history.currentIndex) + (verb === "back" ? -1 : 1);
+      if (!entries[index]) throw badArgument("cannot go " + verb + ": no history entry");
+      await this.send("Page.navigateToHistoryEntry", { entryId: entries[index].id }, { timeoutMs: 10_000 });
+    } else {
+      throw badArgument("history needs back, forward or reload");
     }
     if (waitUntil !== "none") await this.waitForLoad({ timeoutMs });
     this.lastSnapshot = null;
@@ -368,16 +417,35 @@ export class Page {
     }
   }
 
-  async #centerForBackendNode(backendNodeId: any) {
+  async #boxModelForBackendNode(backendNodeId: any) {
     try {
       await this.send("DOM.scrollIntoViewIfNeeded", { backendNodeId }, { timeoutMs: 3_000 });
     } catch {
       /* already visible or detached */
     }
     const model = await this.send("DOM.getBoxModel", { backendNodeId }, { timeoutMs: 5_000 });
-    const center = boxCenter(model.model);
+    return model.model;
+  }
+
+  async #centerForBackendNode(backendNodeId: any) {
+    const center = boxCenter(await this.#boxModelForBackendNode(backendNodeId));
     if (!center) throw elementNotFound("backendNodeId " + backendNodeId, { kind: "box" });
     return center;
+  }
+
+  /** Viewport box for a ref/selector (scrolls the element into view first). */
+  async boxFor(target: any) {
+    let backendNodeId;
+    if (target && target.ref) backendNodeId = (await this.#resolveRef(target.ref)).backendDOMNodeId;
+    else if (target && target.selector) backendNodeId = await this.#resolveSelector(target.selector);
+    else throw badArgument("boxFor needs {ref} or {selector}");
+    const content = (await this.#boxModelForBackendNode(backendNodeId)).content || [];
+    const xs = [content[0], content[2], content[4], content[6]].filter((value: any) => Number.isFinite(value));
+    const ys = [content[1], content[3], content[5], content[7]].filter((value: any) => Number.isFinite(value));
+    if (!xs.length || !ys.length) throw elementNotFound("target", { kind: "box" });
+    const x = Math.min(...xs);
+    const y = Math.min(...ys);
+    return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
   }
 
   /**
@@ -398,6 +466,17 @@ export class Page {
     }
     if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) throw badArgument("click needs {ref}, {selector} or {at:{x,y}}");
     await this.clickAt(point.x, point.y, options);
+    return { ok: true, x: point.x, y: point.y };
+  }
+
+  /** Move the mouse over a ref/selector without clicking (triggers hover menus). */
+  async hover(target: any) {
+    let backendNodeId;
+    if (target && target.ref) backendNodeId = (await this.#resolveRef(target.ref)).backendDOMNodeId;
+    else if (target && target.selector) backendNodeId = await this.#resolveSelector(target.selector);
+    else throw badArgument("hover needs {ref} or {selector}");
+    const point = await this.#centerForBackendNode(backendNodeId);
+    await this.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y }, { timeoutMs: 5_000 });
     return { ok: true, x: point.x, y: point.y };
   }
 
@@ -451,7 +530,8 @@ export class Page {
     const target = await this.#resolveTargetHandle({ ref, selector });
     await this.send("DOM.focus", { backendNodeId: target.backendNodeId }, { timeoutMs: 5_000 });
     if (clearFirst) {
-      const modifiers = 2; // Control
+      // macOS needs Command+A; Control+A only moves the caret to line start.
+      const modifiers = this.platform === "darwin" ? 4 : 2;
       const selectAll = { modifiers, key: "a", code: "KeyA", windowsVirtualKeyCode: 65, nativeVirtualKeyCode: 65 };
       await this.send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...selectAll }, { timeoutMs: 5_000 });
       await this.send("Input.dispatchKeyEvent", { type: "keyUp", ...selectAll }, { timeoutMs: 5_000 });
@@ -563,15 +643,13 @@ export class Page {
    * <stateDir>/screenshots). Relative paths resolve inside that directory, and
    * existing files are never overwritten.
    */
-  async screenshot({ path: filePath, fullPage = false }: any = {} as any) {
-    const result = await this.send("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: Boolean(fullPage) }, { timeoutMs: 60_000 });
-    const buffer = Buffer.from(result.data, "base64");
+  async #artifactTarget(filePath: any, prefix: string, extension: string) {
     const base = resolve(this.screenshotDir);
     await mkdir(base, { recursive: true, mode: 0o700 });
     const realBase = await realpath(base).catch(() => {
       throw policyDenied("cannot resolve screenshotDir", { screenshotDir: base });
     });
-    const target = filePath ? resolve(base, String(filePath)) : join(base, "bh-shot-" + Date.now() + ".png");
+    const target = filePath ? resolve(base, String(filePath)) : join(base, prefix + Date.now() + extension);
     const relativeTarget = relative(resolve(this.screenshotDir), target);
     if (relativeTarget === ".." || relativeTarget.startsWith(".." + sep) || isAbsolute(relativeTarget)) {
       throw policyDenied("screenshot path must stay inside screenshotDir", { path: target, screenshotDir: base });
@@ -586,14 +664,40 @@ export class Page {
     if (relativeParent === ".." || relativeParent.startsWith(".." + sep) || isAbsolute(relativeParent)) {
       throw policyDenied("screenshot path must stay inside screenshotDir", { path: target, screenshotDir: realBase });
     }
+    return target;
+  }
+
+  async #writeArtifact(target: string, buffer: any, kind: string) {
     try {
       await writeFile(target, buffer, { flag: "wx", mode: 0o600 });
     } catch (error: any) {
-      if (error && error.code === "EEXIST") throw policyDenied("refusing to overwrite an existing screenshot", { path: target });
+      if (error && error.code === "EEXIST") throw policyDenied("refusing to overwrite an existing " + kind, { path: target });
       throw error;
     }
+  }
+
+  async screenshot({ path: filePath, fullPage = false, clip }: any = {} as any) {
+    const params: any = { format: "png", fromSurface: true, captureBeyondViewport: Boolean(fullPage) };
+    if (clip) {
+      const { x, y, width, height } = clip;
+      if (![x, y, width, height].every((value: any) => Number.isFinite(value)) || width <= 0 || height <= 0) throw badArgument("screenshot clip needs finite x/y/width/height");
+      params.clip = { x, y, width, height, scale: 1 };
+    }
+    const result = await this.send("Page.captureScreenshot", params, { timeoutMs: 60_000 });
+    const buffer = Buffer.from(result.data, "base64");
+    const target = await this.#artifactTarget(filePath, "bh-shot-", ".png");
+    await this.#writeArtifact(target, buffer, "screenshot");
     const size = pngSize(buffer);
     return { path: target, bytes: buffer.length, width: size ? size.width : null, height: size ? size.height : null };
+  }
+
+  /** Export the page as PDF (confined to screenshotDir). */
+  async pdf({ path: filePath, printBackground = true }: any = {} as any) {
+    const result = await this.send("Page.printToPDF", { printBackground: Boolean(printBackground) }, { timeoutMs: 60_000 });
+    const buffer = Buffer.from(result.data, "base64");
+    const target = await this.#artifactTarget(filePath, "bh-print-", ".pdf");
+    await this.#writeArtifact(target, buffer, "PDF");
+    return { path: target, bytes: buffer.length };
   }
 
   /** Override the viewport metrics (rendering and screenshot size). */
