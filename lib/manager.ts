@@ -229,6 +229,25 @@ export class BrowserManager {
     });
   }
 
+  /** Start a fresh task shell for a lane after its previous task was closed. */
+  async startTask(sessionId: any) {
+    const lane = this.laneFor(sessionId);
+    return this.#withLaneGate(lane, async () => {
+      const { task, dir } = await this.#taskFor(sessionId);
+      if (task.state !== "closed") throw new HarnessError(codes.E_BAD_ARG || "E_BAD_ARG", "task " + task.id + " is " + task.state + "; start is only valid after close");
+      const next = { ...task, state: "active", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), cleanupPolicy: task.cleanupPolicy };
+      await updateState(lane, (currentState: any) => ({
+        ...currentState,
+        current: null,
+        ownedTabs: [],
+        group: null,
+        task: next,
+      }), dir);
+      await this.locks.releaseTask(task.id);
+      return { ok: true, task: next };
+    });
+  }
+
   /** Close a task, optionally closing its owned tabs, and release all leases. */
   async closeTask(sessionId: any, { cleanup }: any = {} as any) {
     const lane = this.laneFor(sessionId);

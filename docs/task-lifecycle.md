@@ -1,6 +1,6 @@
 # 任务生命周期与标签页锁模型
 
-> 状态：Phase A 已随 v1.6.0 实现；严格借用/跨进程锁/context 隔离仍属后续阶段  
+> 状态：Phase A 已随 v1.6.1 实现；严格借用/跨进程锁/context 隔离仍属后续阶段  
 > 目标读者：维护者、DSH 插件集成方  
 > 适用范围：共享同一浏览器 profile 的多 DSH 会话/任务
 
@@ -263,7 +263,7 @@ v1.6 先保证**锁互斥**，暂不改变现有 `use` 的非自建 tab 精确 t
 - `src/tasks.ts`：TabLockManager + task helpers。
 - state v2 兼容字段 + TaskRecord 读写。
 - Manager `withPage/withNavigatedPage`，工具接入。
-- `browser_task` status/pause/resume/close。
+- `browser_task` status/pause/resume/close/start。
 - 单 manager 进程内锁；严格借用策略暂不启用。
 
 ### Phase B（后续）
@@ -278,7 +278,7 @@ v1.6 先保证**锁互斥**，暂不改变现有 `use` 的非自建 tab 精确 t
 - state v2 兼容字段 `task`，旧 state 自动补 `id/state/createdAt/updatedAt/cleanupPolicy`；
 - `src/tasks.ts` 的 `TabLockManager`：按 target 独占、同任务重入、等锁超时、任务级批量释放；
 - `BrowserManager.withPage` / `withNavigatedPage`：lane gate + target lease；
-- 所有页面工具接入锁；`browser_task` 提供 status/pause/resume/close；
+- 所有页面工具接入锁；`browser_task` 提供 status/pause/resume/close/start；
 - pause 释放 lease；close 默认关闭 owned tabs 并写 `closed` tombstone；
 - 单测覆盖锁互斥/重入/超时、任务状态、集成覆盖跨 session 锁与 pause/resume/close。
 

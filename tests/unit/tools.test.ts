@@ -45,6 +45,7 @@ function fakeManager(overrides = {}) {
     pauseTask: async () => ({ ok: true, task: { state: "paused" } }),
     resumeTask: async () => ({ ok: true, task: { state: "active" } }),
     closeTask: async () => ({ ok: true, task: { state: "closed" }, closedTabs: [] }),
+    startTask: async () => ({ ok: true, task: { state: "active" } }),
     ...overrides,
   };
   manager.withPage = async (sessionId, fn) => fn(await manager.pageFor(sessionId), { release: async () => {} });
@@ -561,6 +562,7 @@ test("browser_diagnose returns state, console, network failures and screenshot",
   assert.equal(value.console.length, 1);
   assert.equal(value.networkFailures.length, 1);
   assert.equal(value.screenshot.path, "/tmp/diag.png");
+  assert.equal(value.task.task.state, "active");
   assert.ok(!value.url.includes("secret"));
 });
 

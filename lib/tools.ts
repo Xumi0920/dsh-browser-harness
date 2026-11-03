@@ -545,6 +545,8 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
           .filter((event: any) => event.error || Number(event.status) >= 400)
           .slice(-20)
           .map(redactEvent);
+        let task = null;
+        try { task = await manager.taskStatus(sessionId); } catch { task = null; }
         return {
           url: info ? redactUrlForOutput(info.url) : null,
           title: info ? info.title : null,
@@ -554,6 +556,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
           console: consoleEvents,
           networkFailures: failures,
           screenshot,
+          task,
         };
         });
       }),
@@ -609,9 +612,9 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
     tool({
       name: "browser_task",
       description:
-        "Inspect or control this session's task lifecycle. status returns task state, owned tabs and locks; pause stops new page operations and releases leases; resume re-enables; close optionally closes owned tabs and marks the task closed.",
+        "Inspect or control this session's task lifecycle. status returns task state, owned tabs and locks; pause stops new page operations and releases leases; resume re-enables; close optionally closes owned tabs and marks the task closed; start creates a fresh task after close.",
       parameters: {
-        action: { type: "string", required: true, enum: ["status", "pause", "resume", "close"], description: "task operation" },
+        action: { type: "string", required: true, enum: ["status", "pause", "resume", "close", "start"], description: "task operation" },
         cleanup: { type: "string", enum: ["close-owned", "leave"], description: "close: close owned tabs (default) or leave them open" },
       },
       output: jsonOutput,
@@ -623,6 +626,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         if (action === "pause") return manager.pauseTask(sessionId);
         if (action === "resume") return manager.resumeTask(sessionId);
         if (action === "close") return manager.closeTask(sessionId, { cleanup: args.cleanup });
+        if (action === "start") return manager.startTask(sessionId);
         throw new HarnessError("E_BAD_ARG", "unknown task action: " + action);
       }),
     }),

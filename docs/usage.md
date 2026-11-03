@@ -11,7 +11,7 @@
 5. `browser_extract` — `text` / `html` / `js` / `network` / `console` / `frames`；`text/html/js` 可传 `frameId`/`frameUrl`；
 6. `browser_snapshot`（支持 `offset`/`limit` 分页和 checked/selected/expanded 状态）/ `browser_screenshot` / `browser_pdf` 复核；`browser_diagnose` 生成失败诊断包；
 7. `browser_upload` / `browser_download` 处理文件；`browser_tabs` 管理自建标签页；
-8. `browser_task` 查看/暂停/恢复/关闭当前 Task；页面操作持有 target 独占锁，跨任务冲突返回 `E_TAB_LOCKED` 或 `E_LOCK_TIMEOUT`。
+8. `browser_task` 查看/暂停/恢复/关闭/重新开始当前 Task；页面操作持有 target 独占锁，跨任务冲突返回 `E_TAB_LOCKED` 或 `E_LOCK_TIMEOUT`；closed Task 需 `{action:"start"}` 新建任务壳。
 
 > refs 属于产生它的快照：导航或 DOM 变化后重新 `browser_snapshot`。受控输入用 `fill`（真实聚焦键 + `Input.insertText` + `input`/`change`），`type` 只在需要逐键语义时使用。`fill` 只返回 `{ok, length, verified}`，**不回显输入值**。
 

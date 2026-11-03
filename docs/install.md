@@ -16,7 +16,7 @@ npm run build                                 # tsc → dist/ + extension/sw.js�
 
 npm test                                      # 构建源码与测试，跑 172 单测（fake CDP 替身）
 npm run test:integration                      # 构建 + 36 场景（真实 headless/headful Chromium）
-npm run test:all                              # 构建 + 共 210 条
+npm run test:all                              # 构建 + 共 212 条
 npm run verify -- --browser chrome            # 对 live 实例冒烟（需先 build）
 ```
 

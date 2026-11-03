@@ -23,7 +23,7 @@ A plain public read needs no browser. If `web_fetch` can read it, use `web_fetch
 7. Screenshot with `browser_screenshot` (optionally `ref`/`selector` for an element) when layout or visual state matters; `browser_pdf` exports PDF. Files stay in `screenshotDir` and existing files are never overwritten.
 8. Upload with `browser_upload {ref|selector, path|paths}`; paths must be inside `uploadDir`. Download with `browser_download {ref|selector}`; files land in `downloadDir`.
 9. On failure or ambiguity, call `browser_diagnose` for a screenshot, console errors, failed responses and active requests; then close tabs you created with `browser_tabs {action:"close", targetId}`.
-10. Use `browser_task` to inspect or control the current task: status, pause, resume, close. Page operations hold an exclusive tab lease; another task on the same tab gets `E_TAB_LOCKED` or `E_LOCK_TIMEOUT`.
+10. Use `browser_task` to inspect or control the current task: status, pause, resume, close, start (after close). Page operations hold an exclusive tab lease; another task on the same tab gets `E_TAB_LOCKED` or `E_LOCK_TIMEOUT`.
 
 ## Rules
 

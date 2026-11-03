@@ -380,4 +380,41 @@ test("T38 browser_task pause/resume/close controls page operations", async (t) =
   assert.equal(closed.task.state, "closed");
   assert.ok(closed.closedTabs.includes(nav.targetId));
   await assert.rejects(runAs("browser_navigate", { url: server.url + "/a.html" }, session), /E_TASK_CLOSED/);
+  const restarted = await runAs("browser_task", { action: "start" }, session);
+  assert.equal(restarted.task.state, "active");
+  const restartedNav = await runAs("browser_navigate", { url: server.url + "/a.html", newTab: true }, session);
+  assert.match(restartedNav.url, /a.html/);
+  await runAs("browser_task", { action: "close", cleanup: "close-owned" }, session);
+});
+
+test("T39 a new manager restores task/current state without stale locks", async (t) => {
+  if (needChrome(t)) return;
+  const session = "it-tools-restart";
+  const nav = await runAs("browser_navigate", { url: server.url + "/form.html", newTab: true }, session);
+  const manager2 = new BrowserManager({ cdpUrl: chrome.httpUrl, stateDir });
+  try {
+    const restored = await manager2.pageFor(session);
+    assert.equal(restored.targetId, nav.targetId);
+    const status = await manager2.taskStatus(session);
+    assert.equal(status.task.state, "active");
+    assert.equal(status.locks.length, 0);
+  } finally {
+    await manager2.close();
+  }
+  await runAs("browser_tabs", { action: "close", targetId: nav.targetId }, session);
+});
+
+test("T40 advanced wait handles response and url_changed", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/net.html", newTab: true });
+  const ref = /(e\d+) button "Load"/.exec(nav.snapshot)[1];
+  await run("browser_act", { action: "click", ref });
+  const response = await run("browser_wait", { mode: "response", url: "/api/slow", includeBody: true, timeoutMs: 5_000 });
+  assert.equal(response.response.status, 200);
+  assert.match(String(response.response.body), /"value":42/);
+  const before = nav.url;
+  await run("browser_extract", { mode: "js", expression: "history.pushState({}, '', '/changed')" });
+  const changed = await run("browser_wait", { mode: "url_changed", url: before, timeoutMs: 5_000 });
+  assert.equal(changed.changed, true);
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
 });
