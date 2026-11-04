@@ -358,3 +358,26 @@ test("snapshot offset paginates beyond 400 and keeps filtered totals", async () 
   assert.deepEqual(snapshot.nodes.map((node) => node.ref).slice(0, 2), ["e401", "e402"]);
   assert.equal(snapshot.truncated, false);
 });
+
+test("snapshot generation reuses the cached AX tree and rejects stale generations", async () => {
+  const transport = new FakeTransport();
+  const nodes = Array.from({ length: 450 }, (_, index) => ({ role: { value: "button" }, backendDOMNodeId: 100 + index, name: { value: "button-" + (index + 1) } }));
+  transport.on("Accessibility.getFullAXTree", () => ({ nodes }));
+  transport.on("DOM.getBoxModel", () => quad(1, 1, 10, 10));
+  const page = new Page({ transport, config: { dialogPolicy: "auto-dismiss", focusEmulation: false, stateDir: "/tmp/bh-unit" } }, { sessionId: "s1", targetId: "t1" });
+  const first = await page.snapshot({ maxNodes: 2, offset: 0 });
+  assert.equal(first.generation, "1");
+  assert.deepEqual(first.nodes.map((node) => node.ref), ["e1", "e2"]);
+  const second = await page.snapshot({ maxNodes: 50, offset: 400, generation: first.generation });
+  assert.equal(second.generation, first.generation);
+  assert.equal(second.snapshotVersion, first.snapshotVersion);
+  assert.equal(second.total, 450);
+  assert.equal(second.nodes[0].name, "button-401");
+  assert.deepEqual(second.nodes.slice(0, 2).map((node) => node.ref), ["e401", "e402"]);
+  const next = await page.snapshot({ maxNodes: 2, offset: 0 });
+  assert.notEqual(next.generation, first.generation);
+  await assert.rejects(page.snapshot({ maxNodes: 2, generation: first.generation }), (error) => {
+    assert.equal(error.code, "E_STALE_SNAPSHOT");
+    return true;
+  });
+});

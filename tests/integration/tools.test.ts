@@ -816,3 +816,19 @@ test("T62 browser_act html5 drag carries DataTransfer to a drop zone", async (t)
   assert.equal(text.value, "dropped:card-42");
   await run("browser_tabs", { action: "close", targetId: nav.targetId });
 });
+
+test("T63 snapshot generation keeps refs stable across pages", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/many-buttons.html", newTab: true });
+  const first = await run("browser_snapshot", { role: "button", offset: 0, limit: 2 });
+  assert.equal(first.total, 450);
+  const second = await run("browser_snapshot", { role: "button", offset: 400, limit: 50, generation: first.generation });
+  assert.equal(second.generation, first.generation);
+  assert.equal(second.total, 450);
+  assert.match(second.text, /button-401/);
+  assert.match(second.text, /e\d+ button "button-401"/);
+  const next = await run("browser_snapshot", { role: "button", offset: 0, limit: 2 });
+  assert.notEqual(next.generation, first.generation);
+  await assert.rejects(run("browser_snapshot", { role: "button", generation: first.generation, limit: 2 }), /E_STALE_SNAPSHOT/);
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});

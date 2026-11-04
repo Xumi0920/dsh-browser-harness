@@ -8,6 +8,7 @@
 import { writeFile, readFile, readdir, stat, mkdir, realpath, lstat } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
+import { HarnessError, codes } from "./errors.js";
 import {
   badArgument,
   clickIntercepted,
@@ -130,6 +131,7 @@ export class Page {
   nextRef: number;
   snapshotChain: Promise<any>;
   snapshotVersion: number;
+  snapshotCache: any;
   activeRequests: Map<string, any>;
   lastNetworkActivity: number;
   pendingDialog: any;
@@ -161,11 +163,13 @@ export class Page {
     this.targetId = ids.targetId;
     /** @type {any[] | null} */
     this.lastSnapshot = null;
+    this.snapshotCache = null;
     /** Monotonic ref counter: a stale ref never matches a later snapshot. */
     this.nextRef = 0;
     /** Serializes snapshot generation so concurrent calls cannot share refStart. */
     this.snapshotChain = Promise.resolve();
     this.snapshotVersion = 0;
+    this.snapshotCache = null;
     /** Requests currently in flight, independent of the capped networkLog. */
     this.activeRequests = new Map();
     this.lastNetworkActivity = Date.now();
@@ -340,6 +344,7 @@ export class Page {
     }
     if (waitUntil !== "none") await this.waitForLoad({ waitUntil, timeoutMs });
     this.lastSnapshot = null;
+    this.snapshotCache = null;
     return this.info();
   }
 
@@ -359,6 +364,7 @@ export class Page {
     }
     if (waitUntil !== "none") await this.waitForLoad({ waitUntil, timeoutMs });
     this.lastSnapshot = null;
+    this.snapshotCache = null;
     return this.info();
   }
 
@@ -403,19 +409,48 @@ export class Page {
   }
 
   async #snapshotNow(options: any = {} as any) {
+    const requestedGeneration = options.generation === undefined || options.generation === null ? null : String(options.generation);
+    if (requestedGeneration !== null) {
+      const cache = this.snapshotCache;
+      if (!cache || cache.generation !== requestedGeneration) {
+        throw new HarnessError(codes.E_STALE_SNAPSHOT, "snapshot generation " + requestedGeneration + " is stale; take a new browser_snapshot", {
+          details: { generation: requestedGeneration, currentGeneration: cache ? cache.generation : null },
+        });
+      }
+      const key = JSON.stringify({ frameId: options.frameId || null, role: options.role || null, name: options.name || null });
+      if (cache.key !== key) throw new HarnessError(codes.E_STALE_SNAPSHOT, "snapshot generation filters do not match; take a new browser_snapshot");
+      return this.#snapshotPage(cache, options);
+    }
+
     const params: any = options.frameId ? { frameId: options.frameId } : {};
     const raw = await this.send("Accessibility.getFullAXTree", params, { timeoutMs: 15_000 });
     const sourceNodes = filterAXNodes(raw.nodes || [], options.role, options.name);
-    const offset = Math.max(0, Number(options.offset) || 0);
-    const refStart = this.nextRef + offset;
+    const refStart = this.nextRef;
     this.snapshotVersion += 1;
-    const first = buildSnapshot(sourceNodes, { maxNodes: options.maxNodes ?? 400, roles: options.roles, refStart, offset });
-    const withBoxes = options.includeBoxes !== false;
-    if (withBoxes) {
+    const generation = String(this.snapshotVersion);
+    const full = buildSnapshot(sourceNodes, { maxNodes: Math.min(Math.max(sourceNodes.length, 1), 5_000), roles: options.roles, refStart, offset: 0 });
+    this.lastSnapshot = full.nodes;
+    this.nextRef = refStart + full.nodes.length;
+    this.snapshotCache = {
+      generation,
+      version: this.snapshotVersion,
+      targetId: this.targetId,
+      nodes: full.nodes,
+      total: full.total,
+      key: JSON.stringify({ frameId: options.frameId || null, role: options.role || null, name: options.name || null }),
+    };
+    return this.#snapshotPage(this.snapshotCache, options);
+  }
+
+  async #snapshotPage(cache: any, options: any) {
+    const offset = Math.max(0, Number(options.offset) || 0);
+    const maxNodes = Math.max(1, Math.min(Number(options.maxNodes) || 400, 400));
+    const page = cache.nodes.slice(offset, offset + maxNodes).map((node: any) => ({ ...node }));
+    if (options.includeBoxes !== false) {
       const boxes = new Map();
       const concurrency = 8;
-      for (let index = 0; index < first.nodes.length; index += concurrency) {
-        const chunk = first.nodes.slice(index, index + concurrency);
+      for (let index = 0; index < page.length; index += concurrency) {
+        const chunk = page.slice(index, index + concurrency);
         await Promise.all(chunk.map(async (node: any) => {
           try {
             const model = await this.send("DOM.getBoxModel", { backendNodeId: node.backendDOMNodeId }, { timeoutMs: 2_000 });
@@ -425,14 +460,24 @@ export class Page {
           }
         }));
       }
-      const second = buildSnapshot(sourceNodes, { maxNodes: first.nodes.length, roles: options.roles, boxes, refStart, offset });
-      this.lastSnapshot = second.nodes;
-      this.nextRef = refStart + second.nodes.length;
-      return { ...second, targetId: this.targetId, snapshotVersion: this.snapshotVersion };
+      for (const node of page) {
+        const model = boxes.get(node.backendDOMNodeId);
+        const center = model ? boxCenter(model) : null;
+        if (center) {
+          node.center = { x: center.x, y: center.y };
+          node.size = { width: center.width, height: center.height };
+        }
+      }
     }
-    this.lastSnapshot = first.nodes;
-    this.nextRef = refStart + first.nodes.length;
-    return { ...first, targetId: this.targetId, snapshotVersion: this.snapshotVersion };
+    return {
+      nodes: page,
+      truncated: offset + page.length < cache.total,
+      total: cache.total,
+      offset,
+      targetId: this.targetId,
+      snapshotVersion: cache.version,
+      generation: cache.generation,
+    };
   }
 
   /**
@@ -1170,6 +1215,7 @@ export class Page {
     }
     this.ownedListeners = [];
     this.lastSnapshot = null;
+    this.snapshotCache = null;
   }
 
   /**

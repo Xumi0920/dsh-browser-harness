@@ -403,6 +403,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         frameId: { type: "string", description: "optional iframe frameId from browser_extract mode:'frames'" },
         offset: { type: "number", description: "optional zero-based node offset for pagination" },
         limit: { type: "number", description: "optional page size after filtering" },
+        generation: { type: "string", description: "snapshot generation from a previous page; reuses its refs and cached AX tree" },
       },
       output: jsonOutput,
       timeoutMs: 30_000,
@@ -411,7 +412,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         return withPage(manager, sessionId, async (page: any) => {
         const offset = Math.max(0, Number(args.offset) || 0);
         const limit = Math.min(Math.max(Number(args.limit) || Number(args.maxNodes) || maxSnapshotNodes, 1), 400);
-        const snapshot = await page.snapshot({ maxNodes: limit, offset, frameId: args.frameId, role: args.role, name: args.name });
+        const snapshot = await page.snapshot({ maxNodes: limit, offset, generation: args.generation, frameId: args.frameId, role: args.role, name: args.name });
         let nodes = snapshot.nodes;
         if (args.role || args.name) nodes = findByRole(nodes, { role: args.role, name: args.name });
         const total = Number.isFinite(snapshot.total) ? snapshot.total : nodes.length;
@@ -424,6 +425,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
           targetId: page.targetId,
           snapshotId: page.targetId + ":" + snapshotVersion,
           snapshotVersion,
+          generation: snapshot.generation || null,
           url: redactUrlForOutput((await page.info()).url),
           text: rendered.text,
           nodes: nodes.length,
