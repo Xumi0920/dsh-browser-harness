@@ -40,7 +40,7 @@ browser_tabs        list / use / new / close
 - **自动失败诊断**：页面工具失败时自动写入 `<stateDir>/diagnostics/<lane>/`，含脱敏 URL、截图、console/network 尾部、task/lock/context 摘要；错误信息附诊断路径，不记录输入值。
 - **只读模式**：`readOnly: true` 时工具层阻止 click/fill/type、JS、上传/下载、tabs new/close 和 task 变更；导航/快照/提取/截图仍可用于检查页面。
 - **任务生命周期与标签页锁**：每个 DSH session 是一个 Task；页面操作持有 target 独占 lease，跨任务冲突返回 `E_TAB_LOCKED`/`E_LOCK_TIMEOUT`；支持 `browser_task` 的 status/pause/resume/close。v1.8 起 lease 默认写入 `<stateDir>/locks`，跨 manager 进程通过文件租约/心跳互斥；可选 `isolation: "context"` 为每个任务隔离 cookie/storage（不共享登录态）。
-- **可验证**：198 单测（fake CDP）+ 64 集成场景（真实 headless/headful Chromium）= 262 条，CI 覆盖三平台。
+- **可验证**：200 单测（fake CDP）+ 64 集成场景（真实 headless/headful Chromium）= 264 条，CI 覆盖三平台。
 - **收紧的边界**：`browser_tabs use` 只接受 page + http(s)/about:blank；非自建 tab 需显式 `{borrow:true}`，其他 Task 自建 tab 返回 `E_TAB_OWNER_CONFLICT`；截图/PDF 限定 `screenshotDir` 且不覆盖；上传限定 `uploadDir`、下载限定 `downloadDir` 并拒绝 symlink 逃逸；fill 不回显输入值；JS 模式标非并发；工具输出对 token 类 URL/headers 尽力脱敏；宽泛端口回退改为显式 `auto`；标签组不再临时改写页面标题。
 
 ## 环境要求
@@ -112,7 +112,7 @@ browser_extract {mode:"text" | "html" | "js" | "network" | "console" | "frames"}
 
 ```sh
 npm install                 # 开发依赖（TypeScript），运行时零依赖
-npm run test:all            # 构建 + 198 单测 + 64 集成场景 = 262 条
+npm run test:all            # 构建 + 200 单测 + 64 集成场景 = 264 条
 ```
 
 CI：单测跑 ubuntu / windows / macOS（另有 Node 24 任务）；集成场景跑 ubuntu + xvfb（门禁 64 条，S15/S16 必须实跑）。测试与脚本同样由 `tsc` 编译（`dist-tests/` / `dist-scripts/`），与运行时源码共用 NodeNext 配置。
