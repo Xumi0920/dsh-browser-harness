@@ -806,3 +806,13 @@ test("T61 per-session cleanup closes only the disposed session's owned tab", asy
     await m.close().catch(() => {});
   }
 });
+
+test("T62 browser_act html5 drag carries DataTransfer to a drop zone", async (t) => {
+  if (needChrome(t)) return;
+  const nav = await run("browser_navigate", { url: server.url + "/native-drag.html", newTab: true });
+  const dragged = await run("browser_act", { action: "drag", selector: "#card", toSelector: "#zone", mode: "html5" });
+  assert.equal(dragged.ok, true);
+  const text = await run("browser_extract", { mode: "text", selector: "#zone" });
+  assert.equal(text.value, "dropped:card-42");
+  await run("browser_tabs", { action: "close", targetId: nav.targetId });
+});

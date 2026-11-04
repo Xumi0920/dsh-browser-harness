@@ -647,5 +647,5 @@ test("browser_act drag routes source/target and steps to the page", async () => 
   const act = build(manager).find((definition) => definition.name === "browser_act");
   const value = await act.execute({ action: "drag", ref: "e1", toSelector: "#drop", steps: 4 }, {});
   assert.equal(value.ok, true);
-  assert.deepEqual(seen[0], [{ ref: "e1", selector: undefined }, { ref: undefined, selector: "#drop" }, { steps: 4 }]);
+  assert.deepEqual(seen[0], [{ ref: "e1", selector: undefined }, { ref: undefined, selector: "#drop" }, { steps: 4, mode: "mouse" }]);
 });

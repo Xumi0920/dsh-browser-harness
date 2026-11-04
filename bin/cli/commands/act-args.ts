@@ -21,6 +21,10 @@ export function parseActArgs(positional: string[], flags: any) {
   if (flags["prompt-text"] !== undefined) args.promptText = String(flags["prompt-text"]);
   if (flags["to-ref"] !== undefined) args.toRef = String(flags["to-ref"]);
   if (flags["to-selector"] !== undefined) args.toSelector = String(flags["to-selector"]);
+  if (flags.mode !== undefined) {
+    if (flags.mode !== "mouse" && flags.mode !== "html5") throw new Error("act --mode must be mouse or html5");
+    args.mode = String(flags.mode);
+  }
   const hasTarget = Boolean(args.ref || args.selector);
   const extra = positional.slice(1);
   if (extra.length > 0) {

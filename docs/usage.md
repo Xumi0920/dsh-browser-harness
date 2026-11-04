@@ -54,7 +54,7 @@ node dist/bin/bh.js navigate <url> [--new-tab]   # open 是 navigate 的别名
 node dist/bin/bh.js info | snapshot [--role r --name n --offset 0 --limit 50 --json]
 node dist/bin/bh.js act click --selector "#submit" --expect-text "Saved"
 node dist/bin/bh.js act fill --selector "#name" --text "Ada"
-node dist/bin/bh.js act drag --selector "#source" --to-selector "#target" --steps 12
+node dist/bin/bh.js act drag --selector "#source" --to-selector "#target" --steps 12 [--mode mouse|html5]
 node dist/bin/bh.js wait text --text "Saved"
 node dist/bin/bh.js extract text --selector "#result"   # 也可 html/js/network/console/frames
 node dist/bin/bh.js text [selector] | js <expr>

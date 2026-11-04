@@ -8,7 +8,7 @@ const FLAGS_BY_ACTION: Record<string, string[]> = {
   click: ["ref", "selector", "x", "y", "button", "clicks", "force"],
   hover: ["ref", "selector"],
   highlight: ["ref", "selector"],
-  drag: ["ref", "selector", "to-ref", "to-selector", "steps"],
+  drag: ["ref", "selector", "to-ref", "to-selector", "steps", "mode"],
   type: ["ref", "selector", "text"],
   fill: ["ref", "selector", "text"],
   selectOption: ["ref", "selector", "values"],

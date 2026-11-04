@@ -1,0 +1,16 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Native Drag - Fixture</title></head>
+<body>
+  <div id="card" draggable="true" style="width:120px;height:40px;background:#9cf">card</div>
+  <div id="zone" style="margin-top:30px;width:180px;height:80px;background:#fc9">drop zone</div>
+  <script>
+    var card = document.getElementById('card');
+    var zone = document.getElementById('zone');
+    card.addEventListener('dragstart', function (event) { event.dataTransfer.setData('text/plain', 'card-42'); });
+    zone.addEventListener('dragover', function (event) { event.preventDefault(); });
+    zone.addEventListener('drop', function (event) {
+      event.preventDefault();
+      zone.textContent = 'dropped:' + event.dataTransfer.getData('text/plain');
+    });
+  </script>
+</body></html>

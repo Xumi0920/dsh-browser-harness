@@ -590,7 +590,8 @@ export class Page {
   }
 
   /** Drag from one ref/selector to another using a real mouse sequence. */
-  async drag(source: any, target: any, { steps = 10, button = "left" }: any = {} as any) {
+  async drag(source: any, target: any, { steps = 10, button = "left", mode = "mouse" }: any = {} as any) {
+    if (mode === "html5") return this.#dragHtml5(source, target);
     const from = await this.#centerForDragTarget(source, "source");
     const to = await this.#centerForDragTarget(target, "target");
     const count = Math.max(1, Math.min(Number(steps) || 10, 100));
@@ -603,6 +604,29 @@ export class Page {
     }
     await this.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: to.x, y: to.y, button, buttons: 0, clickCount: 1 }, { timeoutMs: 5_000 });
     return { ok: true, from, to, steps: count };
+  }
+
+  async #objectForDragTarget(target: any, role: string) {
+    let backendNodeId;
+    if (target && target.ref) backendNodeId = (await this.#resolveRef(target.ref)).backendDOMNodeId;
+    else if (target && target.selector) backendNodeId = await this.#resolveSelector(target.selector);
+    else throw badArgument("drag " + role + " needs {ref} or {selector}");
+    const resolved = await this.send("DOM.resolveNode", { backendNodeId }, { timeoutMs: 5_000 });
+    const objectId = resolved && resolved.object && resolved.object.objectId;
+    if (!objectId) throw elementNotFound(target.ref || target.selector);
+    return objectId;
+  }
+
+  async #dragHtml5(source: any, target: any) {
+    const sourceObjectId = await this.#objectForDragTarget(source, "source");
+    const targetObjectId = await this.#objectForDragTarget(target, "target");
+    const result = await this.send("Runtime.callFunctionOn", {
+      objectId: sourceObjectId,
+      functionDeclaration: "function (target) { if (!target) throw new Error('drop target not found'); const dt = new DataTransfer(); const base = { bubbles: true, cancelable: true, dataTransfer: dt }; this.dispatchEvent(new DragEvent('dragstart', base)); target.dispatchEvent(new DragEvent('dragenter', base)); target.dispatchEvent(new DragEvent('dragover', base)); const drop = new DragEvent('drop', base); target.dispatchEvent(drop); this.dispatchEvent(new DragEvent('dragend', base)); return { ok: true, dropped: drop.defaultPrevented, types: Array.from(dt.types) }; }",
+      arguments: [{ objectId: targetObjectId }],
+      returnByValue: true,
+    }, { timeoutMs: 10_000 });
+    return (result && result.result && result.result.value) || { ok: true };
   }
 
   async #centerForDragTarget(target: any, role: string) {

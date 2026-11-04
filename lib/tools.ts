@@ -81,7 +81,8 @@ async function performAct(page: any, args: any) {
     const target = args.toRef || args.toSelector ? { ref: args.toRef, selector: args.toSelector } : null;
     if (!source) throw new HarnessError("E_BAD_ARG", "drag needs source ref or selector");
     if (!target) throw new HarnessError("E_BAD_ARG", "drag needs toRef or toSelector");
-    return { action, ...(await page.drag(source, target, { steps: args.steps })) };
+    if (args.mode !== undefined && args.mode !== "mouse" && args.mode !== "html5") throw new HarnessError("E_BAD_ARG", "drag mode must be mouse or html5");
+    return { action, ...(await page.drag(source, target, { steps: args.steps, mode: args.mode || "mouse" })) };
   }
   if (action === "type") {
     if (args.ref || args.selector) await page.focus({ ref: args.ref, selector: args.selector });
@@ -462,6 +463,7 @@ export function createTools(ctx: any, manager: any, config: any = {} as any, def
         toRef: { type: "string", description: "drag: target snapshot ref" },
         toSelector: { type: "string", description: "drag: target CSS selector" },
         steps: { type: "number", description: "drag: interpolation steps (default 10, capped at 100)" },
+        mode: { type: "string", enum: ["mouse", "html5"], description: "drag: pointer/mouse sequence (default) or synthetic HTML5 DataTransfer drag" },
         expectTimeoutMs: { type: "number", description: "expectation wait in milliseconds (default 5000, capped at 30000)" },
       },
       output: jsonOutput,
