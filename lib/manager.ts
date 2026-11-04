@@ -192,6 +192,9 @@ export class BrowserManager {
     const state = await readState(lane, dir);
     const task = normalizeTask(state.task, lane);
     if (!state.task) await setTask(lane, task, dir);
+    if (task.state === "closed" && this.contexts.has(task.id)) {
+      await this.#disposeTaskContext(task.id).catch(() => {});
+    }
     return { browser, lane, dir, task, state };
   }
 

@@ -1,6 +1,10 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { BrowserManager } from "../../dist/lib/manager.js";
+import { readState, writeState } from "../../dist/src/state.js";
+import { cleanupTempDirs, tempDir } from "../helpers/temp.js";
+
+after(cleanupTempDirs);
 
 function fakeConnection() {
   const calls = [];
@@ -16,7 +20,7 @@ function fakeConnection() {
   };
   const browser = {
     version: { product: "Chrome/156" },
-    transport: { closed: false },
+    transport: { closed: false, send: async (method, params) => { calls.push([method, params]); return method === "Target.createBrowserContext" ? { browserContextId: "ctx-created" } : {}; } },
     calls,
     sessionLane: null,
     async current(lane) { calls.push(["current", lane]); return lane === "dsh-s1" || lane === "dsh-default" ? { targetId: "t1" } : null; },
@@ -143,4 +147,42 @@ test("ensure maps a connect failure to E_NO_BROWSER", async () => {
     assert.match(error.message, /cannot reach a dedicated automation browser/);
     return true;
   });
+});
+
+test("cleanupSession disposes the lane context and closes the task", async () => {
+  const dir = await tempDir("bh-l2-cleanup-");
+  const manager = new BrowserManager({ stateDir: dir, isolation: "context" });
+  const browser = fakeConnection();
+  manager.connection = browser;
+  const now = new Date().toISOString();
+  await writeState({
+    task: { id: "dsh-s1", state: "active", createdAt: now, updatedAt: now, cleanupPolicy: "close-owned", browserContextId: "ctx-1" },
+    current: null,
+    ownedTabs: [],
+    group: null,
+  }, "dsh-s1", dir);
+  const result = await manager.cleanupSession("s1");
+  assert.equal(result.cleaned, true);
+  assert.ok(browser.calls.some((call) => Array.isArray(call) && call[0] === "Target.disposeBrowserContext" && call[1].browserContextId === "ctx-1"));
+  const state = await readState("dsh-s1", dir);
+  assert.equal(state.task.state, "closed");
+  assert.equal(state.task.browserContextId, null);
+});
+
+test("closed tasks dispose any context still cached in memory", async () => {
+  const dir = await tempDir("bh-l2-closed-");
+  const manager = new BrowserManager({ stateDir: dir, isolation: "context" });
+  const browser = fakeConnection();
+  manager.connection = browser;
+  const now = new Date().toISOString();
+  await writeState({
+    task: { id: "dsh-s1", state: "closed", createdAt: now, updatedAt: now, cleanupPolicy: "close-owned" },
+    current: null,
+    ownedTabs: [],
+    group: null,
+  }, "dsh-s1", dir);
+  manager.contexts.set("dsh-s1", "ctx-stale");
+  await manager.taskStatus("s1");
+  assert.ok(browser.calls.some((call) => Array.isArray(call) && call[0] === "Target.disposeBrowserContext" && call[1].browserContextId === "ctx-stale"));
+  assert.equal(manager.contexts.has("dsh-s1"), false);
 });

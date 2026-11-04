@@ -40,7 +40,7 @@ browser_tabs        list / use / new / close
 - **Automatic failure diagnosis.** Page-tool failures write a redacted bundle under `<stateDir>/diagnostics/<lane>/` with URL, screenshot, console/network tails and task/lock/context summaries; the error includes the bundle path and never echoes input values.
 - **Read-only mode.** `readOnly: true` blocks click/fill/type, JS execution, upload/download, tab create/close and task mutations at the tool layer; navigation, snapshots, extraction and screenshots remain available for inspection.
 - **Task lifecycle and tab locks.** Each DSH session is a Task; page operations hold an exclusive target lease, cross-task conflicts return `E_TAB_LOCKED`/`E_LOCK_TIMEOUT`, and `browser_task` supports status/pause/resume/close. Since v1.8, leases also live under `<stateDir>/locks` with heartbeat and stale recovery for cross-manager mutual exclusion; optional `isolation: "context"` gives each task its own cookie/storage context (no shared login).
-- **Tested.** 200 unit tests (fake CDP) + 64 integration scenarios (real headless/headful Chromium) = 264, with CI on three platforms.
+- **Tested.** 202 unit tests (fake CDP) + 64 integration scenarios (real headless/headful Chromium) = 266, with CI on three platforms.
 - **Hardened boundaries.** `browser_tabs use` accepts only page targets with http(s)/about:blank URLs; non-owned tabs require explicit `{borrow:true}`, and tabs owned by another Task return `E_TAB_OWNER_CONFLICT`; screenshots/PDF stay inside `screenshotDir` and never overwrite; uploads are confined to `uploadDir`, downloads to `downloadDir`, with symlink-escape checks; `fill` never echoes the entered value; JS mode is marked non-concurrent; token-like URLs/headers are redacted in tool output; broad port fallback is explicit `auto` only; tab grouping no longer mutates page titles.
 
 ## Requirements
@@ -114,7 +114,7 @@ browser_extract {mode:"text" | "html" | "js" | "network" | "console" | "frames"}
 
 ```sh
 npm install                 # dev deps (TypeScript); runtime stays zero-dependency
-npm run test:all            # build + 200 unit + 64 integration = 264 tests
+npm run test:all            # build + 202 unit + 64 integration = 266 tests
 ```
 
 CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu + xvfb (64-scenario gate, S15/S16 must actually run). Tests and scripts are compiled by `tsc` too (`dist-tests/` / `dist-scripts/`), sharing the runtime NodeNext config.
