@@ -132,4 +132,4 @@ CI: unit on ubuntu / windows / macOS (plus a Node 24 job); integration on ubuntu
 
 ## License
 
-MIT (c) 2026 Xumi0920 · current version **v1.9.5** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog
+MIT (c) 2026 Xumi0920 · current version **v1.10.0** · all code (sources, tests, scripts, extension) is TypeScript · see the [Releases page](https://github.com/Xumi0920/dsh-browser-harness/releases) for the changelog
