@@ -37,6 +37,7 @@ browser_tabs        list / use / new / close
 - **文本优先**：无障碍树 + ref 比“截图喂视觉模型”更准更省，截图只是补充。
 - **按任务标签组**：插件自建的标签页自动按 DSH 会话分组，工作标签页不受影响；headless 自动跳过。
 - **操作可靠性**：快照按页串行、attach 并发去重；click 默认做遮挡/命中检查（`E_CLICK_INTERCEPTED`）；`load` 等 `complete`；首次导航前开启网络抓取；网络空闲基于活动请求集合与最后活动时间。
+- **自动失败诊断**：页面工具失败时自动写入 `<stateDir>/diagnostics/<lane>/`，含脱敏 URL、截图、console/network 尾部、task/lock/context 摘要；错误信息附诊断路径，不记录输入值。
 - **只读模式**：`readOnly: true` 时工具层阻止 click/fill/type、JS、上传/下载、tabs new/close 和 task 变更；导航/快照/提取/截图仍可用于检查页面。
 - **任务生命周期与标签页锁**：每个 DSH session 是一个 Task；页面操作持有 target 独占 lease，跨任务冲突返回 `E_TAB_LOCKED`/`E_LOCK_TIMEOUT`；支持 `browser_task` 的 status/pause/resume/close。v1.8 起 lease 默认写入 `<stateDir>/locks`，跨 manager 进程通过文件租约/心跳互斥；可选 `isolation: "context"` 为每个任务隔离 cookie/storage（不共享登录态）。
 - **可验证**：193 单测（fake CDP）+ 58 集成场景（真实 headless/headful Chromium）= 251 条，CI 覆盖三平台。

@@ -730,3 +730,36 @@ test("T58 CLI validates remaining command arguments before the browser", async (
   await assert.rejects(exec(["text", "a", "b"]), /at most one selector/);
   await assert.rejects(exec(["js"]), /needs an expression/);
 });
+
+test("T59 auto diagnosis writes a redacted failure bundle", async (t) => {
+  if (needChrome(t)) return;
+  const autoTools = createTools(
+    { tools: { register() {} }, effect() {}, get() { return undefined; } },
+    manager,
+    { maxSnapshotNodes: 250, autoDiagnose: "errors" },
+    (definition) => definition,
+  );
+  const auto = (name, args) => autoTools.find((definition) => definition.name === name).execute(args, { agent: { session: { id: SESSION } } });
+  const nav = await run("browser_navigate", { url: server.url + "/form.html", newTab: true });
+  await auto("browser_act", { action: "fill", selector: "#name", text: "topsecret-value" });
+  let failure = null;
+  try {
+    await auto("browser_act", { action: "click", ref: "e999" });
+  } catch (error) {
+    failure = error;
+  }
+  assert.ok(failure, "stale ref must fail");
+  try {
+    const match = /Diagnosis: (.+)$/m.exec(String(failure.message));
+    assert.ok(match, "failure message includes diagnosis path");
+    const reportPath = match[1].trim();
+    const report = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(report.tool, "browser_act");
+    assert.equal(report.error.code, "E_ELEMENT_NOT_FOUND");
+    assert.match(report.page.url, /form\.html/);
+    assert.ok(report.snapshot === null || report.snapshot.nodes >= 0);
+    assert.ok(!JSON.stringify(report).includes("topsecret-value"), "diagnosis must not echo input values");
+  } finally {
+    await run("browser_tabs", { action: "close", targetId: nav.targetId });
+  }
+});

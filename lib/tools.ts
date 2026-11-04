@@ -11,6 +11,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { HarnessError } from "../src/errors.js";
 import { findByRole, formatSnapshot } from "../src/ax.js";
 import { redactHeadersForOutput, redactTextForOutput, redactUrlForOutput } from "../src/redact.js";
+import { collectAutoDiagnosis } from "./diagnosis.js";
 
 export { redactHeadersForOutput, redactTextForOutput, redactUrlForOutput };
 
@@ -223,7 +224,30 @@ function wrap(handler: any) {
  * @returns {any[]}
  */
 export function createTools(ctx: any, manager: any, config: any = {} as any, defineTool: any) {
-  const tool = (definition: any) => defineTool(definition);
+  const autoDiagnose = config.autoDiagnose === "errors";
+  const diagnosisTools = new Set([
+    "browser_navigate", "browser_wait", "browser_snapshot", "browser_act", "browser_extract",
+    "browser_screenshot", "browser_pdf", "browser_upload", "browser_download",
+  ]);
+  const tool = (definition: any) => {
+    const execute = definition.execute;
+    definition.execute = async (args: any, exec: any) => {
+      try {
+        return await execute(args, exec);
+      } catch (error: any) {
+        if (!autoDiagnose || !diagnosisTools.has(definition.name)) throw error;
+        const sessionId = exec && exec.agent && exec.agent.session ? exec.agent.session.id : undefined;
+        const diagnosis = await collectAutoDiagnosis(manager, sessionId, definition.name, error);
+        if (!diagnosis) throw error;
+        const summary = "tool=" + diagnosis.tool + ", code=" + diagnosis.code + ", screenshot=" + (diagnosis.screenshot ? "yes" : "no");
+        const wrapped = new Error(String(error && error.message ? error.message : error) + "\nDiagnosis: " + diagnosis.path + "\nDiagnosis summary: " + summary);
+        (wrapped as any).code = error && error.code;
+        (wrapped as any).diagnosis = diagnosis;
+        throw wrapped;
+      }
+    };
+    return defineTool(definition);
+  };
   const maxSnapshotNodes = Number(config.maxSnapshotNodes) || 250;
   const readOnly = config.readOnly === true;
   const assertWritable = (what: string) => {
