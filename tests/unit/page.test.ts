@@ -381,3 +381,33 @@ test("snapshot generation reuses the cached AX tree and rejects stale generation
     return true;
   });
 });
+
+test("snapshot generation reuses the AX cache and rejects mismatched filters", async () => {
+  const transport = new FakeTransport();
+  const nodes = Array.from({ length: 450 }, (_, index) => ({ role: { value: "button" }, backendDOMNodeId: 100 + index, name: { value: "button-" + (index + 1) } }));
+  transport.on("Accessibility.getFullAXTree", () => ({ nodes }));
+  transport.on("DOM.getBoxModel", () => quad(1, 1, 10, 10));
+  const page = new Page({ transport, config: { dialogPolicy: "auto-dismiss", focusEmulation: false, stateDir: "/tmp/bh-unit" } }, { sessionId: "s1", targetId: "t1" });
+  const first = await page.snapshot({ maxNodes: 2, offset: 0, role: "button" });
+  assert.equal(transport.count("Accessibility.getFullAXTree"), 1);
+  const second = await page.snapshot({ maxNodes: 50, offset: 400, generation: first.generation, role: "button" });
+  assert.equal(second.generation, first.generation);
+  assert.equal(transport.count("Accessibility.getFullAXTree"), 1, "cached generation must not refetch the AX tree");
+  await assert.rejects(page.snapshot({ generation: first.generation, role: "link" }), (error) => {
+    assert.equal(error.code, "E_STALE_SNAPSHOT");
+    return true;
+  });
+});
+
+test("refs from an earlier generation page remain resolvable after pagination", async () => {
+  const transport = new FakeTransport();
+  const nodes = Array.from({ length: 450 }, (_, index) => ({ role: { value: "button" }, backendDOMNodeId: 100 + index, name: { value: "button-" + (index + 1) } }));
+  transport.on("Accessibility.getFullAXTree", () => ({ nodes }));
+  transport.on("DOM.getBoxModel", () => quad(1, 1, 10, 10));
+  const page = new Page({ transport, config: { dialogPolicy: "auto-dismiss", focusEmulation: false, stateDir: "/tmp/bh-unit" } }, { sessionId: "s1", targetId: "t1" });
+  const first = await page.snapshot({ maxNodes: 2, offset: 0 });
+  await page.snapshot({ maxNodes: 50, offset: 400, generation: first.generation });
+  const box = await page.boxFor({ ref: first.nodes[0].ref });
+  assert.equal(box.width, 10);
+  assert.equal(box.height, 10);
+});

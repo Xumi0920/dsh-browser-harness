@@ -649,3 +649,20 @@ test("browser_act drag routes source/target and steps to the page", async () => 
   assert.equal(value.ok, true);
   assert.deepEqual(seen[0], [{ ref: "e1", selector: undefined }, { ref: undefined, selector: "#drop" }, { steps: 4, mode: "mouse" }]);
 });
+
+test("browser_snapshot passes generation through and returns it", async () => {
+  const seen = [];
+  const manager = fakeManager();
+  manager.pageFor = async () => ({
+    targetId: "T1",
+    info: async () => ({ url: "https://example.com" }),
+    snapshot: async (options) => {
+      seen.push(options);
+      return { nodes: [], total: 0, generation: "7", snapshotVersion: 7 };
+    },
+  });
+  const snapshot = build(manager).find((definition) => definition.name === "browser_snapshot");
+  const value = await snapshot.execute({ generation: "7", offset: 10, limit: 2 }, {});
+  assert.equal(seen[0].generation, "7");
+  assert.equal(value.generation, "7");
+});
