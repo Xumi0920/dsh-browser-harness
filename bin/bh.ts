@@ -10,6 +10,7 @@ import { defaultStateDir } from "../src/state.js";
 import { parseCliArgs } from "./cli/args.js";
 import { commands } from "./cli/commands.js";
 import { commandUsages, findCommand } from "./cli/registry.js";
+import { EXIT_CODES, formatCliError } from "./cli/contract.js";
 
 const [commandName, ...rest] = process.argv.slice(2);
 
@@ -25,7 +26,7 @@ async function main() {
       const selected = findCommand(commands, requested);
       if (!selected) {
         console.error("unknown command: " + requested);
-        process.exitCode = 2;
+        process.exitCode = EXIT_CODES.USAGE;
         return;
       }
       console.log(selected.usage);
@@ -38,7 +39,7 @@ async function main() {
   if (!definition) {
     console.error("unknown command: " + commandName);
     printCommands();
-    process.exitCode = 2;
+    process.exitCode = EXIT_CODES.USAGE;
     return;
   }
 
@@ -67,6 +68,6 @@ async function main() {
 }
 
 main().catch((error: any) => {
-  console.error((error && error.code ? error.code + ": " : "") + (error && error.message ? error.message : error));
-  process.exitCode = 1;
+  console.error(formatCliError(error));
+  process.exitCode = EXIT_CODES.FAILURE;
 });

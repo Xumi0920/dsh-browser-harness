@@ -91,6 +91,7 @@ E_LOCK_TIMEOUT: timed out waiting for tab ...
 
 ## 5. 测试
 
+- 契约常量/错误格式/snapshot JSON 渲染：`tests/unit/cli-contract.test.ts`
 - CLI 参数校验：`tests/unit/cli.test.ts`
 - CLI 退出码与 JSON 结构：integration T65
 - 快照 JSON 分页：T53
