@@ -14,6 +14,7 @@
 | [extending.md](extending.md) | 扩展与语言：原生 JS/TS 插件、热插拔/HMR、MCP 接入 Python 等其它语言 |
 | [v1.10-plan.md](v1.10-plan.md) | v1.10 功能规划：自动诊断、生命周期、macOS E2E、HTML5 drag、快照 generation、MCP preview |
 | [v1.10.0-acceptance.md](v1.10.0-acceptance.md) | v1.10.0 发布验收清单、测试数核对、阻塞项与发布步骤 |
+| [v1.10.0-changelog.md](v1.10.0-changelog.md) | v1.10.0 更新日志（Release notes 来源） |
 | [README.md](README.md) | 本文件：仓库结构与维护约定 |
 
 ## 目录
