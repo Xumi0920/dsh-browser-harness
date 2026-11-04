@@ -11,6 +11,7 @@
 | [usage.md](usage.md) | DSH 工作流、独立库、CLI |
 | [architecture.md](architecture.md) | 分层架构、关键流程、错误模型、安全边界、测试策略 |
 | [extending.md](extending.md) | 扩展与语言：原生 JS/TS 插件、热插拔/HMR、MCP 接入 Python 等其它语言 |
+| [v1.10-plan.md](v1.10-plan.md) | v1.10 功能规划：自动诊断、生命周期、macOS E2E、HTML5 drag、快照 generation、MCP preview |
 | [README.md](README.md) | 本文件：仓库结构与维护约定 |
 
 ## 目录
