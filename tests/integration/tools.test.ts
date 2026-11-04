@@ -832,3 +832,35 @@ test("T63 snapshot generation keeps refs stable across pages", async (t) => {
   await assert.rejects(run("browser_snapshot", { role: "button", generation: first.generation, limit: 2 }), /E_STALE_SNAPSHOT/);
   await run("browser_tabs", { action: "close", targetId: nav.targetId });
 });
+
+test("T65 CLI exit codes, stderr errors and snapshot JSON contract", async (t) => {
+  if (needChrome(t)) return;
+  const stateDir = await tempDir("bh-cli-contract-");
+  const bh = join(ROOT, "dist", "bin", "bh.js");
+  const env = { ...process.env, BH_CDP_URL: chrome.httpUrl, BH_STATE_DIR: stateDir };
+  const exec = (args) => runCli(process.execPath, [bh, ...args], { env, timeout: 30_000 });
+  const help = await exec(["help"]);
+  assert.match(help.stdout, /usage: bh/);
+  await assert.rejects(exec(["unknown-command"]), (error) => {
+    assert.equal(error.code, 2);
+    assert.match(error.stderr, /unknown command/);
+    return true;
+  });
+  await assert.rejects(exec(["navigate"]), (error) => {
+    assert.equal(error.code, 1);
+    assert.match(error.stderr, /^E_|needs a URL/);
+    return true;
+  });
+  await assert.rejects(exec(["snapshot", "--bogus"]), (error) => {
+    assert.equal(error.code, 1);
+    assert.match(error.stderr, /unknown option for snapshot/);
+    return true;
+  });
+  await exec(["navigate", server.url + "/form.html"]);
+  const snapshot = JSON.parse((await exec(["snapshot", "--json"])).stdout);
+  for (const key of ["targetId", "snapshotId", "snapshotVersion", "generation", "url", "nodes", "total", "offset", "limit", "truncated"]) {
+    assert.ok(key in snapshot, "snapshot JSON exposes " + key);
+  }
+  assert.ok(!("text" in snapshot), "snapshot --json omits text");
+  await exec(["close"]);
+});
