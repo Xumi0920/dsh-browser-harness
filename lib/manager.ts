@@ -547,6 +547,63 @@ export class BrowserManager {
     return { connected: true, version, tabs, current, tabGroups, endpoints };
   }
 
+  /**
+   * Close every non-closed task found in this stateDir, respecting each task's
+   * cleanupPolicy. Used on plugin teardown; normal CLI close() must not clean
+   * tasks because the next CLI process reuses their current tab.
+   */
+  async cleanupSessions() {
+    const browser = this.connection;
+    const dir = this.config.stateDir || (browser && browser.config && browser.config.stateDir);
+    if (!browser || !dir) return { cleaned: 0, closedTabs: 0 };
+    const states = await listStates(dir);
+    let cleaned = 0;
+    let closedTabs = 0;
+    for (const entry of states as any[]) {
+      const task = entry.state && entry.state.task;
+      if (!task || task.state === "closed") continue;
+      const lane = task.id || entry.lane;
+      const ownedTabs = Array.isArray(entry.state.ownedTabs) ? entry.state.ownedTabs.map((tab: any) => tab.targetId).filter(Boolean) : [];
+      const contextId = task.browserContextId || this.contexts.get(lane);
+      if (contextId) {
+        await this.#disposeTaskContext(lane, contextId).catch(() => {});
+        closedTabs += ownedTabs.length;
+      } else if (task.cleanupPolicy !== "leave") {
+        for (const targetId of ownedTabs) {
+          let lease: any = null;
+          try {
+            lease = await this.locks.acquire(targetId, lane, { timeoutMs: 500 });
+            await browser.closeTab(targetId, { lane });
+            closedTabs += 1;
+          } catch {
+            /* already gone or held elsewhere */
+          } finally {
+            if (lease) await lease.release().catch(() => {});
+          }
+        }
+      }
+      await this.locks.releaseTask(lane).catch(() => {});
+      this.borrowedTabs.delete(lane);
+      const closedTask = { ...task, state: "closed", updatedAt: new Date().toISOString(), browserContextId: null };
+      await updateState(lane, (currentState: any) => ({
+        ...currentState,
+        current: null,
+        ownedTabs: [],
+        group: null,
+        task: closedTask,
+      }), dir).catch(() => {});
+      cleaned += 1;
+    }
+    return { cleaned, closedTabs };
+  }
+
+  /** Plugin teardown: clean owned tasks first, then close the CDP connection. */
+  async dispose() {
+    const result = await this.cleanupSessions().catch(() => ({ cleaned: 0, closedTabs: 0 }));
+    await this.close();
+    return result;
+  }
+
   async close() {
     const connection = this.connection;
     await this.#disposeAllContexts().catch(() => {});

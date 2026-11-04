@@ -30,6 +30,7 @@ export function resolveConfig(config: any = {}) {
     isolation: config.isolation === "context" ? "context" : "shared",
     readOnly: config.readOnly === true,
     autoDiagnose: config.autoDiagnose === "off" ? "off" : "errors",
+    cleanupOnDispose: config.cleanupOnDispose !== false,
     strictTabOwnership: config.strictTabOwnership !== false,
     allowBorrowUserTabs: config.allowBorrowUserTabs !== false,
     dialogPolicy: config.dialogPolicy || "auto-dismiss",
@@ -60,7 +61,10 @@ export function createApply({ defineTool, managerFactory = (settings: any) => ne
       for (const dispose of disposers) {
         try { dispose(); } catch { /* ignore */ }
       }
-      void manager.close();
+      const teardown = settings.cleanupOnDispose !== false && typeof manager.dispose === "function"
+        ? manager.dispose()
+        : manager.close();
+      void teardown.catch(() => {});
     });
 
     // Best effort: also expose the workflow as a runtime skill.

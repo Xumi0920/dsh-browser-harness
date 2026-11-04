@@ -763,3 +763,23 @@ test("T59 auto diagnosis writes a redacted failure bundle", async (t) => {
     await run("browser_tabs", { action: "close", targetId: nav.targetId });
   }
 });
+
+test("T60 manager dispose closes owned task tabs and marks tasks closed", async (t) => {
+  if (needChrome(t)) return;
+  const cleanupState = await tempDir("bh-dispose-");
+  const disposable = new BrowserManager({ cdpUrl: chrome.httpUrl, stateDir: cleanupState });
+  try {
+    const nav = await disposable.withNavigatedPage("cleanup-lane", server.url + "/a.html", { newTab: true }, async (page) => ({ targetId: page.targetId }));
+    const result = await disposable.dispose();
+    assert.ok(result.cleaned >= 1, "cleaned at least one task");
+    assert.ok(result.closedTabs >= 1, "closed at least one owned tab");
+    const tabs = await run("browser_tabs", { action: "list" });
+    assert.ok(!tabs.tabs.some((tab) => tab.targetId === nav.targetId), "owned tab is gone");
+    const state = JSON.parse(await readFile(join(cleanupState, "state-dsh-cleanup-lane.json"), "utf8"));
+    assert.equal(state.task.state, "closed");
+    assert.deepEqual(state.ownedTabs, []);
+    assert.equal(state.current, null);
+  } finally {
+    await disposable.close().catch(() => {});
+  }
+});
