@@ -123,6 +123,7 @@ test("snapshot subcommand validates pagination and filters", async () => {
     json: true,
   });
   assert.equal(snapshot(["--max-nodes", "10"]).args.limit, 10);
+
   assert.throws(() => snapshot(["extra"]), /no positional/);
   assert.throws(() => snapshot(["--offset", "-1"]), /zero or greater/);
   assert.throws(() => snapshot(["--offset", "100001"]), /at most 100000/);
