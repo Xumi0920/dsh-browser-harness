@@ -5,13 +5,16 @@ import { createApply, resolveConfig } from "../../dist/lib/plugin.js";
 function fakeCtx() {
   const registered = [];
   const effects = [];
+  const handlers = new Map();
   let skill = null;
   return {
     registered,
     effects,
+    handlers,
     get skill() { return skill; },
     tools: { register(definition) { registered.push(definition); return () => {}; } },
     effect(effect) { effects.push(effect); return () => {}; },
+    on(event, handler) { handlers.set(event, handler); return () => handlers.delete(event); },
     get(name) { return name === "skills" ? { register(spec) { skill = spec; return () => {}; } } : undefined; },
   };
 }
@@ -46,4 +49,18 @@ test("resolveConfig defaults tab groups on and keeps explicit overrides", () => 
   assert.equal(resolveConfig({ tabGroups: false }).tabGroups, false);
   assert.equal(resolveConfig({ tabGroupTitle: "任务 {session}" }).tabGroupTitle, "任务 {session}");
   assert.equal(resolveConfig({ maxSnapshotNodes: 42 }).maxSnapshotNodes, 42);
+});
+
+test("createApply cleans browser resources when a session is disposed", async () => {
+  const ctx = fakeCtx();
+  const cleaned = [];
+  const apply = createApply({
+    defineTool: (definition) => definition,
+    managerFactory: () => ({ close: async () => {}, cleanupSession: async (id) => { cleaned.push(id); return { cleaned: 1 }; } }),
+  });
+  apply(ctx, { tabGroups: false });
+  assert.equal(typeof ctx.handlers.get("session/disposed"), "function");
+  ctx.handlers.get("session/disposed")({ id: "session-1" });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(cleaned, ["session-1"]);
 });

@@ -31,6 +31,7 @@ export function resolveConfig(config: any = {}) {
     readOnly: config.readOnly === true,
     autoDiagnose: config.autoDiagnose === "off" ? "off" : "errors",
     cleanupOnDispose: config.cleanupOnDispose !== false,
+    cleanupOnSessionDispose: config.cleanupOnSessionDispose !== false,
     strictTabOwnership: config.strictTabOwnership !== false,
     allowBorrowUserTabs: config.allowBorrowUserTabs !== false,
     dialogPolicy: config.dialogPolicy || "auto-dismiss",
@@ -56,6 +57,19 @@ export function createApply({ defineTool, managerFactory = (settings: any) => ne
     const manager = managerFactory(settings);
     const definitions = createTools(ctx, manager, settings, defineTool);
     const disposers = definitions.map((definition: any) => ctx.tools.register(definition));
+
+    if (settings.cleanupOnSessionDispose !== false && typeof ctx.on === "function") {
+      try {
+        const off = ctx.on("session/disposed", (session: any) => {
+          const id = session && session.id;
+          if (!id || !manager || typeof manager.cleanupSession !== "function") return;
+          void manager.cleanupSession(id).catch(() => {});
+        });
+        if (typeof off === "function") ctx.effect(() => off);
+      } catch {
+        /* host without per-session lifecycle support */
+      }
+    }
 
     ctx.effect(() => () => {
       for (const dispose of disposers) {

@@ -552,6 +552,42 @@ export class BrowserManager {
    * cleanupPolicy. Used on plugin teardown; normal CLI close() must not clean
    * tasks because the next CLI process reuses their current tab.
    */
+  async #cleanupLaneState(lane: any, state: any, browser: any, dir: any) {
+    const task = state && state.task;
+    if (!task || task.state === "closed") return { cleaned: false, closedTabs: 0 };
+    const ownedTabs = Array.isArray(state.ownedTabs) ? state.ownedTabs.map((tab: any) => tab.targetId).filter(Boolean) : [];
+    const contextId = task.browserContextId || this.contexts.get(lane);
+    let closedTabs = 0;
+    if (contextId) {
+      await this.#disposeTaskContext(lane, contextId).catch(() => {});
+      closedTabs = ownedTabs.length;
+    } else if (task.cleanupPolicy !== "leave") {
+      for (const targetId of ownedTabs) {
+        let lease: any = null;
+        try {
+          lease = await this.locks.acquire(targetId, lane, { timeoutMs: 500 });
+          await browser.closeTab(targetId, { lane });
+          closedTabs += 1;
+        } catch {
+          /* already gone or held elsewhere */
+        } finally {
+          if (lease) await lease.release().catch(() => {});
+        }
+      }
+    }
+    await this.locks.releaseTask(lane).catch(() => {});
+    this.borrowedTabs.delete(lane);
+    const closedTask = { ...task, state: "closed", updatedAt: new Date().toISOString(), browserContextId: null };
+    await updateState(lane, (currentState: any) => ({
+      ...currentState,
+      current: null,
+      ownedTabs: [],
+      group: null,
+      task: closedTask,
+    }), dir).catch(() => {});
+    return { cleaned: true, closedTabs };
+  }
+
   async cleanupSessions() {
     const browser = this.connection;
     const dir = this.config.stateDir || (browser && browser.config && browser.config.stateDir);
@@ -560,41 +596,21 @@ export class BrowserManager {
     let cleaned = 0;
     let closedTabs = 0;
     for (const entry of states as any[]) {
-      const task = entry.state && entry.state.task;
-      if (!task || task.state === "closed") continue;
-      const lane = task.id || entry.lane;
-      const ownedTabs = Array.isArray(entry.state.ownedTabs) ? entry.state.ownedTabs.map((tab: any) => tab.targetId).filter(Boolean) : [];
-      const contextId = task.browserContextId || this.contexts.get(lane);
-      if (contextId) {
-        await this.#disposeTaskContext(lane, contextId).catch(() => {});
-        closedTabs += ownedTabs.length;
-      } else if (task.cleanupPolicy !== "leave") {
-        for (const targetId of ownedTabs) {
-          let lease: any = null;
-          try {
-            lease = await this.locks.acquire(targetId, lane, { timeoutMs: 500 });
-            await browser.closeTab(targetId, { lane });
-            closedTabs += 1;
-          } catch {
-            /* already gone or held elsewhere */
-          } finally {
-            if (lease) await lease.release().catch(() => {});
-          }
-        }
-      }
-      await this.locks.releaseTask(lane).catch(() => {});
-      this.borrowedTabs.delete(lane);
-      const closedTask = { ...task, state: "closed", updatedAt: new Date().toISOString(), browserContextId: null };
-      await updateState(lane, (currentState: any) => ({
-        ...currentState,
-        current: null,
-        ownedTabs: [],
-        group: null,
-        task: closedTask,
-      }), dir).catch(() => {});
-      cleaned += 1;
+      const result = await this.#cleanupLaneState(entry.lane, entry.state, browser, dir);
+      if (result.cleaned) cleaned += 1;
+      closedTabs += result.closedTabs;
     }
     return { cleaned, closedTabs };
+  }
+
+  /** Clean one DSH session's browser task when its runtime is disposed. */
+  async cleanupSession(sessionId: any) {
+    const browser = this.connection;
+    const dir = this.config.stateDir || (browser && browser.config && browser.config.stateDir);
+    if (!browser || !dir) return { cleaned: 0 };
+    const lane = this.laneFor(sessionId);
+    const state = await readState(lane, dir);
+    return this.#cleanupLaneState(lane, state, browser, dir);
   }
 
   /** Plugin teardown: clean owned tasks first, then close the CDP connection. */

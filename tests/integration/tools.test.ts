@@ -783,3 +783,26 @@ test("T60 manager dispose closes owned task tabs and marks tasks closed", async 
     await disposable.close().catch(() => {});
   }
 });
+
+test("T61 per-session cleanup closes only the disposed session's owned tab", async (t) => {
+  if (needChrome(t)) return;
+  const sessionState = await tempDir("bh-session-dispose-");
+  const m = new BrowserManager({ cdpUrl: chrome.httpUrl, stateDir: sessionState });
+  try {
+    const a = await m.withNavigatedPage("s1", server.url + "/a.html", { newTab: true }, async (page) => ({ targetId: page.targetId }));
+    const b = await m.withNavigatedPage("s2", server.url + "/b.html", { newTab: true }, async (page) => ({ targetId: page.targetId }));
+    const result = await m.cleanupSession("s1");
+    assert.equal(result.cleaned, true);
+    assert.ok(result.closedTabs >= 1);
+    const tabs = await run("browser_tabs", { action: "list" });
+    assert.ok(!tabs.tabs.some((tab) => tab.targetId === a.targetId), "disposed session tab is gone");
+    assert.ok(tabs.tabs.some((tab) => tab.targetId === b.targetId), "other session tab survives");
+    const s1 = JSON.parse(await readFile(join(sessionState, "state-dsh-s1.json"), "utf8"));
+    assert.equal(s1.task.state, "closed");
+    const s2 = JSON.parse(await readFile(join(sessionState, "state-dsh-s2.json"), "utf8"));
+    assert.equal(s2.task.state, "active");
+  } finally {
+    await m.cleanupSessions().catch(() => {});
+    await m.close().catch(() => {});
+  }
+});

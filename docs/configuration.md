@@ -118,6 +118,7 @@ open -na "Google Chrome" --args --remote-debugging-port=9331 "--user-data-dir=$H
 | `fileLeaseStaleMs` | `30000` | 心跳超过该时间视为 stale，可回收 |
 | `isolation` | `shared` | `shared` 共享登录态；`context` 每 Task 独立 browser context（L2） |
 | `readOnly` | `false` | 工具层只读：阻止 page mutation、JS、上传下载、tabs new/close、task 变更 |
+| `cleanupOnSessionDispose` | `true` | 监听 DSH `session/disposed`，关闭该 session 的 owned tabs、释放锁和 context；保留 state/diagnostics 历史 |
 | `cleanupOnDispose` | `true` | 插件卸载时关闭 owned tabs、释放租约、dispose L2 context，并写 closed tombstone；用户 tab 保留 |
 | `autoDiagnose` | `errors` | 页面工具失败时写入诊断包到 `<stateDir>/diagnostics/<lane>/`；`off` 关闭。包内含截图、console/network 尾部、task/lock/context 摘要，不记录输入值 |
 | `strictTabOwnership` | `true`（插件默认） | 非自建 tab 必须 borrow，其他 Task 自建 tab 返回 `E_TAB_OWNER_CONFLICT` |
