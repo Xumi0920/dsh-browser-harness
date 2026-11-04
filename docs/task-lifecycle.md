@@ -291,7 +291,7 @@ v1.8.0 Phase B 实现：
 
 - 严格 `borrow:true` 与 `E_TAB_OWNER_CONFLICT` / `E_TAB_BORROW_REQUIRED`；
 - 借用 tab 记录、其他 Task 借用冲突、close 不关闭用户 tab；
-- T58 集成测试覆盖 strict manager；
+- T61 集成测试覆盖 strict manager；
 - Plugin 默认 `strictTabOwnership: true`，可通过配置关闭。
 
 尚未实现（保留为 Phase C）：
